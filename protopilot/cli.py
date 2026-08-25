@@ -16,7 +16,8 @@ import click
 
 from protopilot import __version__, build as builder
 from protopilot.baseline import standard_screens
-from protopilot.llm import LLMError, build_llm
+from protopilot.llm import ClaudeCodeLLM, ClaudeLLM, LLMError, build_llm
+from protopilot import registry
 from protopilot.passes import PassContext, intake
 from protopilot.render import render_skeleton
 from protopilot.runner import SubprocessRunner, docker_available
@@ -78,9 +79,16 @@ def main() -> None:
 @click.option("--port", type=int, default=None, help="Host port (default: first free from 8080).")
 @click.option("--attempts", type=int, default=3, show_default=True, help="Repair attempts before handing back a RUNBOOK.")
 @click.option("--offline", is_flag=True, help="Deterministic baseline generator; no API calls.")
+@click.option(
+    "--backend",
+    type=click.Choice(["api", "claude-code", "offline"]),
+    default=None,
+    help="api bills API credit; claude-code bills a Claude subscription.",
+)
 @click.option("--no-verify", is_flag=True, help="Generate but do not boot or test.")
 @click.option("--no-git", is_flag=True, help="Do not git init the generated tree.")
 @click.option("--yes", "-y", is_flag=True, help="Skip the spec review checkpoint.")
+@click.option("--demo", is_flag=True, help="Hide test files from the output.")
 def new(
     idea: str,
     directory: str | None,
@@ -88,12 +96,14 @@ def new(
     port: int | None,
     attempts: int,
     offline: bool,
+    backend: str | None,
     no_verify: bool,
     no_git: bool,
     yes: bool,
+    demo: bool,
 ) -> None:
     """Generate a new prototype from IDEA."""
-    llm = build_llm(offline=offline)
+    llm = build_llm(offline=offline, backend=backend)
 
     if not no_verify:
         ok, why = docker_available(SubprocessRunner())
@@ -145,9 +155,13 @@ def new(
 
     ctx = PassContext(project_dir=target, change=direction)
     try:
-        builder.generate(spec, ctx, llm, log=_echo)
+        builder.generate(spec, ctx, llm, log=_echo, hide_tests=demo)
     except LLMError as exc:
         raise click.ClickException(str(exc)) from exc
+
+    registry.record(
+        slug=spec.slug, name=spec.name, path=target, port=spec.port, idea=idea
+    )
 
     if not no_git:
         _git_init(target)
@@ -164,6 +178,12 @@ def new(
 @click.option("--dir", "directory", default=None, help="Project directory (default: cwd).")
 @click.option("--attempts", type=int, default=3, show_default=True)
 @click.option("--offline", is_flag=True)
+@click.option(
+    "--backend",
+    type=click.Choice(["api", "claude-code", "offline"]),
+    default=None,
+    help="api bills API credit; claude-code bills a Claude subscription.",
+)
 @click.option("--no-verify", is_flag=True)
 @click.option("--yes", "-y", is_flag=True)
 def add(
@@ -171,17 +191,23 @@ def add(
     directory: str | None,
     attempts: int,
     offline: bool,
+    backend: str | None,
     no_verify: bool,
     yes: bool,
 ) -> None:
     """Apply CHANGE to an existing prototype and re-verify it."""
     target = _project(directory)
     spec = Spec.load(target)
-    llm = build_llm(offline=offline)
+    llm = build_llm(offline=offline, backend=backend)
     if llm.offline:
         raise click.ClickException(
             "`add` needs the model: the baseline generator cannot read a change request."
         )
+
+    # A change request can add or retype a column, and there are no
+    # migrations -- so the old volume is dropped rather than silently kept and
+    # left disagreeing with the models it is about to be read through.
+    _compose(target, "down", "-v")
 
     _echo("amending spec...")
     system, user = intake.build_amend(spec, change)
@@ -277,9 +303,127 @@ def up(directory: str | None) -> None:
 
 @main.command()
 @click.option("--dir", "directory", default=None)
-def down(directory: str | None) -> None:
-    """Stop the app and drop its data."""
-    sys.exit(_compose(_project(directory), "down", "-v"))
+@click.option("--purge", is_flag=True, help="Also delete saved data (the database volume).")
+def down(directory: str | None, purge: bool) -> None:
+    """Stop the app. Saved data survives unless --purge."""
+    target = _project(directory)
+    args = ["down", "-v"] if purge else ["down"]
+    code = _compose(target, *args)
+    if code == 0:
+        _echo("stopped; data kept (`proto down --purge` to drop it)" if not purge
+              else "stopped; data dropped")
+    sys.exit(code)
+
+
+@main.command()
+@click.option("--dir", "directory", default=None)
+@click.option("--yes", "-y", is_flag=True)
+def reset(directory: str | None, yes: bool) -> None:
+    """Drop saved data and start clean.
+
+    There are no migrations here, so a schema change against an old volume is
+    a stale database rather than an error. This is the escape hatch.
+    """
+    target = _project(directory)
+    if not yes and not click.confirm(f"Delete all saved data in {target.name}?", default=False):
+        raise click.Abort()
+    _compose(target, "down", "-v")
+    code = _compose(target, "up", "-d", "--build")
+    if code == 0:
+        _echo(f"clean; http://localhost:{Spec.load(target).port}")
+    sys.exit(code)
+
+
+@main.command()
+@click.option("--port", type=int, default=7000, show_default=True)
+@click.option("--workspace", default=None, help="Where prototypes are generated (default: ./prototypes).")
+@click.option("--backend", type=click.Choice(["api", "claude-code", "offline"]), default=None)
+@click.option("--demo/--no-demo", default=True, show_default=True,
+              help="Hide test files in the UI (they are still generated and run).")
+def serve(port: int, workspace: str | None, backend: str | None, demo: bool) -> None:
+    """Run the web front end."""
+    try:
+        import uvicorn
+    except ImportError as exc:  # pragma: no cover - dependency guard
+        raise click.ClickException('the front end needs extras: pip install -e ".[web]"') from exc
+
+    if backend in ("claude-code", "subscription"):
+        # Fail here rather than three passes into a generation.
+        from protopilot.llm import ClaudeCodeLLM
+
+        try:
+            ClaudeCodeLLM().check()
+        except LLMError as exc:
+            raise click.ClickException(
+                f"{exc}\n     set PROTOPILOT_CLAUDE_BIN to a working `claude` binary"
+            ) from exc
+
+    from protopilot.web.app import create_app
+
+    root = Path(workspace).resolve() if workspace else Path.cwd() / "prototypes"
+    _echo(f"workspace: {root}")
+    _echo(f"http://localhost:{port}" + ("  (demo mode: tests hidden)" if demo else ""))
+    uvicorn.run(create_app(root, backend=backend, demo=demo), host="127.0.0.1", port=port,
+                log_level="warning")
+
+
+@main.command(name="ls")
+def list_projects() -> None:
+    """List every prototype generated on this machine."""
+    entries = registry.prune()
+    if not entries:
+        _echo("no prototypes yet -- `proto new \"an idea\"`")
+        return
+    width = max(len(e.slug) for e in entries)
+    for entry in entries:
+        _echo(f"  {entry.slug:<{width}}  :{entry.port}  {entry.path}")
+    _echo(f"\n  {len(entries)} prototype(s)")
+
+
+@main.command(name="rm")
+@click.option("--dir", "directory", default=None)
+@click.option("--yes", "-y", is_flag=True)
+def remove_project(directory: str | None, yes: bool) -> None:
+    """Delete this prototype: containers, data and the tree."""
+    target = _project(directory)
+    spec = Spec.load(target)
+    if not yes and not click.confirm(
+        f"Delete {spec.name} and everything in {target}?", default=False
+    ):
+        raise click.Abort()
+    try:
+        registry.delete(target)
+    except registry.NotAProject as exc:
+        raise click.ClickException(str(exc)) from exc
+    _echo(f"deleted {target}")
+
+
+@main.command(name="export")
+@click.option("--dir", "directory", default=None)
+@click.option("--to", "destination", default=None, help="Output path (default: ./<slug>.zip).")
+@click.option("--with-tests/--without-tests", default=True, help="Include the test suite.")
+def export_project(directory: str | None, destination: str | None, with_tests: bool) -> None:
+    """Package this prototype as a zip you can hand to someone."""
+    import zipfile
+
+    target = _project(directory)
+    spec = Spec.load(target)
+    out = Path(destination) if destination else Path.cwd() / f"{spec.slug}.zip"
+    skipped = 0
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
+        for path in sorted(target.rglob("*")):
+            if not path.is_file():
+                continue
+            rel = path.relative_to(target)
+            parts = set(rel.parts)
+            if parts & {"__pycache__", ".pytest_cache", ".git"}:
+                continue
+            if not with_tests and rel.parts and rel.parts[0] == "tests":
+                skipped += 1
+                continue
+            zf.write(path, Path(spec.slug) / rel)
+    note = f" ({skipped} test file(s) omitted)" if skipped else ""
+    _echo(f"{out}{note}")
 
 
 @main.command()
@@ -313,14 +457,24 @@ def doctor() -> None:
         _echo("FAIL anthropic sdk: not installed (`pip install anthropic`)")
         ok = False
 
-    try:
-        from protopilot.llm import ClaudeLLM
-
-        llm = ClaudeLLM()
-        _echo(f"ok   credentials: resolved (model {llm.model}, effort {llm.effort})")
-    except Exception as exc:  # noqa: BLE001
-        _echo(f"FAIL credentials: {exc}")
-        _echo("     set ANTHROPIC_API_KEY, or run `ant auth login`")
+    # Either backend is a complete answer, so this is not two failures -- it
+    # is one question ("can this machine reach Claude at all") asked twice.
+    reached = False
+    for label, factory, hint in (
+        ("api credit", ClaudeLLM, "set ANTHROPIC_API_KEY, or run `ant auth login` and buy credit"),
+        ("subscription", ClaudeCodeLLM, "install the `claude` CLI and log in with your plan"),
+    ):
+        try:
+            llm = factory()
+            llm.check()
+            _echo(f"ok   {label}: reachable (model {llm.model}, effort {llm.effort})")
+            reached = True
+        except Exception as exc:  # noqa: BLE001
+            detail = str(exc).splitlines()[0] if str(exc) else type(exc).__name__
+            _echo(f"--   {label}: {detail}")
+            _echo(f"     {hint}")
+    if not reached:
+        _echo("FAIL no backend: neither API credit nor a subscription is usable here")
         ok = False
 
     port = None
