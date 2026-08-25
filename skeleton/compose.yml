@@ -14,10 +14,13 @@ services:
       interval: 2s
       timeout: 3s
       retries: 30
-    tmpfs:
-      # Prototype data is disposable by design -- no volume, no stale schema
-      # surviving a model change, no `docker volume rm` in the repair loop.
-      - /var/lib/postgresql/data
+    volumes:
+      # Named, so what you save survives `proto down` and a restart. The cost
+      # is real: there are no migrations, so a regenerated model against an
+      # existing volume leaves a stale schema `create_all()` will not fix.
+      # `proto down --purge` and `proto reset` drop it, and `proto add`
+      # (which can change the schema) drops it automatically.
+      - pgdata:/var/lib/postgresql/data
 
   app:
     build: .
@@ -35,3 +38,6 @@ services:
       # it up without a rebuild.
       - ./app:/srv/app
       - ./tests:/srv/tests
+
+volumes:
+  pgdata:
