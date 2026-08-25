@@ -40,14 +40,35 @@ class Outcome:
     repairs: list[str] = field(default_factory=list)
 
 
-def generate(spec: Spec, ctx: PassContext, llm: LLM, log: Log = print) -> list[PassResult]:
+def generate(
+    spec: Spec,
+    ctx: PassContext,
+    llm: LLM,
+    log: Log = print,
+    hide_tests: bool = False,
+) -> list[PassResult]:
+    """Run the five passes in order.
+
+    `hide_tests` is presentation only. The smoke pass still runs, still runs
+    second, and the routes pass is still handed its output as the target --
+    hiding the suite from a demo audience must not change what gets built, or
+    the thing being demoed is not the thing that ships.
+    """
     results = []
     for module in CODE_PASSES:
         log(f"  pass {module.NAME}...")
         result = run_pass(module, spec, ctx, llm)
-        log(f"    {len(result.files)} file(s): {', '.join(str(f) for f in result.files)}")
+        shown = [f for f in result.files if not (hide_tests and is_test_path(f))]
+        if shown:
+            log(f"    {len(shown)} file(s): {', '.join(str(f) for f in shown)}")
         results.append(result)
     return results
+
+
+def is_test_path(path) -> bool:
+    """A generated test file, by either of the two ways it can look."""
+    p = Path(str(path))
+    return "tests" in p.parts or p.name.startswith("test_")
 
 
 def _test_count(project_dir: Path) -> int:
