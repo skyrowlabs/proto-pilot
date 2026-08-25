@@ -34,6 +34,23 @@ Modules you import from, which already exist:
                    value directly.
 - `app.models`  -> the generated model classes.
 
+Third-party packages available to import, beyond the framework itself:
+
+- `PIL` (Pillow 12) -> `Image`, `ImageFilter`, `ImageEnhance`, `ImageOps`.
+  Available for apps that transform images. Nothing else is installed, and
+  you cannot add a dependency: `requirements.txt` is skeleton and a pass that
+  needs a package which is not listed here has no way to get one.
+
+## Binary content (images, uploads)
+
+If the spec involves uploaded files, store the bytes in Postgres on a
+`mapped_column(LargeBinary)` alongside their media type, and serve them from
+a route returning `fastapi.Response(content=..., media_type=...)`. Do not
+write to the filesystem: `app/` is a mounted volume holding generated source,
+and anything written there pollutes the project tree rather than the
+database. Accept uploads with `file: UploadFile = File(...)` and read them
+with `await file.read()`, which means the route must be `async def`.
+
 `app/main.py` creates the app, mounts `/static`, includes `router` from
 `app.routes`, runs `Base.metadata.create_all()` and then `seed(db)` on
 startup, and serves `/healthz`. You do not write any of it.
