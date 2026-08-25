@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Turn an idea into a running app</h1>
+<p class="muted small">Generates a FastAPI + Postgres prototype, boots it in Docker, and verifies it before handing back a URL.</p>
+
+{% if not docker_ok %}<div class="card" style="border-color:var(--bad)"><strong>Docker unavailable</strong><div class="small muted">{{ docker_why }}</div></div>{% endif %}
+
+<div class="card">
+  <form method="post" action="/clarify">
+    <label for="idea">Idea</label>
+    <input type="text" id="idea" name="idea" required placeholder="take a photo and turn it into a painted version of itself">
+    <label for="direction">Direction <span class="muted">(optional)</span></label>
+    <textarea id="direction" name="direction" placeholder="load a photo, adjust a few simple controls, save to a small library"></textarea>
+    <div class="row" style="margin-top:13px"><button class="primary" type="submit">Next</button>
+      <span class="muted small">a couple of questions first, then a few minutes</span></div>
+  </form>
+</div>
+
+<h2>Saved prototypes</h2>
+{% if projects %}
+<table><tr><th>Name</th><th>Port</th><th>Created</th><th></th></tr>
+{% for p in projects %}
+<tr><td><a href="/projects/{{ p.slug }}">{{ p.name }}</a><div class="muted small">{{ p.idea[:70] }}</div></td>
+<td class="small">:{{ p.port }}</td><td class="muted small">{{ p.created_at[:16].replace("T"," ") }}</td>
+<td class="row" style="gap:6px"><a class="btn small" href="http://localhost:{{ p.port }}" target="_blank" rel="noopener">open</a>
+<form method="post" action="/projects/{{ p.slug }}/delete"
+      onsubmit="return confirm('Delete {{ p.name }} and everything in {{ p.path }}?\n\nThis cannot be undone.')">
+  <button type="submit" class="small" style="border-color:var(--bad);color:var(--bad)">delete</button></form></td></tr>
+{% endfor %}</table>
+{% else %}<div class="empty">Nothing generated yet.</div>{% endif %}
+
+{% if jobs %}
+<h2>Runs</h2>
+<table><tr><th>Idea</th><th>Status</th><th>Started</th></tr>
+{% for j in jobs %}
+<tr><td><a href="/jobs/{{ j.id }}">{{ j.idea[:60] }}</a></td>
+<td><span class="pill {{ 'run' if j.status=='running' else ('done' if j.status=='done' else ('fail' if j.status=='failed' else '')) }}">{{ j.status }}</span></td>
+<td class="muted small">{{ j.started_at[11:19] }}</td></tr>
+{% endfor %}</table>
+{% endif %}
+{% endblock %}
