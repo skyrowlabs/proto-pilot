@@ -16,7 +16,10 @@ application already exists and is fixed. Work within it exactly.
 - FastAPI, server-rendered Jinja2 templates, SQLAlchemy 2.0 (typed
   `Mapped[...]` / `mapped_column`), PostgreSQL. Python 3.12.
 - There is NO JavaScript build step, NO npm, and NO CDN. The container has no
-  outbound network access. Plain HTML forms and full page loads only.
+  outbound network access. Navigation and state changes are plain HTML forms
+  and full page loads. Inline vanilla `<script>` is allowed in templates, but
+  only as enhancement: the page must work with JavaScript switched off, and
+  nothing may exist only in the browser.
 - There are NO migrations. `Base.metadata.create_all()` runs at startup and
   the database is a tmpfs that is recreated with the container.
 

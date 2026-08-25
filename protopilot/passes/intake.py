@@ -74,9 +74,13 @@ and two people taking turns at one browser works fine.
 So do NOT write a limit saying the pieces or the artwork will be emoji. They
 will be drawn. Photographs and 3D models are still out; drawing is not.
 
-Not buildable, at all: drag-and-drop, animation, 3D or isometric rendering,
-live multiplayer between two devices, sound, video, a camera feed, infinite
-scroll, or anything that needs a JavaScript library.
+Buildable with care: small touches of inline vanilla JavaScript, and a
+`<canvas>` where a picture genuinely has to be computed pixel by pixel. Both
+only ever enhance a page that already works without them.
+
+Not buildable, at all: anything that needs a JavaScript library or a package
+from npm, live multiplayer between two devices, sound, video, a camera feed,
+or 3D and isometric rendering.
 
 When the idea asks for something in that second list, do NOT quietly specify
 something smaller and say nothing about it. Specify the closest honest thing

@@ -61,9 +61,13 @@ class Verifier:
         sleep: Callable[[float], None] = time.sleep,
         health_timeout: float = 180.0,
         build_timeout: float = 900.0,
+        screens: list[str] | None = None,
     ) -> None:
         self.project_dir = Path(project_dir)
         self.port = port
+        # Concrete paths, not spec patterns: "/games/{row_id}" cannot be
+        # fetched. The caller substitutes a real row id or drops it.
+        self.screens = screens or []
         self.runner = runner
         self.getter = getter
         self.sleep = sleep
@@ -135,7 +139,33 @@ class Verifier:
                 False, "tests", "the smoke tests failed", tests.describe(), self.logs()
             )
 
+        # Last, because it is the only stage that can see the browser. The
+        # suite above runs through an in-process TestClient and never executes
+        # a script tag, so up to this point a page that throws on load or
+        # paints nothing is indistinguishable from one that works.
+        page_result = self.check_pages()
+        if page_result is not None and not page_result.ok:
+            return VerifyResult(
+                False, "browser", "a screen failed in the browser",
+                page_result.report(), self.logs(),
+            )
+
         return VerifyResult(
             True, "tests", f"green -- app is up on http://localhost:{self.port}",
             tests.output,
         )
+
+    def check_pages(self):
+        """Load every screen in a real browser. None when not configured.
+
+        Returning None rather than a pass keeps the distinction honest: a
+        machine without the browser has not verified the browser, and the
+        caller says so rather than reporting a green it did not earn.
+        """
+        if not self.screens:
+            return None
+        from protopilot import browser
+
+        if browser.available():
+            return None
+        return browser.check(f"http://localhost:{self.port}", self.screens)

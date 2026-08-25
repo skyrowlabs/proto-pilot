@@ -22,7 +22,7 @@ from protopilot.llm import build_llm
 from protopilot.passes import PassContext, clarify, intake
 from protopilot.render import render_skeleton
 from protopilot.runner import SubprocessRunner, docker_available
-from protopilot.spec import Screen, Spec
+from protopilot.spec import Screen, Spec, checkable_paths
 from protopilot.baseline import standard_screens
 from protopilot.verify import Verifier
 
@@ -80,7 +80,8 @@ def run_generation(
 
     log("verify...")
     make_verifier = verifier_factory or (
-        lambda: Verifier(target, spec.port, SubprocessRunner())
+        lambda: Verifier(target, spec.port, SubprocessRunner(),
+                         screens=checkable_paths(spec))
     )
     outcome = builder.drive_to_green(
         spec, ctx, llm, make_verifier(), attempts=attempts, log=log
@@ -142,7 +143,8 @@ def run_amend(job, project_dir: Path, change: str, backend: str | None = None,
 
     log("verify...")
     make_verifier = verifier_factory or (
-        lambda: Verifier(target, updated.port, SubprocessRunner())
+        lambda: Verifier(target, updated.port, SubprocessRunner(),
+                         screens=checkable_paths(updated))
     )
     outcome = builder.drive_to_green(
         updated, ctx, llm, make_verifier(), attempts=attempts, log=log

@@ -51,7 +51,7 @@ Shape:
   list with a count.
 
 Use the stylesheet's existing classes for chrome and layout. Do not write
-CSS, do not add `<style>`, do not add JavaScript.
+CSS and do not add `<style>`.
 
 ## Drawing
 
@@ -83,6 +83,31 @@ serves it from a route; the template just points an `<img>` at that route.
 
 Emoji are still fine as small accents and labels. They are not fine as the
 artwork when the screen is asking to be looked at.
+
+## JavaScript, and when a canvas is worth it
+
+Inline `<script>` is allowed. There is still no npm, no CDN and no build step,
+and the container has no outbound network, so it is vanilla JavaScript written
+into the template and nothing else.
+
+The rule that matters: **the page must work with JavaScript switched off.**
+Every action is still a form submit or a link, and the server still renders
+the truth. Script may sharpen a working page -- highlight the squares a picked
+piece can reach, preview a colour before submitting, sort a table in place --
+but nothing may exist only in the browser. State lives in Postgres, reached
+by forms, exactly as before.
+
+`<canvas>` is the exception where a drawing genuinely has to be computed per
+frame or per pixel rather than described as shapes -- a plotted curve over
+thousands of points, a generated texture. Prefer SVG whenever the picture can
+be expressed as shapes, because SVG needs no script, scales, and survives with
+JavaScript off. If you do use a canvas, draw on it during page load, never
+leave it blank waiting for an interaction, and render the same information as
+text or SVG underneath it so the page still says something without script.
+
+Anything you write is loaded in a real browser during verification, and an
+uncaught error or a canvas that was never drawn on fails the run. Script that
+cannot be seen to work is worse than no script.
 """
 
 

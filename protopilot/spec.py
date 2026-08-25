@@ -176,6 +176,25 @@ class Spec(BaseModel):
         return "\n".join(lines)
 
 
+def checkable_paths(spec: "Spec") -> list[str]:
+    """Screen paths a browser can actually fetch.
+
+    Detail screens carry `{row_id}`, and the seed pass guarantees rows exist,
+    so `1` is a safe substitution. Anything with a placeholder we cannot fill
+    is dropped rather than guessed at -- a 404 from a made-up URL would be
+    reported as a broken screen, which is worse than not checking it.
+    """
+    paths = []
+    for screen in spec.screens:
+        path = screen.path
+        if "{row_id}" in path:
+            path = path.replace("{row_id}", "1")
+        if "{" in path:
+            continue
+        paths.append(path)
+    return paths
+
+
 def _snake(pascal: str) -> str:
     return re.sub(r"(?<!^)(?=[A-Z])", "_", pascal).lower()
 

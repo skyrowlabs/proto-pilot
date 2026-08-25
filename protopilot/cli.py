@@ -21,7 +21,7 @@ from protopilot import registry
 from protopilot.passes import PassContext, intake
 from protopilot.render import render_skeleton
 from protopilot.runner import SubprocessRunner, docker_available
-from protopilot.spec import SPEC_DIR, SPEC_FILENAME, Screen, Spec
+from protopilot.spec import SPEC_DIR, SPEC_FILENAME, Screen, Spec, checkable_paths
 from protopilot.verify import Verifier
 
 PORT_RANGE = range(8080, 8180)
@@ -59,7 +59,9 @@ def _project(directory: str | None) -> Path:
 
 
 def _verifier(project_dir: Path, spec: Spec) -> Verifier:
-    return Verifier(project_dir, spec.port, SubprocessRunner())
+    return Verifier(
+        project_dir, spec.port, SubprocessRunner(), screens=checkable_paths(spec)
+    )
 
 
 def _compose(project_dir: Path, *args: str) -> int:
@@ -478,6 +480,15 @@ def doctor() -> None:
     if not reached:
         _echo("FAIL no backend: neither API credit nor a subscription is usable here")
         ok = False
+
+    from protopilot import browser as browser_check
+
+    why = browser_check.available()
+    if why:
+        _echo(f"--   browser: {why}")
+        _echo("     screens will not be checked in a browser; canvas and script go unverified")
+    else:
+        _echo(f"ok   browser: {browser_check._executable() or 'playwright bundled chromium'}")
 
     port = None
     try:
