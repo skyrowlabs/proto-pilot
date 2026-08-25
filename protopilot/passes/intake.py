@@ -66,10 +66,13 @@ full page loads. There is NO JavaScript, NO canvas, NO WebGL, NO npm, NO CDN,
 and no realtime connection of any kind.
 
 Buildable, and often better than it sounds: a grid of squares where each
-square is a form button, a page that re-renders after every submit, emoji or
-text glyphs as artwork, colour and layout via the existing stylesheet. That
-is how you build a board game here, and two people taking turns at one
-browser works fine.
+square is a form button, a page that re-renders after every submit, and real
+artwork drawn as inline SVG -- vector shapes, hand-drawn by the UI pass, not
+emoji standing in for illustrations. That is how you build a board game here,
+and two people taking turns at one browser works fine.
+
+So do NOT write a limit saying the pieces or the artwork will be emoji. They
+will be drawn. Photographs and 3D models are still out; drawing is not.
 
 Not buildable, at all: drag-and-drop, animation, 3D or isometric rendering,
 live multiplayer between two devices, sound, video, a camera feed, infinite
