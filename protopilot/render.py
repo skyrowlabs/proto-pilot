@@ -7,6 +7,7 @@ thing you are templating is a bug waiting for the first `{{ app_name }}`.
 
 from __future__ import annotations
 
+import hashlib
 import re
 import shutil
 from pathlib import Path
@@ -23,12 +24,28 @@ SKIP_DIRS = {"__pycache__", ".pytest_cache", ".git"}
 SKELETON_DIR = Path(__file__).resolve().parent.parent / "skeleton"
 
 
-def substitutions(spec: Spec) -> dict[str, str]:
+def project_name(spec: Spec, target: Path | None = None) -> str:
+    """The Docker Compose project name: unique per directory, not per slug.
+
+    The slug alone is not unique. Generating the same idea twice -- which is
+    what iterating on one looks like -- produced two trees with one compose
+    project between them, and the second `up` silently adopted the first's
+    containers and took its app down. The suffix is the target path, so two
+    trees never collide and the same tree is stable across runs.
+    """
+    if target is None:
+        return spec.slug
+    digest = hashlib.sha256(str(Path(target).resolve()).encode()).hexdigest()[:6]
+    return f"{spec.slug}_{digest}"
+
+
+def substitutions(spec: Spec, target: Path | None = None) -> dict[str, str]:
     return {
         "APP_NAME": spec.name,
         "APP_SLUG": spec.slug,
         "APP_PURPOSE": spec.purpose,
         "PORT": str(spec.port),
+        "PROJECT": project_name(spec, target),
     }
 
 
@@ -49,7 +66,7 @@ def render_skeleton(spec: Spec, target: Path, skeleton: Path | None = None) -> l
     skeleton = skeleton or SKELETON_DIR
     if not skeleton.is_dir():
         raise FileNotFoundError(f"skeleton not found at {skeleton}")
-    values = substitutions(spec)
+    values = substitutions(spec, target)
     target.mkdir(parents=True, exist_ok=True)
 
     written: list[Path] = []

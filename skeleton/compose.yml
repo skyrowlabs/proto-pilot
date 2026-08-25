@@ -1,4 +1,7 @@
-name: @@APP_SLUG@@
+# Unique per directory: two trees generated from the same idea must not
+# share one compose project, or the second `up` adopts the first's
+# containers and takes the first app down.
+name: @@PROJECT@@
 
 services:
   db:
