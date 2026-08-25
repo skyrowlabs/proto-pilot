@@ -31,6 +31,15 @@ SMOKE_PATH = "tests/test_smoke.py"
 Log = Callable[[str], None]
 
 
+class PassFailed(RuntimeError):
+    """A pass did not return. Carries which one, so the CLI can name it."""
+
+    def __init__(self, pass_name: str, reason: str) -> None:
+        super().__init__(f"pass {pass_name!r} failed: {reason}")
+        self.pass_name = pass_name
+        self.reason = reason
+
+
 @dataclass
 class Outcome:
     ok: bool
@@ -57,7 +66,15 @@ def generate(
     results = []
     for module in CODE_PASSES:
         log(f"  pass {module.NAME}...")
-        result = run_pass(module, spec, ctx, llm)
+        try:
+            result = run_pass(module, spec, ctx, llm)
+        except Exception as exc:
+            # Name the pass and leave a runbook before re-raising, so the
+            # caller reports a stage rather than a stack trace.
+            write_generation_runbook(
+                ctx.project_dir, module.NAME, str(exc), [r.name for r in results]
+            )
+            raise PassFailed(module.NAME, str(exc)) from exc
         shown = [f for f in result.files if not (hide_tests and is_test_path(f))]
         if shown:
             log(f"    {len(shown)} file(s): {', '.join(str(f) for f in shown)}")
@@ -184,6 +201,62 @@ only if you are done generating:
 The rest of the tree is the fixed proto-pilot skeleton and is very unlikely to be
 the problem.
 """
+
+
+GENERATION_RUNBOOK = """\
+# Runbook
+
+proto-pilot did not finish generating this prototype. The tree is handed over
+part-built rather than deleted, because a half-generated tree whose shape you
+know beats a directory that vanished.
+
+## Where it stops
+
+Pass: **{pass_name}**
+
+{reason}
+
+## What exists
+
+Passes that completed before it:
+
+{done}
+
+Everything else in the tree is the fixed proto-pilot skeleton.
+
+## Carrying on
+
+The passes are ordered and each one reads the previous pass's real source, so
+a tree that stops here cannot be booted as it stands. Re-run generation:
+
+```bash
+proto new "<the same idea>" --dir <a fresh directory>
+```
+
+If the cause was transient -- a timeout, a rate limit, an empty credit
+balance -- the same command will usually just work. If the pass keeps failing
+at the same place, `--offline` generates a plain CRUD version of the same spec
+so at least the shape is there.
+"""
+
+
+def write_generation_runbook(
+    project_dir: Path, pass_name: str, reason: str, done: list[str]
+) -> Path:
+    """The floor for a pass that never returned.
+
+    `drive_to_green` has had a floor since the beginning; generation did not,
+    so a pass that timed out or ran out of credit left a part-built tree and a
+    stack trace. Same promise, applied one stage earlier.
+    """
+    listed = "\n".join(f"- {name}" for name in done) or "- none"
+    path = project_dir / "RUNBOOK.md"
+    path.write_text(
+        GENERATION_RUNBOOK.format(
+            pass_name=pass_name, reason=reason.strip() or "(no reason given)", done=listed
+        )
+    )
+    return path
 
 
 def write_runbook(project_dir: Path, spec: Spec, outcome: Outcome) -> Path:

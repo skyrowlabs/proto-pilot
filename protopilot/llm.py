@@ -182,12 +182,15 @@ class ClaudeCodeLLM:
         effort: str | None = None,
         runner: Any | None = None,
         binary: str | None = None,
-        timeout: float = 900.0,
+        timeout: float | None = None,
     ) -> None:
         self.model = model or os.environ.get("PROTOPILOT_MODEL", DEFAULT_MODEL)
         self.effort = effort or os.environ.get("PROTOPILOT_EFFORT", DEFAULT_EFFORT)
         self.binary = binary or os.environ.get("PROTOPILOT_CLAUDE_BIN", "claude")
-        self.timeout = timeout
+        # SVG-heavy UI passes run long: 15 minutes was not enough for a
+        # chess board's worth of drawn pieces, and a timeout mid-generation
+        # costs every pass before it.
+        self.timeout = timeout or float(os.environ.get("PROTOPILOT_TIMEOUT", "2700"))
         if runner is None:
             from protopilot.runner import SubprocessRunner
 

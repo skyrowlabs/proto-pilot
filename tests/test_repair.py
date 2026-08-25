@@ -123,3 +123,69 @@ def test_a_repair_with_no_changes_stops_the_loop(spec, tmp_path):
 
     assert not outcome.ok
     assert verifier.runs == 1
+
+
+# --- the generation floor ----------------------------------------------------
+#
+# `drive_to_green` has had a floor since the beginning: on red the tree is
+# handed back with a RUNBOOK naming the stage. Generation had none, so a pass
+# that timed out or ran out of credit left a part-built tree and a stack
+# trace. These pin the same promise one stage earlier.
+
+import pytest
+
+from protopilot import build as builder
+
+
+class ExplodingLLM:
+    """Fails on the pass named, after letting the earlier ones through."""
+
+    offline = False
+
+    def __init__(self, fail_on: str, responses: list[dict]):
+        self.fail_on = fail_on
+        self.responses = list(responses)
+
+    def structured(self, *, system, user, schema, label):
+        if label == self.fail_on:
+            raise TimeoutError("timed out after 900.0s")
+        return self.responses.pop(0)
+
+
+def test_a_failed_pass_leaves_a_runbook(tmp_path, spec):
+    from protopilot.passes import PassContext
+    from protopilot.render import render_skeleton
+
+    render_skeleton(spec, tmp_path)
+    ctx = PassContext(project_dir=tmp_path)
+    llm = ExplodingLLM(fail_on="schema", responses=[])
+
+    with pytest.raises(builder.PassFailed) as caught:
+        builder.generate(spec, ctx, llm, log=lambda _: None)
+
+    assert caught.value.pass_name == "schema"
+    runbook = (tmp_path / "RUNBOOK.md").read_text()
+    assert "did not finish generating" in runbook
+    # Names the pass, so the tree's shape is known rather than mysterious.
+    assert "**schema**" in runbook
+    assert "timed out after 900.0s" in runbook
+
+
+def test_the_runbook_lists_the_passes_that_did_finish(tmp_path, spec):
+    from protopilot.passes import PassContext
+    from protopilot.render import render_skeleton
+
+    render_skeleton(spec, tmp_path)
+    ctx = PassContext(project_dir=tmp_path)
+    # Let schema through, fail on smoke.
+    from protopilot.baseline import models_py
+
+    llm = ExplodingLLM(
+        fail_on="smoke",
+        responses=[{"files": [{"path": "app/models.py", "content": models_py(spec)}],
+                    "notes": ""}],
+    )
+    with pytest.raises(builder.PassFailed):
+        builder.generate(spec, ctx, llm, log=lambda _: None)
+    runbook = (tmp_path / "RUNBOOK.md").read_text()
+    assert "- schema" in runbook

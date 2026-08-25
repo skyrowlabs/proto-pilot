@@ -156,8 +156,10 @@ def new(
     ctx = PassContext(project_dir=target, change=direction)
     try:
         builder.generate(spec, ctx, llm, log=_echo, hide_tests=demo)
-    except LLMError as exc:
-        raise click.ClickException(str(exc)) from exc
+    except (LLMError, builder.PassFailed) as exc:
+        raise click.ClickException(
+            f"{exc}\n  part-built tree and a RUNBOOK are at {target}"
+        ) from exc
 
     registry.record(
         slug=spec.slug, name=spec.name, path=target, port=spec.port, idea=idea
