@@ -112,6 +112,11 @@ class Spec(BaseModel):
     # Free-text direction the user gave, carried through to every pass so
     # "make it feel like a kanban board" survives past intake.
     direction: str = ""
+    # What the fixed stack cannot do for this idea, in plain sentences.
+    # Empty when the idea fits as asked. Shown at the review checkpoint,
+    # because quietly building something smaller than what was asked for is
+    # the failure mode that looks exactly like success.
+    limits: list[str] = Field(default_factory=list)
 
     @field_validator("slug")
     @classmethod
@@ -162,6 +167,12 @@ class Spec(BaseModel):
             lines.append(f"  jobs: {', '.join(self.jobs)}")
         if self.external_apis:
             lines.append(f"  external apis: {', '.join(self.external_apis)}")
+        if self.limits:
+            # Last, and named plainly, because this is the part a reviewer
+            # most needs to disagree with before any tokens are spent.
+            lines.append("  not in this version:")
+            for limit in self.limits:
+                lines.append(f"    - {limit}")
         return "\n".join(lines)
 
 

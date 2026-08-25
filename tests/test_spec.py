@@ -59,3 +59,19 @@ def test_intake_schema_is_self_contained_and_strict():
                 check(value)
 
     check(schema)
+
+
+def test_summary_names_what_it_cannot_do(spec):
+    """The review checkpoint is the only place a downscope can be caught.
+
+    Building something smaller than what was asked for, and saying nothing,
+    is the failure mode that looks identical to success.
+    """
+    spec.limits = ["the board is flat, not 3D", "two people share one browser"]
+    out = spec.summary()
+    assert "not in this version:" in out
+    assert "- the board is flat, not 3D" in out
+
+
+def test_summary_stays_quiet_when_the_idea_fits(spec):
+    assert "not in this version" not in spec.summary()

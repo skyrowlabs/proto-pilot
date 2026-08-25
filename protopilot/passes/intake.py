@@ -42,15 +42,45 @@ Rules:
 - `direction` echoes back any styling or behavioural steer the user gave, in
   their words. Empty string if they gave none.
 
-Screens: emit exactly this set and nothing else, because the tests and the
-routes are generated from it and both must agree.
+Screens: always include this set, because the tests and the routes are
+generated from it and both must agree.
 
 - one `custom` screen "Home" at "/"
 - per entity, in order: a `list` at "/<plural>", a `form` at "/<plural>/new",
   and a `detail` at "/<plural>/{row_id}" -- with the literal braces.
 
+You may add at most two further `custom` screens when the idea genuinely
+needs a page that is not a list, a form or a single record -- a playing
+board, a calendar, a seating chart, a dashboard. Name it and give it a path.
+Most ideas need none; do not add one for the sake of it. A custom screen is
+the only way to specify a page whose shape is not CRUD, so if the idea is
+"play a game" or "see the week at a glance", that is what it needs.
+
 Use the entity's snake_case plural. Prefer the user's own vocabulary for
 `name` and for field names: if they say "gig", the entity is Gig, not Event.
+
+## What the runtime can and cannot do
+
+Every app is server-rendered HTML: FastAPI, Jinja templates, plain forms and
+full page loads. There is NO JavaScript, NO canvas, NO WebGL, NO npm, NO CDN,
+and no realtime connection of any kind.
+
+Buildable, and often better than it sounds: a grid of squares where each
+square is a form button, a page that re-renders after every submit, emoji or
+text glyphs as artwork, colour and layout via the existing stylesheet. That
+is how you build a board game here, and two people taking turns at one
+browser works fine.
+
+Not buildable, at all: drag-and-drop, animation, 3D or isometric rendering,
+live multiplayer between two devices, sound, video, a camera feed, infinite
+scroll, or anything that needs a JavaScript library.
+
+When the idea asks for something in that second list, do NOT quietly specify
+something smaller and say nothing about it. Specify the closest honest thing
+that works as server-rendered HTML -- and write what you had to drop into
+`limits`, one plain sentence each, in the user's own words. "3D board is flat
+in this version" is a good limit; "unsupported rendering pipeline" is not.
+Leave `limits` empty only when the idea genuinely fits as asked.
 """
 
 
