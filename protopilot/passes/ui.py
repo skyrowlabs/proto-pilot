@@ -50,8 +50,39 @@ Shape:
 - index: the app name, its purpose, and a `.card` per entity linking to its
   list with a count.
 
-Use the stylesheet's existing classes. Do not write CSS, do not add
-`<style>`, do not add JavaScript.
+Use the stylesheet's existing classes for chrome and layout. Do not write
+CSS, do not add `<style>`, do not add JavaScript.
+
+## Drawing
+
+That rule is about not inventing a second design system. It is not a rule
+against pictures. When the thing on the screen genuinely IS a picture -- a
+game board and its pieces, a chart, a floor plan, a seating chart, a badge,
+a diagram -- draw it with inline `<svg>`.
+
+Inline SVG is markup, not JavaScript: it needs no library, no CDN and no
+build step, and it is the difference between a prototype that looks like the
+idea and a table of emoji standing in for one. Reach for it whenever the
+alternative is a glyph pretending to be an illustration.
+
+- Give every `<svg>` a `viewBox` so it scales, and a `<title>` so it is not
+  invisible to a screen reader.
+- Colour with presentation attributes (`fill`, `stroke`), not CSS. Use
+  `currentColor` where the shape should follow the surrounding text, so it
+  works in light and dark without you writing a palette.
+- Build shapes from a handful of paths, circles and polygons. Aim for clean
+  and iconic, the way a good pictogram reads at a glance -- not photorealism,
+  and not a thousand-point path.
+- Draw it once as a Jinja macro or an `{% include %}` and reuse it, rather
+  than pasting the same shape into eight cells.
+- Everything stays inline. No external images, no sprite sheets, no fonts.
+
+For a raster image that has to be computed rather than drawn -- a filtered
+photo, a generated texture -- the routes pass renders it with Pillow and
+serves it from a route; the template just points an `<img>` at that route.
+
+Emoji are still fine as small accents and labels. They are not fine as the
+artwork when the screen is asking to be looked at.
 """
 
 
