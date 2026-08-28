@@ -97,6 +97,15 @@ A per-visitor quota without logins can only be enforced by IP, which is a speed
 bump. The actual control is a hard daily spend ceiling on the funding account,
 set so that the worst case is a page that says "come back tomorrow."
 
+There is a third lever that removes the bill rather than capping it: **run the
+model ourselves.** A local-model backend on a breeze.brain node — Qwen or
+whatever else measures up — turns a generation into electricity instead of API
+credit, which is the only version of this where "free and unmetered" is
+honest at any volume. It is tracked in [NOTES](../NOTES.md) as its own idea
+because it is worth doing whether or not this page ever exists, and the catch is
+recorded there: every pass depends on schema-constrained output, so the serving
+runtime has to provide it.
+
 ### 3. The learning signal is already in the pipeline
 
 The instinct is to build a feedback widget. proto.pilot does not need one first,

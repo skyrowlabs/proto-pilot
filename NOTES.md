@@ -57,6 +57,44 @@ belong in `README.md` (the design document) or `CLAUDE.md` (the rules).
   as a long-term idea; would reclassify proto.pilot from an internal instrument
   to a minor product. Read the doc before acting on any part of it.
 
+- **Make Claude optional — a local-model backend.** Captured 2026-08-28. Run Qwen
+  (and whatever else is worth trying) on our own breeze.brain node and let `proto`
+  drive it, so the pipeline is not bound to one vendor and a generation can cost
+  electricity instead of API credit. This is the same internal-GPU-as-cost-play
+  argument as [the gpu-platform seam](../skyrow-workspace/strategy/seams/gpu-platform.md),
+  applied to proto.pilot instead of jam.sense, and it is what would make the free
+  public tier in `docs/hosted.md` affordable at all.
+
+  **The plumbing is nearly free.** `LLM` is a two-member Protocol — `offline: bool`
+  and `structured(system, user, schema, label) -> dict`. A fourth backend is a class
+  plus a name in `build_llm`, which already dispatches on `PROTOPILOT_LLM` over
+  `'api' | 'claude-code' | 'offline'`. Nothing in the passes changes.
+
+  **The real question is structured output.** `ClaudeLLM` gets a schema-valid object
+  from the server (`format: {"type": "json_schema", ...}`), and every pass depends on
+  that — the pipeline is built on typed per-pass schemas, not on parsing prose. A
+  local model only matches that if the serving runtime does constrained decoding
+  (vLLM guided decoding, llama.cpp GBNF, Ollama structured outputs). Pick the runtime
+  for that property first; a backend that returns *almost* valid JSON is worse than
+  no backend, because the repair loop will spend real attempts on it.
+
+  Two smaller things to check when it happens: the stack brief is byte-identical
+  across passes specifically to stay a cache prefix — that still pays off locally,
+  but as a serving-side prefix cache rather than as Anthropic's, so confirm the
+  runtime actually has one. And `ClaudeLLM` carries streaming and a refusal fallback
+  that a local backend has no equivalent of and probably does not need; do not port
+  the shape, port the interface.
+
+  This is the engineering half. The research half — which open model, fine-tuned on
+  what corpus, at what cost crossover, aimed at a public skyrow.ai — is
+  [R1 in the research queue](../skyrow-workspace/strategy/research.md).
+
+  Expectation-setting: the five passes each read the previous pass's real source, so
+  context is long and quality-sensitive. Treat the first local backend as a way to
+  *measure* how far a smaller model is from usable — the offline baseline already
+  gives a floor and Claude gives a ceiling, so the corpus of green/red verdicts is
+  the natural scoreboard. It is an experiment with a built-in grader, not a swap.
+
 ## Resolved
 
 _(nothing recorded yet — the pre-2026-08-28 history was lost with the old file)_
