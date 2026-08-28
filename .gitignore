@@ -6,3 +6,7 @@ build/
 dist/
 .venv/
 .env
+
+# Generated prototypes -- throwaway output, not source. `proto serve` and
+# `proto new` default their workspace here (cli.py:367).
+prototypes/
