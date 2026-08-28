@@ -127,9 +127,19 @@ cache prefix — keep it that way. Override with `PROTOPILOT_MODEL` /
 
 ## Known state — check before trusting a doc
 
-**`../proto-pilot-notes.md` is the live parking lot** (open items, "resolved this
-session", and what's highest value next). It is outside the repo, at the workspace
-root. Read it before starting work; update it when you resolve something.
+**`NOTES.md` is the live parking lot** (open items, "resolved this session", and
+what's highest value next). Read it before starting work; update it when you
+resolve something.
+
+It lived at `../proto-pilot-notes.md` until 2026-08-28 — outside every repo, at a
+workspace root that is not a git repository. It was unbacked, and it was lost. The
+file here is a reconstruction from what this guide and the README already record;
+anything that existed only in the old file is gone.
+
+`docs/` holds long-form docs that are neither rules nor design:
+[`docs/hosted.md`](docs/hosted.md) captures the hosted-public-service idea — not a
+plan, and it would reclassify this repo from an internal instrument to a minor
+product.
 
 The README's **Status** section is stale in four known ways: it says the `passes/`
 prompts have never run live (they have), and it omits Pillow, the browser stage,
