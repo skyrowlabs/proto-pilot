@@ -33,14 +33,6 @@ belong in `README.md` (the design document) or `CLAUDE.md` (the rules).
   the browser stage, and the venv requirement. Fix the README rather than
   propagating it; this note exists because the drift keeps getting re-copied.
 
-## Open — repo state
-
-- **`feat/subscription-backend-and-front-end` is 15 commits ahead of `main` and
-  unmerged.** It carries the web front end, the subscription (`ClaudeCodeLLM`)
-  backend, prototype lifecycle commands, the registry, the browser stage, and
-  `CLAUDE.md` itself. Almost everything true about this repo is on that branch.
-  Landing it is a prerequisite for anything else.
-
 ## Traps — not bugs, but they will get you
 
 - **`proto ls` calls `prune()`, which deletes registry entries whose directory is
@@ -97,4 +89,10 @@ belong in `README.md` (the design document) or `CLAUDE.md` (the rules).
 
 ## Resolved
 
-_(nothing recorded yet — the pre-2026-08-28 history was lost with the old file)_
+- **2026-08-28 — `feat/subscription-backend-and-front-end` landed on `main`, and the
+  branch is deleted.** It carried the web front end, the `ClaudeCodeLLM` subscription
+  backend, prototype lifecycle commands, the registry, the browser stage, and
+  `CLAUDE.md` itself — almost everything true about this repo lived on one unmerged
+  branch, which is why it was worth naming here. `main` is now the only branch.
+
+_(nothing before that: the pre-2026-08-28 history was lost with the old file.)_
