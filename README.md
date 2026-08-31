@@ -1,5 +1,12 @@
 # proto-pilot
 
+<p align="center">
+  <a href="https://github.com/skyrowlabs/proto-pilot/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/skyrowlabs/proto-pilot/actions/workflows/ci.yml/badge.svg?branch=develop"></a>
+  <a href="https://github.com/skyrowlabs/proto-pilot/tags"><img alt="Latest tag" src="https://img.shields.io/github/v/tag/skyrowlabs/proto-pilot?label=version"></a>
+  <a href="https://github.com/skyrowlabs/proto-pilot/actions/workflows/ci.yml"><img alt="Python 3.11 to 3.14" src="https://img.shields.io/badge/python-3.11%E2%80%933.14-blue"></a>
+  <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/github/license/skyrowlabs/proto-pilot"></a>
+</p>
+
 A framework for prototyping ideas with agents.
 
 Give it an idea and a little direction; get back a prototype running in Docker.
@@ -51,13 +58,22 @@ afternoon.
 
 ```bash
 git clone https://github.com/skyrowlabs/proto-pilot && cd proto-pilot
+python -m venv .venv && . .venv/bin/activate
 pip install -e ".[dev]"
 proto doctor          # checks Docker, the SDK, credentials and a free port
 ```
 
-Needs Docker with Compose v2, and Claude API credentials — either
-`ANTHROPIC_API_KEY` or an `ant auth login` profile, which the SDK picks up on
-its own.
+The virtualenv is not optional advice — on a distro whose Python is externally
+managed (Arch, and Debian since 3.11) a bare `pip install -e .` refuses to run.
+
+Needs Python 3.11 or newer, Docker with Compose v2, and Claude credentials —
+either `ANTHROPIC_API_KEY`, or a Claude subscription driven through the Claude
+Code CLI.
+
+Three optional extras: `dev` pulls the generated app's stack too, because the
+end-to-end test runs a generated tree in process; `browser` adds Playwright, and
+without it the browser verification stage is **skipped and reported as skipped,
+never as green**; `web` is the front end behind `proto serve`.
 
 ## Commands
 
@@ -84,7 +100,8 @@ Useful flags on `new`: `--offline` (no API calls, see below), `--no-verify`
 Five decisions carry most of the weight.
 
 **The stack is fixed, not chosen.** FastAPI, server-rendered Jinja, SQLAlchemy
-2.0, Postgres. No JS build step, no CDN, no migrations. A generator that picks
+2.0, Postgres, and Pillow so a prototype can draw its own images instead of
+hotlinking one. No JS build step, no CDN, no migrations. A generator that picks
 a stack per idea produces N unrunnable variants and you debug all of them.
 Everything in `skeleton/` — the Dockerfile, the compose file, `app/main.py`,
 `app/db.py`, the stylesheet, `tests/conftest.py` — is copied byte for byte
@@ -123,6 +140,13 @@ both beat a loop that never terminates.
 One guard the prompt cannot enforce: if a repair shrinks the smoke suite, the
 file is reverted. Green because there is nothing left to fail is the only
 failure mode here that nobody would notice.
+
+With the `browser` extra installed there is a further stage, and it exists
+because every other one is blind to the browser: `/healthz` returns 200 for a
+page that paints nothing, and the smoke suite runs through an in-process client
+that never executes a script tag. The browser stage loads every screen for real
+and fails a page that rendered nothing visible. Without Playwright it is skipped
+and reported as skipped — never as green.
 
 ## The offline baseline
 
@@ -165,13 +189,21 @@ does not abandon a generation that is most of the way done. Override with
 
 ## Status
 
-Early. Known gaps, in the order they will bite:
+Early, and honest about it. Known gaps, in the order they will bite:
 
 - `auth: "password"` is accepted by the spec and not implemented by any pass.
+  Either it gets built or intake should reject it; silently accepting it is the
+  worst of the three.
 - `jobs` and `external_apis` are recorded and otherwise ignored — a spec that
   needs either will generate an app that does not have it.
 - The offline baseline ignores `spec.screens` and always generates its own
-  CRUD set. Only the model path honours custom screens.
-- Every prompt in `passes/` is written but has not yet been run against the
-  live API in this repository's own CI; the baseline path is what the test
-  suite covers.
+  CRUD set. Only the model path honours custom screens, so the thing the test
+  suite exercises and the thing you get differ on exactly that point.
+
+The prompts in `passes/` have been run against the live API; the baseline is
+what CI covers, for the reason given above. `NOTES.md` is the live parking lot —
+open items, what got resolved, and what is worth doing next.
+
+## Licence
+
+[MIT](LICENSE) © SKYROW LABS LLC

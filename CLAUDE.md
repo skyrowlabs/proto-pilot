@@ -20,6 +20,17 @@ decisions and why each exists. Read it before changing pipeline behavior; the
 reasoning there is what keeps this from degenerating into a stack-picking code
 generator.
 
+## Branches
+
+Work lands on `develop`; `main` is what has been released. The split arrived
+2026-08-30 with the CI and licence work, for the reason the workspace guide
+gives: two branches are what an audience costs. One ref cannot answer both
+*what is being worked on* and *what you should expect to work*, and the moment a
+stranger can clone the repo those became different questions.
+
+CI runs on push and pull request against both, so a change is gated twice. The
+README's CI badge reads `?branch=develop` — the branch that is actually moving.
+
 ## Setup
 
 ```bash
@@ -141,9 +152,11 @@ anything that existed only in the old file is gone.
 plan, and it would reclassify this repo from an internal instrument to a minor
 product.
 
-The README's **Status** section is stale in four known ways: it says the `passes/`
-prompts have never run live (they have), and it omits Pillow, the browser stage,
-and the venv requirement. Fix the README rather than propagating it.
+The README's **Status** section was stale in four known ways and was corrected on
+2026-08-30, when this repo was prepared to go public: it claimed the `passes/`
+prompts had never run live (they have), and omitted Pillow, the browser stage,
+and the venv requirement. It is now the accurate list of gaps — keep it that way,
+because it is the first thing a stranger reads.
 
 Two traps worth knowing:
 

@@ -1,19 +1,70 @@
+# The whole suite, on every push and every pull request.
+#
+# There is no cost gating and no `paths-ignore`, deliberately. Gating exists to
+# keep an expensive suite off the pre-merge path; this one is 113 tests in
+# under two seconds with no network, so deciding whether to run it would cost
+# more than running it. A `paths-ignore` is the worse version of the same idea:
+# it makes a required check that never reports, and blocks the PR forever.
+
 name: ci
 
+# `develop` is where work lands and `main` is what has been released, so a
+# change is gated twice -- once entering integration, once leaving it.
+#
+# `workflow_dispatch` so a branch with no new commits can still be given a run.
+# The CI badge reads the latest conclusion for a branch; without this, a freshly
+# cut branch shows no badge at all, which reads like a project with no CI rather
+# than one that has not pushed yet.
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+# A public repo means pushes to a PR arrive from people who are not watching the
+# Actions tab. Superseded runs are cancelled rather than left to finish.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+# Least privilege by default. A fork PR gets a read-only token anyway; saying so
+# means a workflow that later wants more has to ask for it in the diff.
+permissions:
+  contents: read
 
 jobs:
   test:
+    # `pyproject.toml` says `requires-python = ">=3.11"` and for one job that was
+    # a belief rather than a check -- the suite only ever ran on whatever the
+    # runner happened to pin. The floor of this list is the version the metadata
+    # is allowed to claim.
+    #
+    # `fail-fast: false` because the useful answer is *which* version broke.
+    # Cancelling the rest on the first red turns four data points into one.
+    name: pytest ${{ matrix.python }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11', '3.12', '3.13', '3.14']
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
-      # No API key and no Docker daemon: the offline baseline is what makes
-      # the pipeline testable in CI, which is the point of having one.
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      # No API key and no Docker daemon. The offline baseline is what makes the
+      # pipeline testable in CI, which is the point of having one: the skeleton,
+      # all five passes, the write guard and the repair loop are exercised here
+      # without a credential or a container.
+      #
+      # `[dev]` and not `[browser]` on purpose. `tests/test_browser.py` asserts
+      # against the stage's result objects rather than driving chromium, so the
+      # browser stage is covered with no Playwright install and no download.
       - run: pip install -e ".[dev]"
+
       - run: python -m pytest -q

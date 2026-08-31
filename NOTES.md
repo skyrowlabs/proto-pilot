@@ -26,12 +26,15 @@ belong in `README.md` (the design document) or `CLAUDE.md` (the rules).
   CRUD set. Only the model path honours custom screens — so the thing the test
   suite exercises and the thing users get differ on exactly this point.
 
-## Open — docs
+## Open — going public
 
-- **`README.md`'s Status section is stale in four known ways.** It claims the
-  `passes/` prompts have never been run live (they have), and it omits Pillow,
-  the browser stage, and the venv requirement. Fix the README rather than
-  propagating it; this note exists because the drift keeps getting re-copied.
+- **The repo is still private.** Everything else on the public path is done
+  (licence, CI, badges, tag, `develop`), but the badges render as broken images
+  to anyone but the owner until the visibility flips. That flip is the one step
+  here that is not a commit.
+- **No `CONTRIBUTING.md`, issue templates, `dependabot.yml` or `CODEOWNERS`.**
+  sky-boss has all four. None of them block going public; they are what stops
+  the first outside issue from arriving shapeless.
 
 ## Traps — not bugs, but they will get you
 
@@ -88,6 +91,27 @@ belong in `README.md` (the design document) or `CLAUDE.md` (the rules).
   the natural scoreboard. It is an experiment with a built-in grader, not a swap.
 
 ## Resolved
+
+- **2026-08-30 — prepared to go public: licence, CI, badges, tag, `develop`.**
+  MIT `LICENSE` added (there was none, which was the only hard blocker). CI went
+  from one Python 3.12 job on `checkout@v4` to a 3.11–3.14 matrix on v7 actions
+  with `concurrency`, `permissions: contents: read` and `workflow_dispatch` — the
+  matrix is the first thing to actually *check* `requires-python = ">=3.11"`,
+  which until now was a claim nothing verified. `v0.1.0` tagged, since
+  `pyproject.toml` had carried that version with no tag behind it and the version
+  badge would have rendered empty. Four badges added to the README.
+
+  `develop` cut at the same time, mirroring what sky.boss did the day *it* went
+  public — see [Branches in `CLAUDE.md`](CLAUDE.md). The workspace table in
+  `../skyrow-workspace` still lists proto.pilot as neither public nor on
+  `develop`; that is a separate repo and a separate commit.
+
+- **2026-08-30 — the README's stale Status section is fixed.** It had claimed the
+  `passes/` prompts were never run live, and omitted Pillow, the browser stage
+  and the venv requirement. All four corrected in place; the Install section now
+  says why the venv is mandatory and what the three extras are for. Going public
+  is what forced it — the drift had been getting re-copied for weeks because
+  nobody outside was reading it.
 
 - **2026-08-28 — `feat/subscription-backend-and-front-end` landed on `main`, and the
   branch is deleted.** It carried the web front end, the `ClaudeCodeLLM` subscription
