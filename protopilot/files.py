@@ -52,9 +52,7 @@ def check_path(path: str) -> Path:
     if posix in PROTECTED:
         raise UnsafePath(f"{posix} is part of the skeleton and is not generated")
     if not any(fnmatch.fnmatch(posix, pattern) for pattern in WRITABLE):
-        raise UnsafePath(
-            f"{posix} is not a generated path; generated paths are: {', '.join(WRITABLE)}"
-        )
+        raise UnsafePath(f"{posix} is not a generated path; generated paths are: {', '.join(WRITABLE)}")
     return rel
 
 
@@ -64,9 +62,7 @@ def banner_for(path: str, pass_name: str) -> str:
     return BANNER_PY.format(pass_name=pass_name)
 
 
-def write_all(
-    project_dir: Path, files: list[GeneratedFile], pass_name: str
-) -> list[Path]:
+def write_all(project_dir: Path, files: list[GeneratedFile], pass_name: str) -> list[Path]:
     """Authorise every path first, then write. All-or-nothing.
 
     Validating up front matters: a half-applied pass leaves a tree that is

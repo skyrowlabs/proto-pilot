@@ -35,15 +35,11 @@ class CommandResult:
 
 
 class Runner(Protocol):
-    def run(
-        self, argv: list[str], cwd: Path | None = None, timeout: float | None = None
-    ) -> CommandResult: ...
+    def run(self, argv: list[str], cwd: Path | None = None, timeout: float | None = None) -> CommandResult: ...
 
 
 class SubprocessRunner:
-    def run(
-        self, argv: list[str], cwd: Path | None = None, timeout: float | None = None
-    ) -> CommandResult:
+    def run(self, argv: list[str], cwd: Path | None = None, timeout: float | None = None) -> CommandResult:
         try:
             proc = subprocess.run(  # noqa: S603 -- argv is built by us, never by the model
                 argv,

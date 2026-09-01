@@ -112,21 +112,14 @@ cannot be seen to work is worse than no script.
 
 
 def build(spec, ctx) -> tuple[str, str]:
-    user = (
-        spec_block(spec)
-        + "\n\n## Already generated\n\n"
-        + ctx.sources("app/models.py", "app/routes.py")
-    )
+    user = spec_block(spec) + "\n\n## Already generated\n\n" + ctx.sources("app/models.py", "app/routes.py")
     if spec.direction:
         user += f"\n\nThe user's direction for how this should look and feel: {spec.direction}"
     return STACK_BRIEF + TASK, user
 
 
 def offline(spec, ctx) -> dict:
-    files = [
-        {"path": path, "content": body}
-        for path, body in sorted(baseline.templates_for(spec).items())
-    ]
+    files = [{"path": path, "content": body} for path, body in sorted(baseline.templates_for(spec).items())]
     return {
         "files": files,
         "notes": "baseline: nav, index, and list/detail/form per entity.",

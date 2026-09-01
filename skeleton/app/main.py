@@ -6,16 +6,15 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
-from sqlalchemy import text
-
 from app import models  # noqa: F401  -- import registers tables on Base.metadata
 from app.db import Base, SessionLocal, engine
 from app.routes import router
 from app.seed import seed
 from app.settings import settings
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
 
 
 @asynccontextmanager
@@ -27,9 +26,7 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
-app.mount(
-    "/static", StaticFiles(directory=str(Path(__file__).parent / "static")), name="static"
-)
+app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")), name="static")
 app.include_router(router)
 
 

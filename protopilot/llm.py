@@ -71,9 +71,7 @@ class ClaudeLLM:
             try:
                 import anthropic
             except ImportError as exc:  # pragma: no cover - dependency guard
-                raise LLMError(
-                    "the `anthropic` package is not installed; `pip install anthropic`"
-                ) from exc
+                raise LLMError("the `anthropic` package is not installed; `pip install anthropic`") from exc
             # Zero-arg: resolves ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN, or an
             # `ant auth login` profile. An unset env var does not mean no
             # credentials.
@@ -143,9 +141,7 @@ class ClaudeLLM:
 
         if getattr(message, "stop_reason", None) == "refusal":
             details = getattr(message, "stop_details", None)
-            raise Refused(
-                getattr(details, "category", None), getattr(details, "explanation", None)
-            )
+            raise Refused(getattr(details, "category", None), getattr(details, "explanation", None))
 
         text = next((b.text for b in message.content if b.type == "text"), None)
         if text is None:
@@ -235,10 +231,7 @@ class ClaudeCodeLLM:
         # parses what the CLI has already parsed.
         data = envelope.get("structured_output")
         if data is None:
-            raise LLMError(
-                f"pass {label!r}: no structured output "
-                f"(stop_reason {envelope.get('stop_reason')!r})"
-            )
+            raise LLMError(f"pass {label!r}: no structured output " f"(stop_reason {envelope.get('stop_reason')!r})")
         return data
 
 
@@ -285,6 +278,4 @@ def build_llm(offline: bool = False, backend: str | None = None) -> LLM:
         return ClaudeCodeLLM()
     if choice == "api":
         return ClaudeLLM()
-    raise LLMError(
-        f"unknown backend {choice!r}; expected 'api', 'claude-code' or 'offline'"
-    )
+    raise LLMError(f"unknown backend {choice!r}; expected 'api', 'claude-code' or 'offline'")

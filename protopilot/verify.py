@@ -13,6 +13,7 @@ import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 
 from protopilot.runner import CommandResult, Runner
 
@@ -20,6 +21,18 @@ from protopilot.runner import CommandResult, Runner
 # is told, and a repair prompt for "the image would not build" is a different
 # prompt from one for "the create test asserted 2 == 1".
 STAGES = ("build", "health", "tests")
+
+
+class Verifies(Protocol):
+    """What `drive_to_green` actually needs: something that returns a verdict.
+
+    The concrete `Verifier` needs Docker; the repair loop does not care. Naming
+    the capability rather than the class is what lets the test suite drive the
+    loop with a scripted sequence of results -- which is the only way the repair
+    loop gets covered at all, since exercising it for real means a red container.
+    """
+
+    def verify(self) -> "VerifyResult": ...
 
 
 @dataclass(frozen=True)
@@ -75,9 +88,7 @@ class Verifier:
         self.build_timeout = build_timeout
 
     def compose(self, *args: str, timeout: float | None = None) -> CommandResult:
-        return self.runner.run(
-            ["docker", "compose", *args], cwd=self.project_dir, timeout=timeout
-        )
+        return self.runner.run(["docker", "compose", *args], cwd=self.project_dir, timeout=timeout)
 
     def down(self) -> CommandResult:
         return self.compose("down", "-v", "--remove-orphans", timeout=180)
@@ -120,24 +131,25 @@ class Verifier:
         built = self.up()
         if not built.ok:
             return VerifyResult(
-                False, "build", "docker compose could not build or start the stack",
+                False,
+                "build",
+                "docker compose could not build or start the stack",
                 built.describe(),
             )
 
         healthy, detail = self.wait_healthy()
         if not healthy:
             return VerifyResult(
-                False, "health",
-                f"/healthz never came up on port {self.port} within "
-                f"{self.health_timeout:.0f}s",
-                detail, self.logs(),
+                False,
+                "health",
+                f"/healthz never came up on port {self.port} within " f"{self.health_timeout:.0f}s",
+                detail,
+                self.logs(),
             )
 
         tests = self.run_tests()
         if not tests.ok:
-            return VerifyResult(
-                False, "tests", "the smoke tests failed", tests.describe(), self.logs()
-            )
+            return VerifyResult(False, "tests", "the smoke tests failed", tests.describe(), self.logs())
 
         # Last, because it is the only stage that can see the browser. The
         # suite above runs through an in-process TestClient and never executes
@@ -146,12 +158,17 @@ class Verifier:
         page_result = self.check_pages()
         if page_result is not None and not page_result.ok:
             return VerifyResult(
-                False, "browser", "a screen failed in the browser",
-                page_result.report(), self.logs(),
+                False,
+                "browser",
+                "a screen failed in the browser",
+                page_result.report(),
+                self.logs(),
             )
 
         return VerifyResult(
-            True, "tests", f"green -- app is up on http://localhost:{self.port}",
+            True,
+            "tests",
+            f"green -- app is up on http://localhost:{self.port}",
             tests.output,
         )
 

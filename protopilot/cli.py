@@ -1,8 +1,8 @@
 """The command line.
 
-    proto new "an app for tracking camping gear across trips"
-    proto add "let people mark items as packed"
-    proto up | down | logs | test | spec | doctor
+proto new "an app for tracking camping gear across trips"
+proto add "let people mark items as packed"
+proto up | down | logs | test | spec | doctor
 """
 
 from __future__ import annotations
@@ -14,10 +14,11 @@ from pathlib import Path
 
 import click
 
-from protopilot import __version__, build as builder
+from protopilot import __version__
+from protopilot import build as builder
+from protopilot import registry
 from protopilot.baseline import standard_screens
 from protopilot.llm import ClaudeCodeLLM, ClaudeLLM, LLMError, build_llm
-from protopilot import registry
 from protopilot.passes import PassContext, intake
 from protopilot.render import render_skeleton
 from protopilot.runner import SubprocessRunner, docker_available
@@ -52,16 +53,12 @@ def free_port(preferred: int | None = None) -> int:
 def _project(directory: str | None) -> Path:
     path = Path(directory or ".").resolve()
     if not (path / SPEC_DIR / SPEC_FILENAME).exists():
-        raise click.ClickException(
-            f"{path} is not a proto-pilot project (no {SPEC_DIR}/{SPEC_FILENAME})"
-        )
+        raise click.ClickException(f"{path} is not a proto-pilot project (no {SPEC_DIR}/{SPEC_FILENAME})")
     return path
 
 
 def _verifier(project_dir: Path, spec: Spec) -> Verifier:
-    return Verifier(
-        project_dir, spec.port, SubprocessRunner(), screens=checkable_paths(spec)
-    )
+    return Verifier(project_dir, spec.port, SubprocessRunner(), screens=checkable_paths(spec))
 
 
 def _compose(project_dir: Path, *args: str) -> int:
@@ -79,7 +76,9 @@ def main() -> None:
 @click.option("--dir", "directory", default=None, help="Target directory (default: ./<slug>).")
 @click.option("--direction", default="", help="Extra steer: look, feel, emphasis.")
 @click.option("--port", type=int, default=None, help="Host port (default: first free from 8080).")
-@click.option("--attempts", type=int, default=3, show_default=True, help="Repair attempts before handing back a RUNBOOK.")
+@click.option(
+    "--attempts", type=int, default=3, show_default=True, help="Repair attempts before handing back a RUNBOOK."
+)
 @click.option("--offline", is_flag=True, help="Deterministic baseline generator; no API calls.")
 @click.option(
     "--backend",
@@ -112,9 +111,7 @@ def new(
         if not ok:
             # Said now rather than after the generation passes, because after
             # is when the tokens have already been spent.
-            raise click.ClickException(
-                f"{why}. Start Docker, or pass --no-verify to generate without booting."
-            )
+            raise click.ClickException(f"{why}. Start Docker, or pass --no-verify to generate without booting.")
 
     _echo("intake...")
     ctx = PassContext(project_dir=Path("."), change=direction)
@@ -123,9 +120,7 @@ def new(
             data = intake.offline(idea, ctx)
         else:
             system, user = intake.build(idea, ctx)
-            data = llm.structured(
-                system=system, user=user, schema=intake.SCHEMA, label=intake.NAME
-            )
+            data = llm.structured(system=system, user=user, schema=intake.SCHEMA, label=intake.NAME)
     except LLMError as exc:
         raise click.ClickException(str(exc)) from exc
 
@@ -159,13 +154,9 @@ def new(
     try:
         builder.generate(spec, ctx, llm, log=_echo, hide_tests=demo)
     except (LLMError, builder.PassFailed) as exc:
-        raise click.ClickException(
-            f"{exc}\n  part-built tree and a RUNBOOK are at {target}"
-        ) from exc
+        raise click.ClickException(f"{exc}\n  part-built tree and a RUNBOOK are at {target}") from exc
 
-    registry.record(
-        slug=spec.slug, name=spec.name, path=target, port=spec.port, idea=idea
-    )
+    registry.record(slug=spec.slug, name=spec.name, path=target, port=spec.port, idea=idea)
 
     if not no_git:
         _git_init(target)
@@ -204,9 +195,7 @@ def add(
     spec = Spec.load(target)
     llm = build_llm(offline=offline, backend=backend)
     if llm.offline:
-        raise click.ClickException(
-            "`add` needs the model: the baseline generator cannot read a change request."
-        )
+        raise click.ClickException("`add` needs the model: the baseline generator cannot read a change request.")
 
     # A change request can add or retype a column, and there are no
     # migrations -- so the old volume is dropped rather than silently kept and
@@ -216,9 +205,7 @@ def add(
     _echo("amending spec...")
     system, user = intake.build_amend(spec, change)
     try:
-        data = llm.structured(
-            system=system, user=user, schema=intake.SCHEMA, label="amend"
-        )
+        data = llm.structured(system=system, user=user, schema=intake.SCHEMA, label="amend")
     except LLMError as exc:
         raise click.ClickException(str(exc)) from exc
 
@@ -248,9 +235,7 @@ def add(
 
 
 def _finish(spec: Spec, ctx: PassContext, llm, target: Path, attempts: int) -> None:
-    outcome = builder.drive_to_green(
-        spec, ctx, llm, _verifier(target, spec), attempts=attempts, log=_echo
-    )
+    outcome = builder.drive_to_green(spec, ctx, llm, _verifier(target, spec), attempts=attempts, log=_echo)
     if outcome.ok:
         runbook = target / "RUNBOOK.md"
         if runbook.exists():
@@ -288,9 +273,7 @@ def show_spec(directory: str | None, as_json: bool) -> None:
     """Show this project's spec."""
     target = _project(directory)
     spec = Spec.load(target)
-    click.echo(
-        (target / SPEC_DIR / SPEC_FILENAME).read_text() if as_json else spec.summary()
-    )
+    click.echo((target / SPEC_DIR / SPEC_FILENAME).read_text() if as_json else spec.summary())
 
 
 @main.command()
@@ -314,8 +297,7 @@ def down(directory: str | None, purge: bool) -> None:
     args = ["down", "-v"] if purge else ["down"]
     code = _compose(target, *args)
     if code == 0:
-        _echo("stopped; data kept (`proto down --purge` to drop it)" if not purge
-              else "stopped; data dropped")
+        _echo("stopped; data kept (`proto down --purge` to drop it)" if not purge else "stopped; data dropped")
     sys.exit(code)
 
 
@@ -342,8 +324,12 @@ def reset(directory: str | None, yes: bool) -> None:
 @click.option("--port", type=int, default=7000, show_default=True)
 @click.option("--workspace", default=None, help="Where prototypes are generated (default: ./prototypes).")
 @click.option("--backend", type=click.Choice(["api", "claude-code", "offline"]), default=None)
-@click.option("--demo/--no-demo", default=True, show_default=True,
-              help="Hide test files in the UI (they are still generated and run).")
+@click.option(
+    "--demo/--no-demo",
+    default=True,
+    show_default=True,
+    help="Hide test files in the UI (they are still generated and run).",
+)
 def serve(port: int, workspace: str | None, backend: str | None, demo: bool) -> None:
     """Run the web front end."""
     try:
@@ -358,17 +344,14 @@ def serve(port: int, workspace: str | None, backend: str | None, demo: bool) -> 
         try:
             ClaudeCodeLLM().check()
         except LLMError as exc:
-            raise click.ClickException(
-                f"{exc}\n     set PROTOPILOT_CLAUDE_BIN to a working `claude` binary"
-            ) from exc
+            raise click.ClickException(f"{exc}\n     set PROTOPILOT_CLAUDE_BIN to a working `claude` binary") from exc
 
     from protopilot.web.app import create_app
 
     root = Path(workspace).resolve() if workspace else Path.cwd() / "prototypes"
     _echo(f"workspace: {root}")
     _echo(f"http://localhost:{port}" + ("  (demo mode: tests hidden)" if demo else ""))
-    uvicorn.run(create_app(root, backend=backend, demo=demo), host="127.0.0.1", port=port,
-                log_level="warning")
+    uvicorn.run(create_app(root, backend=backend, demo=demo), host="127.0.0.1", port=port, log_level="warning")
 
 
 @main.command(name="ls")
@@ -376,7 +359,7 @@ def list_projects() -> None:
     """List every prototype generated on this machine."""
     entries = registry.prune()
     if not entries:
-        _echo("no prototypes yet -- `proto new \"an idea\"`")
+        _echo('no prototypes yet -- `proto new "an idea"`')
         return
     width = max(len(e.slug) for e in entries)
     for entry in entries:
@@ -391,9 +374,7 @@ def remove_project(directory: str | None, yes: bool) -> None:
     """Delete this prototype: containers, data and the tree."""
     target = _project(directory)
     spec = Spec.load(target)
-    if not yes and not click.confirm(
-        f"Delete {spec.name} and everything in {target}?", default=False
-    ):
+    if not yes and not click.confirm(f"Delete {spec.name} and everything in {target}?", default=False):
         raise click.Abort()
     try:
         registry.delete(target)

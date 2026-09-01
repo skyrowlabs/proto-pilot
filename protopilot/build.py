@@ -19,11 +19,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from protopilot.llm import LLM
-from protopilot.passes import PassContext, PassResult, repair, routes, seed, smoke, ui
+from protopilot.passes import PassContext, PassResult
 from protopilot.passes import models as schema_pass
-from protopilot.passes import run_pass
+from protopilot.passes import repair, routes, run_pass, seed, smoke, ui
 from protopilot.spec import Spec
-from protopilot.verify import VerifyResult, Verifier
+from protopilot.verify import Verifies, VerifyResult
 
 CODE_PASSES = (schema_pass, smoke, seed, routes, ui)
 SMOKE_PATH = "tests/test_smoke.py"
@@ -71,9 +71,7 @@ def generate(
         except Exception as exc:
             # Name the pass and leave a runbook before re-raising, so the
             # caller reports a stage rather than a stack trace.
-            write_generation_runbook(
-                ctx.project_dir, module.NAME, str(exc), [r.name for r in results]
-            )
+            write_generation_runbook(ctx.project_dir, module.NAME, str(exc), [r.name for r in results])
             raise PassFailed(module.NAME, str(exc)) from exc
         shown = [f for f in result.files if not (hide_tests and is_test_path(f))]
         if shown:
@@ -97,7 +95,7 @@ def drive_to_green(
     spec: Spec,
     ctx: PassContext,
     llm: LLM,
-    verifier: Verifier,
+    verifier: Verifies,
     attempts: int = 3,
     log: Log = print,
 ) -> Outcome:
@@ -147,10 +145,7 @@ def drive_to_green(
         after = _test_count(ctx.project_dir)
         if before and after < before:
             (ctx.project_dir / SMOKE_PATH).write_text(original)
-            log(
-                f"    rejected: repair cut the smoke suite from {before} to "
-                f"{after} tests; reverted {SMOKE_PATH}"
-            )
+            log(f"    rejected: repair cut the smoke suite from {before} to " f"{after} tests; reverted {SMOKE_PATH}")
             repairs[-1] += "  [test deletion rejected and reverted]"
 
     return Outcome(False, len(history), history[-1] if history else None, history, repairs)
@@ -240,9 +235,7 @@ so at least the shape is there.
 """
 
 
-def write_generation_runbook(
-    project_dir: Path, pass_name: str, reason: str, done: list[str]
-) -> Path:
+def write_generation_runbook(project_dir: Path, pass_name: str, reason: str, done: list[str]) -> Path:
     """The floor for a pass that never returned.
 
     `drive_to_green` has had a floor since the beginning; generation did not,
@@ -252,9 +245,7 @@ def write_generation_runbook(
     listed = "\n".join(f"- {name}" for name in done) or "- none"
     path = project_dir / "RUNBOOK.md"
     path.write_text(
-        GENERATION_RUNBOOK.format(
-            pass_name=pass_name, reason=reason.strip() or "(no reason given)", done=listed
-        )
+        GENERATION_RUNBOOK.format(pass_name=pass_name, reason=reason.strip() or "(no reason given)", done=listed)
     )
     return path
 

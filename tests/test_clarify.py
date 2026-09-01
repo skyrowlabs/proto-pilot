@@ -8,7 +8,13 @@ corrupt the direction that was already given.
 
 from __future__ import annotations
 
+import pytest
+
 from protopilot.passes import clarify
+
+# Host-side: no key, no Docker daemon, no network. The offline baseline is
+# what makes the whole pipeline testable under one marker.
+pytestmark = pytest.mark.unit
 
 
 def test_build_includes_the_idea_and_the_direction():

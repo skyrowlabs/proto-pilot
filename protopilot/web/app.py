@@ -15,15 +15,17 @@ from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from protopilot import __version__, build as builder, registry
+from protopilot import __version__
+from protopilot import build as builder
+from protopilot import registry
+from protopilot.baseline import standard_screens
 from protopilot.build import is_test_path
-from protopilot.jobs import STORE, Job
+from protopilot.jobs import STORE
 from protopilot.llm import build_llm
 from protopilot.passes import PassContext, clarify, intake
 from protopilot.render import render_skeleton
 from protopilot.runner import SubprocessRunner, docker_available
 from protopilot.spec import Screen, Spec, checkable_paths
-from protopilot.baseline import standard_screens
 from protopilot.verify import Verifier
 
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -54,9 +56,7 @@ def run_generation(
         data = intake.offline(job.idea, ctx)
     else:
         system, user = intake.build(job.idea, ctx)
-        data = llm.structured(
-            system=system, user=user, schema=intake.SCHEMA, label=intake.NAME
-        )
+        data = llm.structured(system=system, user=user, schema=intake.SCHEMA, label=intake.NAME)
 
     spec = Spec.model_validate(data)
     spec.port = free_port()
@@ -80,16 +80,11 @@ def run_generation(
 
     log("verify...")
     make_verifier = verifier_factory or (
-        lambda: Verifier(target, spec.port, SubprocessRunner(),
-                         screens=checkable_paths(spec))
+        lambda: Verifier(target, spec.port, SubprocessRunner(), screens=checkable_paths(spec))
     )
-    outcome = builder.drive_to_green(
-        spec, ctx, llm, make_verifier(), attempts=attempts, log=log
-    )
+    outcome = builder.drive_to_green(spec, ctx, llm, make_verifier(), attempts=attempts, log=log)
 
-    registry.record(
-        slug=spec.slug, name=spec.name, path=target, port=spec.port, idea=job.idea
-    )
+    registry.record(slug=spec.slug, name=spec.name, path=target, port=spec.port, idea=job.idea)
     job.url = f"http://localhost:{spec.port}"
     if not outcome.ok:
         # Handed back anyway, with the stage named -- the same floor the CLI has.
@@ -105,13 +100,18 @@ def run_clarify(job, backend: str | None = None) -> None:
         job.result = {"heads_up": "", "questions": []}
         return
     system, user = clarify.build(job.idea, job.direction)
-    job.result = llm.structured(
-        system=system, user=user, schema=clarify.SCHEMA, label=clarify.NAME
-    )
+    job.result = llm.structured(system=system, user=user, schema=clarify.SCHEMA, label=clarify.NAME)
 
 
-def run_amend(job, project_dir: Path, change: str, backend: str | None = None,
-              demo: bool = True, attempts: int = 3, verifier_factory=None) -> None:
+def run_amend(
+    job,
+    project_dir: Path,
+    change: str,
+    backend: str | None = None,
+    demo: bool = True,
+    attempts: int = 3,
+    verifier_factory=None,
+) -> None:
     """Apply a change to an existing prototype. The CLI's `add`, over HTTP."""
     import subprocess
 
@@ -143,12 +143,9 @@ def run_amend(job, project_dir: Path, change: str, backend: str | None = None,
 
     log("verify...")
     make_verifier = verifier_factory or (
-        lambda: Verifier(target, updated.port, SubprocessRunner(),
-                         screens=checkable_paths(updated))
+        lambda: Verifier(target, updated.port, SubprocessRunner(), screens=checkable_paths(updated))
     )
-    outcome = builder.drive_to_green(
-        updated, ctx, llm, make_verifier(), attempts=attempts, log=log
-    )
+    outcome = builder.drive_to_green(updated, ctx, llm, make_verifier(), attempts=attempts, log=log)
     job.project_dir = str(target)
     job.port = updated.port
     job.url = f"http://localhost:{updated.port}"
@@ -169,9 +166,9 @@ def create_app(workspace: Path, backend: str | None = None, demo: bool = True) -
     def index(request: Request):
         ok, why = docker_available(SubprocessRunner())
         return TEMPLATES.TemplateResponse(
-            request, "index.html",
-            {"projects": registry.prune(), "jobs": STORE.all(),
-             "docker_ok": ok, "docker_why": why, "demo": demo},
+            request,
+            "index.html",
+            {"projects": registry.prune(), "jobs": STORE.all(), "docker_ok": ok, "docker_why": why, "demo": demo},
         )
 
     @app.post("/clarify")
@@ -185,9 +182,7 @@ def create_app(workspace: Path, backend: str | None = None, demo: bool = True) -
         job = STORE.get(job_id)
         if job is None:
             return RedirectResponse("/", status_code=303)
-        return TEMPLATES.TemplateResponse(
-            request, "clarify.html", {"job": job, "demo": demo}
-        )
+        return TEMPLATES.TemplateResponse(request, "clarify.html", {"job": job, "demo": demo})
 
     @app.post("/generate")
     async def generate(request: Request):
@@ -196,11 +191,7 @@ def create_app(workspace: Path, backend: str | None = None, demo: bool = True) -
         direction = str(form.get("direction", "")).strip()
         # Answers arrive as answer::<question text>; folding them into
         # `direction` means they reach every pass with no new plumbing.
-        answers = {
-            key.split("::", 1)[1]: str(value)
-            for key, value in form.items()
-            if key.startswith("answer::")
-        }
+        answers = {key.split("::", 1)[1]: str(value) for key, value in form.items() if key.startswith("answer::")}
         direction = clarify.answers_to_direction(direction, answers)
         job = STORE.create(idea, direction)
         STORE.run(job, _generate)
@@ -214,8 +205,7 @@ def create_app(workspace: Path, backend: str | None = None, demo: bool = True) -
         job = STORE.create(f"[change] {change.strip()}", "")
         STORE.run(
             job,
-            lambda j: run_amend(j, Path(entry.path), change.strip(),
-                                backend=backend, demo=demo),
+            lambda j: run_amend(j, Path(entry.path), change.strip(), backend=backend, demo=demo),
         )
         return RedirectResponse(f"/jobs/{job.id}", status_code=303)
 
@@ -240,7 +230,8 @@ def create_app(workspace: Path, backend: str | None = None, demo: bool = True) -
             return RedirectResponse("/", status_code=303)
         root = Path(entry.path)
         files = sorted(
-            p.relative_to(root) for p in root.rglob("*")
+            p.relative_to(root)
+            for p in root.rglob("*")
             if p.is_file() and not {"__pycache__", ".git", ".pytest_cache"} & set(p.parts)
         )
         show_tests = bool(tests) or not demo
@@ -248,9 +239,16 @@ def create_app(workspace: Path, backend: str | None = None, demo: bool = True) -
         if not show_tests:
             files = [f for f in files if not is_test_path(f)]
         return TEMPLATES.TemplateResponse(
-            request, "project.html",
-            {"entry": entry, "files": files, "show_tests": show_tests,
-             "hidden": hidden, "spec": Spec.load(root).summary(), "demo": demo},
+            request,
+            "project.html",
+            {
+                "entry": entry,
+                "files": files,
+                "show_tests": show_tests,
+                "hidden": hidden,
+                "spec": Spec.load(root).summary(),
+                "demo": demo,
+            },
         )
 
     def _compose(entry, *args: str) -> int:
@@ -264,9 +262,9 @@ def create_app(workspace: Path, backend: str | None = None, demo: bool = True) -
         if action == "up":
             _compose(entry, "up", "-d", "--build")
         elif action == "down":
-            _compose(entry, "down")          # data kept
+            _compose(entry, "down")  # data kept
         elif action == "purge":
-            _compose(entry, "down", "-v")    # data dropped
+            _compose(entry, "down", "-v")  # data dropped
         elif action == "forget":
             # Leaves the tree on disk; just stops listing it.
             registry.forget(Path(entry.path))

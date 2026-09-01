@@ -9,7 +9,13 @@ from __future__ import annotations
 
 import time
 
+import pytest
+
 from protopilot.jobs import JobStore
+
+# Host-side: no key, no Docker daemon, no network. The offline baseline is
+# what makes the whole pipeline testable under one marker.
+pytestmark = pytest.mark.unit
 
 
 def wait_for(job, *, timeout=3.0):

@@ -59,9 +59,7 @@ class PassContext:
         root = self.project_dir / "app" / "templates"
         if not root.is_dir():
             return []
-        return sorted(
-            f"app/templates/{p.name}" for p in root.glob("*.html") if p.name != "base.html"
-        )
+        return sorted(f"app/templates/{p.name}" for p in root.glob("*.html") if p.name != "base.html")
 
 
 @dataclass
@@ -71,17 +69,13 @@ class PassResult:
     notes: str
 
 
-def run_pass(
-    module: ModuleType, spec: Spec, ctx: PassContext, llm: LLM
-) -> PassResult:
+def run_pass(module: ModuleType, spec: Spec, ctx: PassContext, llm: LLM) -> PassResult:
     """Produce a pass's files and write them, or raise."""
     if llm.offline:
         data = module.offline(spec, ctx)
     else:
         system, user = module.build(spec, ctx)
-        data = llm.structured(
-            system=system, user=user, schema=module.SCHEMA, label=module.NAME
-        )
+        data = llm.structured(system=system, user=user, schema=module.SCHEMA, label=module.NAME)
     files = [GeneratedFile(path=f["path"], content=f["content"]) for f in data["files"]]
     written = write_all(ctx.project_dir, files, module.NAME)
     notes = data.get("notes", "")

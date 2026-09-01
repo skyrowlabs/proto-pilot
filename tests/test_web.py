@@ -13,7 +13,6 @@ disk. Anything invented about the pipeline's API surface fails here.
 from __future__ import annotations
 
 import pytest
-
 from fakes import FakeVerifier
 
 from protopilot.jobs import JobStore
@@ -22,6 +21,10 @@ from protopilot.verify import VerifyResult
 pytest.importorskip("fastapi")
 
 from protopilot.web.app import run_generation  # noqa: E402
+
+# Host-side: no key, no Docker daemon, no network. The offline baseline is
+# what makes the whole pipeline testable under one marker.
+pytestmark = pytest.mark.unit
 
 
 GREEN = VerifyResult(ok=True, stage="tests", summary="green")
@@ -40,9 +43,7 @@ def test_generation_produces_a_tree_and_registers_it(tmp_path):
     from protopilot import registry
 
     job = JobStore().create("track camping gear across trips", "make it a checklist")
-    run_generation(
-        job, tmp_path, backend="offline", verifier_factory=green_verifier
-    )
+    run_generation(job, tmp_path, backend="offline", verifier_factory=green_verifier)
 
     root = tmp_path / job.project_dir.rsplit("/", 1)[-1]
     assert (root / "app" / "models.py").exists()
@@ -55,7 +56,10 @@ def test_generation_produces_a_tree_and_registers_it(tmp_path):
 def test_demo_mode_hides_tests_from_the_log_but_still_writes_them(tmp_path):
     job = JobStore().create("track camping gear across trips")
     run_generation(
-        job, tmp_path, backend="offline", demo=True,
+        job,
+        tmp_path,
+        backend="offline",
+        demo=True,
         verifier_factory=green_verifier,
     )
     root = tmp_path / job.project_dir.rsplit("/", 1)[-1]
@@ -67,7 +71,10 @@ def test_demo_mode_hides_tests_from_the_log_but_still_writes_them(tmp_path):
 def test_without_demo_the_test_file_is_named_in_the_log(tmp_path):
     job = JobStore().create("track camping gear across trips")
     run_generation(
-        job, tmp_path, backend="offline", demo=False,
+        job,
+        tmp_path,
+        backend="offline",
+        demo=False,
         verifier_factory=green_verifier,
     )
     assert any("test_smoke.py" in line for line in job.lines)

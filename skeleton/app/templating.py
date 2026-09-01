@@ -9,9 +9,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi.templating import Jinja2Templates
-
 from app.settings import settings
+from fastapi.templating import Jinja2Templates
 
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 templates.env.globals["app_name"] = settings.app_name

@@ -4,10 +4,13 @@ import pytest
 
 from protopilot.files import GeneratedFile, UnsafePath, check_path, write_all
 
+# Host-side: no key, no Docker daemon, no network. The offline baseline is
+# what makes the whole pipeline testable under one marker.
+pytestmark = pytest.mark.unit
+
 
 @pytest.mark.parametrize(
-    "path", ["app/models.py", "app/routes.py", "app/seed.py",
-             "app/templates/trips_list.html", "tests/test_smoke.py"]
+    "path", ["app/models.py", "app/routes.py", "app/seed.py", "app/templates/trips_list.html", "tests/test_smoke.py"]
 )
 def test_generated_paths_are_allowed(path):
     assert check_path(path)

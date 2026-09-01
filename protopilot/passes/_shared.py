@@ -118,8 +118,5 @@ def spec_block(spec) -> str:
     import json
 
     return (
-        "## The spec\n\n```json\n"
-        + json.dumps(spec.model_dump(mode="json"), indent=2)
-        + "\n```\n\n"
-        + spec.summary()
+        "## The spec\n\n```json\n" + json.dumps(spec.model_dump(mode="json"), indent=2) + "\n```\n\n" + spec.summary()
     )

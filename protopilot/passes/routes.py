@@ -52,11 +52,7 @@ names from the same rule, so a name invented here is a 500 at render time.
 
 
 def build(spec, ctx) -> tuple[str, str]:
-    user = (
-        spec_block(spec)
-        + "\n\n## Already generated\n\n"
-        + ctx.sources("app/models.py", "tests/test_smoke.py")
-    )
+    user = spec_block(spec) + "\n\n## Already generated\n\n" + ctx.sources("app/models.py", "tests/test_smoke.py")
     return STACK_BRIEF + TASK, user
 
 

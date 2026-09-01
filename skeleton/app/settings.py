@@ -16,9 +16,7 @@ class Settings:
     @classmethod
     def from_env(cls) -> "Settings":
         return cls(
-            database_url=os.environ.get(
-                "DATABASE_URL", "postgresql+psycopg://app:app@db:5432/app"
-            ),
+            database_url=os.environ.get("DATABASE_URL", "postgresql+psycopg://app:app@db:5432/app"),
             app_name=os.environ.get("APP_NAME", "@@APP_NAME@@"),
             app_purpose=os.environ.get("APP_PURPOSE", "@@APP_PURPOSE@@"),
         )

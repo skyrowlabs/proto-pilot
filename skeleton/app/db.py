@@ -9,19 +9,16 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
+from app.settings import settings
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
-
-from app.settings import settings
 
 engine = create_engine(settings.database_url, pool_pre_ping=True, future=True)
 
 # expire_on_commit=False so a template can still read attributes off an object
 # after the route committed it. The default expires them and renders a
 # DetachedInstanceError instead of a page.
-SessionLocal = sessionmaker(
-    bind=engine, autoflush=False, expire_on_commit=False, class_=Session
-)
+SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False, class_=Session)
 
 
 class Base(DeclarativeBase):

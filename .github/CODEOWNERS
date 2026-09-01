@@ -1,0 +1,9 @@
+# Default owner for everything.
+*                           @skyrowlabs
+
+# The governance layer. A change here changes how every other change is
+# reviewed, so it gets read even when the diff looks mechanical.
+/.claude/                   @skyrowlabs
+/.github/workflows/         @skyrowlabs
+/.pre-commit-config.yaml    @skyrowlabs
+/scripts/docs/              @skyrowlabs

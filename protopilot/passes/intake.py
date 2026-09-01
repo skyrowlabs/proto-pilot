@@ -135,9 +135,7 @@ def offline(idea: str, ctx) -> dict:
     return data
 
 
-AMEND_SYSTEM = (
-    SYSTEM
-    + """
+AMEND_SYSTEM = SYSTEM + """
 
 ## Amending an existing spec
 
@@ -152,7 +150,6 @@ Return the COMPLETE updated spec.
 - Regenerate the `screens` list from the same rule as before, so it stays
   consistent with the entities after your change.
 """
-)
 
 
 def build_amend(spec, change: str) -> tuple[str, str]:

@@ -45,7 +45,7 @@ def seed_expr(field: Field_) -> str:
     lower = label.lower()
     return {
         "str": 'f"' + label + ' {i}"',
-        "text": 'f"Notes on ' + lower + " {i}. Replace this with something real.\"",
+        "text": 'f"Notes on ' + lower + ' {i}. Replace this with something real."',
         "int": "i * 3",
         "float": "round(i * 2.5, 2)",
         "bool": "i % 2 == 0",
@@ -69,9 +69,7 @@ def children_of(spec: Spec, entity: Entity) -> list[Entity]:
 
 def ordered_entities(spec: Spec) -> list[Entity]:
     """Parents before children -- a child row needs its parent's id to exist."""
-    return [e for e in spec.entities if not e.belongs_to] + [
-        e for e in spec.entities if e.belongs_to
-    ]
+    return [e for e in spec.entities if not e.belongs_to] + [e for e in spec.entities if e.belongs_to]
 
 
 # -- models ------------------------------------------------------------
@@ -106,16 +104,12 @@ def models_py(spec: Spec) -> str:
             info = TYPES[field.type]
             ann = info.py if field.required else f"Optional[{info.py}]"
             null = "False" if field.required else "True"
-            lines.append(
-                f"    {field.name}: Mapped[{ann}] = "
-                f"mapped_column({info.sa}, nullable={null})"
-            )
+            lines.append(f"    {field.name}: Mapped[{ann}] = " f"mapped_column({info.sa}, nullable={null})")
         if entity.belongs_to:
             parent = spec.entity(entity.belongs_to)
             assert parent is not None, f"unknown parent {entity.belongs_to!r}"
             lines.append(
-                f"    {parent.var}_id: Mapped[Optional[int]] = "
-                f'mapped_column(ForeignKey("{parent.table}.id"))'
+                f"    {parent.var}_id: Mapped[Optional[int]] = " f'mapped_column(ForeignKey("{parent.table}.id"))'
             )
             lines.append(
                 f'    {parent.var}: Mapped[Optional["{parent.name}"]] = '
@@ -218,14 +212,14 @@ def seed_py(spec: Spec, rows: int = 5) -> str:
 
 # -- routes ------------------------------------------------------------
 
-_INDEX_ROUTE = '''@router.get("/", response_class=HTMLResponse)
+_INDEX_ROUTE = """@router.get("/", response_class=HTMLResponse)
 def index(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
     sections = [
 __SECTIONS__
     ]
-    return templates.TemplateResponse(request, "index.html", {"sections": sections})'''
+    return templates.TemplateResponse(request, "index.html", {"sections": sections})"""
 
-_ENTITY_ROUTES = '''@router.get("/__PLURAL__", response_class=HTMLResponse)
+_ENTITY_ROUTES = """@router.get("/__PLURAL__", response_class=HTMLResponse)
 def __VAR___list(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
     rows = db.scalars(select(__NAME__).order_by(__NAME__.id)).all()
     return templates.TemplateResponse(request, "__PLURAL___list.html", {"rows": rows})
@@ -288,7 +282,7 @@ def __VAR___delete(row_id: int, db: Session = Depends(get_db)) -> RedirectRespon
     if row is not None:
         db.delete(row)
         db.commit()
-    return RedirectResponse("/__PLURAL__", status_code=303)'''
+    return RedirectResponse("/__PLURAL__", status_code=303)"""
 
 
 def _coerce_call(field: Field_) -> str:
@@ -348,10 +342,7 @@ def routes_py(spec: Spec) -> str:
             fk = f"{parent.var}_id"
             assign.append(f'        {fk}=parse_int(form.get("{fk}")),')
             update.append(f'    row.{fk} = parse_int(form.get("{fk}"))')
-            parents = (
-                f', "parents": db.scalars('
-                f"select({parent.name}).order_by({parent.name}.id)).all()"
-            )
+            parents = f', "parents": db.scalars(' f"select({parent.name}).order_by({parent.name}.id)).all()"
         blocks.append(
             _ENTITY_ROUTES.replace("__NAME__", entity.name)
             .replace("__PLURAL__", entity.plural)
@@ -466,11 +457,7 @@ _PARENT_SELECT = """    <label for="__FK__">__PARENT_LABEL__
 
 def _cell(field: Field_) -> str:
     if field.type == "bool":
-        return (
-            "        <td>{% if row.__N__ %}yes{% else %}no{% endif %}</td>".replace(
-                "__N__", field.name
-            )
-        )
+        return "        <td>{% if row.__N__ %}yes{% else %}no{% endif %}</td>".replace("__N__", field.name)
     return "        <td>{{ row.__N__ }}</td>".replace("__N__", field.name)
 
 
@@ -481,11 +468,7 @@ def _set_value(field: Field_) -> str:
     rejects Python's default `2030-01-02 03:04:00` rendering -- it wants the T.
     """
     if field.type in {"date", "datetime"}:
-        return (
-            "{% set value = obj.__N__.isoformat() if obj and obj.__N__ else '' %}".replace(
-                "__N__", field.name
-            )
-        )
+        return "{% set value = obj.__N__.isoformat() if obj and obj.__N__ else '' %}".replace("__N__", field.name)
     if field.type == "bool":
         return "{% set value = obj.__N__ if obj else False %}".replace("__N__", field.name)
     return "{% set value = obj.__N__ if obj else '' %}".replace("__N__", field.name)
@@ -507,10 +490,7 @@ def _input(field: Field_) -> str:
 def templates_for(spec: Spec) -> dict[str, str]:
     out: dict[str, str] = {}
 
-    links = "\n".join(
-        f'  <a href="/{e.plural}">{e.plural.replace("_", " ").capitalize()}</a>'
-        for e in spec.entities
-    )
+    links = "\n".join(f'  <a href="/{e.plural}">{e.plural.replace("_", " ").capitalize()}</a>' for e in spec.entities)
     out["app/templates/_nav.html"] = _NAV.replace("__LINKS__", links or "")
     out["app/templates/index.html"] = _INDEX
 
@@ -523,20 +503,16 @@ def templates_for(spec: Spec) -> dict[str, str]:
             "__TITLE_LOWER__": title.lower(),
         }
 
-        headers = "\n".join(
-            f"        <th>{f.human_label()}</th>" for f in entity.fields
-        )
+        headers = "\n".join(f"        <th>{f.human_label()}</th>" for f in entity.fields)
         cells = "\n".join(_cell(f) for f in entity.fields)
         out[f"app/templates/{entity.plural}_list.html"] = _apply(
             _LIST, base | {"__HEADERS__": headers, "__CELLS__": cells}
         )
 
         detail_fields = "\n".join(
-            f"      <dt class=\"muted\">{f.human_label()}</dt>\n"
+            f'      <dt class="muted">{f.human_label()}</dt>\n'
             + (
-                "      <dd>{% if row.__N__ %}yes{% else %}no{% endif %}</dd>".replace(
-                    "__N__", f.name
-                )
+                "      <dd>{% if row.__N__ %}yes{% else %}no{% endif %}</dd>".replace("__N__", f.name)
                 if f.type == "bool"
                 else "      <dd>{{ row.__N__ }}</dd>".replace("__N__", f.name)
             )
@@ -547,11 +523,15 @@ def templates_for(spec: Spec) -> dict[str, str]:
             parent = spec.entity(entity.belongs_to)
             assert parent is not None
             parent_block = (
-                "  {% if row.__PVAR__ %}\n"
-                '  <p class="muted">Part of '
-                '<a href="/__PPLURAL__/{{ row.__PVAR__.id }}">{{ row.__PVAR__.display }}</a></p>\n'
-                "  {% endif %}"
-            ).replace("__PVAR__", parent.var).replace("__PPLURAL__", parent.plural)
+                (
+                    "  {% if row.__PVAR__ %}\n"
+                    '  <p class="muted">Part of '
+                    '<a href="/__PPLURAL__/{{ row.__PVAR__.id }}">{{ row.__PVAR__.display }}</a></p>\n'
+                    "  {% endif %}"
+                )
+                .replace("__PVAR__", parent.var)
+                .replace("__PPLURAL__", parent.plural)
+            )
 
         child_blocks = []
         for child in children_of(spec, entity):
@@ -585,7 +565,7 @@ def templates_for(spec: Spec) -> dict[str, str]:
         )
 
         form_fields = "\n".join(
-            f"    <label for=\"{f.name}\">{f.human_label()}\n"
+            f'    <label for="{f.name}">{f.human_label()}\n'
             f"      {_set_value(f)}\n"
             f"      {_input(f)}\n"
             "    </label>"
@@ -675,9 +655,7 @@ def smoke_py(spec: Spec) -> str:
             f'    assert client.get("/{p}/99999999").status_code == 404'
         )
 
-        data_lines = [
-            f'        "{f.name}": {_FORM_VALUES[f.type]},' for f in entity.fields
-        ]
+        data_lines = [f'        "{f.name}": {_FORM_VALUES[f.type]},' for f in entity.fields]
         lookup = ""
         if entity.belongs_to:
             parent = spec.entity(entity.belongs_to)
@@ -714,9 +692,7 @@ def standard_screens(spec: Spec) -> list[dict]:
     satisfy, so they need a predictable shape. A model free to invent URL
     conventions per app produces tests and routes that disagree.
     """
-    screens: list[dict] = [
-        {"name": "Home", "path": "/", "entity": None, "kind": "custom"}
-    ]
+    screens: list[dict] = [{"name": "Home", "path": "/", "entity": None, "kind": "custom"}]
     for entity in spec.entities:
         title = entity.plural.replace("_", " ").capitalize()
         screens += [

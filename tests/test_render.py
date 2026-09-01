@@ -4,6 +4,10 @@ import pytest
 
 from protopilot.render import SKELETON_DIR, TOKEN_RE, render, render_skeleton, substitutions
 
+# Host-side: no key, no Docker daemon, no network. The offline baseline is
+# what makes the whole pipeline testable under one marker.
+pytestmark = pytest.mark.unit
+
 
 def test_render_substitutes_known_tokens(spec):
     assert render("port @@PORT@@", substitutions(spec)) == "port 8099"

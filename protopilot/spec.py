@@ -56,9 +56,7 @@ class Entity(BaseModel):
     name: str = Field(description="PascalCase singular, e.g. Trip")
     plural: str = Field(default="", description="snake_case plural, e.g. trips")
     fields: list[Field_] = Field(default_factory=list)
-    belongs_to: str | None = Field(
-        default=None, description="PascalCase name of the parent entity, or null"
-    )
+    belongs_to: str | None = Field(default=None, description="PascalCase name of the parent entity, or null")
 
     @field_validator("name")
     @classmethod
@@ -131,9 +129,7 @@ class Spec(BaseModel):
     def load(cls, project_dir: Path) -> "Spec":
         path = Path(project_dir) / SPEC_DIR / SPEC_FILENAME
         if not path.exists():
-            raise FileNotFoundError(
-                f"no spec at {path} -- is {project_dir} a proto-pilot project?"
-            )
+            raise FileNotFoundError(f"no spec at {path} -- is {project_dir} a proto-pilot project?")
         return cls.model_validate_json(path.read_text())
 
     def save(self, project_dir: Path) -> Path:

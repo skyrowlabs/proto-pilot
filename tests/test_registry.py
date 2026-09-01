@@ -16,6 +16,10 @@ import pytest
 from protopilot import registry
 from protopilot.build import is_test_path
 
+# Host-side: no key, no Docker daemon, no network. The offline baseline is
+# what makes the whole pipeline testable under one marker.
+pytestmark = pytest.mark.unit
+
 
 @pytest.fixture(autouse=True)
 def isolated_registry(tmp_path, monkeypatch):
