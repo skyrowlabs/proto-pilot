@@ -37,6 +37,11 @@ class PassContext:
     notes: dict[str, str] = field(default_factory=dict)
     # Free-text instruction for an incremental change (`proto add`).
     change: str = ""
+    # The archetype the classifier chose, known before intake runs and needed
+    # by it: intake picks the entities, and "a match and its moves" versus "a
+    # table of games" is a decision only the shape can settle. Every other pass
+    # reads it off the spec; intake has no spec yet, which is what it is for.
+    archetype: str = ""
     # A formatted VerifyResult, set only when the repair pass is running.
     failure: str = ""
 

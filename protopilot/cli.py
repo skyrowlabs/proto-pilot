@@ -247,7 +247,7 @@ def new(
     chosen, theme = _classify(llm, idea, direction, archetype_name)
 
     _echo("intake...")
-    ctx = PassContext(project_dir=Path("."), change=direction)
+    ctx = PassContext(project_dir=Path("."), change=direction, archetype=chosen)
     try:
         if llm.offline:
             data = intake.offline(idea, ctx)

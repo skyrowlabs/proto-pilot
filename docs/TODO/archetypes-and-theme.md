@@ -283,15 +283,20 @@ form button, re-rendered per submit, is a complete two-player board game.
 Cheap, high-visibility, and the axis that does the most for "relatable" per unit
 of work.
 
-- [ ] `theme` reaches the UI pass only. No other pass reads it, and a test
+- [x] `theme` reaches the UI pass only. No other pass reads it, and a test
       asserts that: a theme that can change routes or models is an archetype
       wearing the wrong name
-- [ ] The UI brief asks for drawn inline SVG on-theme — the existing prompt
+- [x] The UI brief asks for drawn inline SVG on-theme — the existing prompt
       already insists artwork is drawn rather than emoji, and this gives that
       instruction a subject
-- [ ] The offline baseline ignores `theme` and produces the plain look. Themes
+- [x] The offline baseline ignores `theme` and produces the plain look. Themes
       cost nothing in baseline maintenance, which is exactly why they are a
       separate axis
+- [x] **Phase 2's deferred item, now that it has somewhere to go.** The
+      board-game essay leaves `intake.SYSTEM` and `turn-based-game.brief()`
+      keeps it — which required wiring the brief *into* intake, because intake
+      is the one pass with no spec to read the archetype off. Removing the
+      prose without that would have been a deletion, not a move
 
 ## Phase 6 — The journey, in the front end
 

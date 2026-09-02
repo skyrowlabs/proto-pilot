@@ -55,8 +55,12 @@ def run_generation(
     llm = build_llm(backend=backend)
     log = job.log
 
+    # Resolved once, and before intake: intake is the one pass with no spec to
+    # read the shape off, so it is told through the context.
+    chosen = job.archetype or archetypes_default()
+
     log("intake...")
-    ctx = PassContext(project_dir=Path("."), change=job.direction)
+    ctx = PassContext(project_dir=Path("."), change=job.direction, archetype=chosen)
     if llm.offline:
         data = intake.offline(job.idea, ctx)
     else:
@@ -69,7 +73,7 @@ def run_generation(
     spec.protopilot_version = __version__
     # Set here, never by the model: intake is not shown these fields precisely
     # so it cannot produce a second opinion that overwrites the human's.
-    spec.archetype = job.archetype or archetypes_default()
+    spec.archetype = chosen
     spec.answers = dict(job.answers)
     theme = Theme(**job.theme) if job.theme else Theme()
     spec.theme = None if theme.is_empty() else theme
