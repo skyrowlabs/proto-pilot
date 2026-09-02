@@ -97,13 +97,30 @@ is only a pointer at it).
   a seeded directory and an empty one and requires identical manifest keys.
 
   **Still open on our side, and it waits on them.** Our `.skeletor.json` keeps
-  its 114 foreign entries until skeletor is committed and tagged; `skeletor_ref`
-  here is `v0.1.0-8-gabcac22` and the remedy is a prune driven by
-  `skeletor-upgrade --dry-run --from-dir .` (whose report goes to **stderr**).
-  Do it once, after their tag — not before, and not twice. Do **not** re-scaffold
-  to fix it: that would clobber the seven hand-merges. We owe them a
-  `--dry-run` on this tree once tagged, as the real-world confirmation their
-  gate's decoys only model.
+  its 114 foreign entries until skeletor is committed and tagged.
+
+  The remedy, corrected by skeletor on 2026-09-01 — **do not pass `--from-dir`**.
+  With no base flag, `skeletor-upgrade` renders the base at the `skeletor_ref`
+  our manifest records (`v0.1.0-8-gabcac22`), which is exactly the base our 114
+  hashes describe. That is correct by construction and stays correct however far
+  their template moves ahead of us; the `--from-dir .` version they first gave
+  was only valid while their fix stayed under `bin/`, and a template change has
+  since landed, so it has already expired.
+
+      bin/skeletor-upgrade <this tree> --dry-run     # drift list on STDERR
+
+  Prune the reported keys from `.skeletor.json`, re-run until it stops
+  complaining, then run the real upgrade. Do it once, after their tag. Do
+  **not** re-scaffold: that would clobber the hand-merges. We owe them the raw
+  dry-run output either way, as the real-world confirmation their gate's decoys
+  only model.
+
+  **Both field reports we sent back were accepted and fixed in the template**,
+  so `.github/workflows/ci.yml` will be a genuine three-way merge on upgrade —
+  our push-trigger and project-install edits sit in the same region the template
+  now changes. That makes it the eighth hand-merge and the interesting one. If
+  it conflicts, our file is left untouched and the template's diff lands in
+  `tmp/upgrade/`.
 
 ## Traps — not bugs, but they will get you
 
