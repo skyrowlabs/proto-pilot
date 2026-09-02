@@ -19,16 +19,38 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from protopilot.llm import LLM
-from protopilot.passes import PassContext, PassResult
+from protopilot.passes import PassContext, PassResult, intake
 from protopilot.passes import models as schema_pass
 from protopilot.passes import repair, routes, run_pass, seed, smoke, ui
-from protopilot.spec import Spec
+from protopilot.spec import MODEL_OWNED_EXCLUSIONS, Screen, Spec
 from protopilot.verify import Verifies, VerifyResult
 
 CODE_PASSES = (schema_pass, smoke, seed, routes, ui)
 SMOKE_PATH = "tests/test_smoke.py"
 
 Log = Callable[[str], None]
+
+#: Identity. The slug is the database name and the port is the tab the user has
+#: open, so neither is the model's to revise on an amend.
+IDENTITY = ("slug", "port")
+
+#: What survives an amend unchanged, and why it is DERIVED rather than listed.
+#:
+#: `MODEL_OWNED_EXCLUSIONS` is exactly the set of fields the amend schema does
+#: not contain, because they have an owner that is not intake. A field the
+#: model was never shown cannot come back in its response -- so on an amend it
+#: has to come from the spec that already exists, or it silently reverts to a
+#: default.
+#:
+#: It silently did. Before this was here, `proto add` on a `turn-based-game`
+#: project reset it to `crud` and dropped the theme, the answers and the board
+#: dimensions, then regenerated a tracking app over a game's entities. Nothing
+#: failed; the tree just quietly became a different app.
+#:
+#: Derived, so the next field added to the exclusions is carried without
+#: anybody remembering this list exists. That is the whole reason to compute it
+#: rather than write it down.
+CARRIED_THROUGH_AMEND = IDENTITY + MODEL_OWNED_EXCLUSIONS
 
 
 class PassFailed(RuntimeError):
@@ -47,6 +69,81 @@ class Outcome:
     result: VerifyResult | None
     history: list[VerifyResult] = field(default_factory=list)
     repairs: list[str] = field(default_factory=list)
+
+
+def _run_intake(idea: str, llm: LLM, ctx: PassContext, *, label: str = "") -> dict:
+    """The intake call, offline or not. One place, so the two front ends cannot
+    drift on which branch they take."""
+    if llm.offline:
+        return intake.offline(idea, ctx)
+    system, user = intake.build(idea, ctx)
+    return llm.structured(system=system, user=user, schema=intake.SCHEMA, label=label or intake.NAME)
+
+
+def spec_from_idea(
+    idea: str,
+    llm: LLM,
+    *,
+    archetype: str,
+    port: int,
+    direction: str = "",
+    theme=None,
+    answers: dict[str, str] | None = None,
+) -> Spec:
+    """An idea and a classification -> a spec that is fully decided.
+
+    **The only implementation.** `proto new` and `proto serve` are two callers
+    of this, which is a rule the web module's docstring already claimed and
+    this function is what makes true: the same seven fields were being assigned
+    in two places, agreeing only because one person wrote both. Adding
+    `PassContext.archetype` needed an edit in each, and nothing would have
+    failed had only one been made.
+
+    Everything set here is set AFTER validation and never by the model. Intake
+    is not shown these fields (`MODEL_OWNED_EXCLUSIONS`) precisely so it cannot
+    return a confident second opinion that overwrites the human's.
+    """
+    from protopilot import __version__, archetypes
+
+    ctx = PassContext(project_dir=Path("."), change=direction, archetype=archetype)
+    spec = Spec.model_validate(_run_intake(idea, llm, ctx))
+
+    spec.port = port
+    spec.direction = direction or spec.direction
+    spec.protopilot_version = __version__
+    spec.archetype = archetype
+    spec.theme = theme if (theme is not None and not theme.is_empty()) else None
+    spec.answers = dict(answers or {})
+    # Screens are the contract the smoke tests and the routes are both
+    # generated from, and the rule belongs to the archetype -- so they are
+    # resolved AFTER `spec.archetype` is set, never before. Model-proposed
+    # `custom` pages survive on top; its guesses at the rest do not.
+    spec.screens = [Screen(**s) for s in archetypes.screens_for(spec, spec.screens)]
+    return spec
+
+
+def amend_spec(previous: Spec, change: str, llm: LLM) -> Spec:
+    """An existing spec and a change request -> the updated spec.
+
+    The other half of the same rule, and the half that was actually broken.
+    An amend response cannot contain the model-owned fields, so every one of
+    them has to be carried across from the spec that already exists --
+    `CARRIED_THROUGH_AMEND` is that set, derived rather than listed.
+
+    Screens are re-resolved rather than taken from the response for the same
+    reason as in `spec_from_idea`: the rule is the archetype's, and the
+    archetype has just been carried forward rather than re-decided.
+    """
+    from protopilot import __version__, archetypes
+
+    system, user = intake.build_amend(previous, change)
+    updated = Spec.model_validate(llm.structured(system=system, user=user, schema=intake.SCHEMA, label="amend"))
+
+    for name in CARRIED_THROUGH_AMEND:
+        setattr(updated, name, getattr(previous, name))
+    updated.protopilot_version = __version__
+    updated.screens = [Screen(**s) for s in archetypes.screens_for(updated, updated.screens)]
+    return updated
 
 
 def generate(

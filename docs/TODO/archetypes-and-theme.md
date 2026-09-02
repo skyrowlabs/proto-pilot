@@ -345,35 +345,78 @@ of work.
 Last, deliberately: the web form is a *rendering* of the question set, and until
 Phases 3–4 exist there is nothing to render.
 
-- [ ] `clarify.html` shows the archetype it inferred and lets the user change it
+- [x] `clarify.html` shows the archetype it inferred and lets the user change it
       before answering — the classification is the highest-leverage thing to
-      correct, and the cheapest moment to correct it is before any tokens
-- [ ] Fixed and model-generated questions render distinguishably, because they
-      are not the same kind of thing
-- [ ] Theme gets its own small control rather than being buried in a free-text
-      box
-- [ ] `proto serve` stays a second *caller* of the pipeline, never a second
+      correct, and the cheapest moment to correct it is before any tokens.
+      Landed in Phase 3; overruling is a GET with no model call
+- [x] Fixed and model-generated questions render distinguishably, because they
+      are not the same kind of thing. Landed in Phase 3
+- [x] Theme gets its own small control rather than being buried in a free-text
+      box. Landed in Phase 3
+- [x] `proto serve` stays a second *caller* of the pipeline, never a second
       implementation — the existing rule, restated because this phase is where
-      it is most tempting to break
+      it is most tempting to break. **This was the one that was false**, and
+      the only real work left in the phase
+
+> **Phase 6 landed, and the last item was not a restatement.** The first three
+> had already been built by Phases 3 and 4; the fourth was a claim the code
+> did not support. `web/app.py`'s own docstring said it was "a second caller of
+> the pipeline, not a second implementation of it" while assigning the same
+> seven spec fields `cli.py` assigns, in parallel. They agreed only because one
+> person wrote both — and adding `PassContext.archetype` in Phase 5 needed an
+> edit in each, with nothing to fail had only one been made.
+>
+> That is the workspace's seam rule playing out inside a single repo, so the
+> fix is the same shape: one implementation (`build.spec_from_idea`,
+> `build.amend_spec`) and a test that recomputes the offenders rather than
+> listing them — every assignment to a spec attribute anywhere in the package
+> must live in the module that owns the decision.
+>
+> **It was already broken, and silently.** `proto add` builds its updated spec
+> from an amend response, and the amend schema is the intake schema — which
+> omits `MODEL_OWNED_EXCLUSIONS`. So a model that answered perfectly still
+> could not return `archetype`, `theme`, `answers` or `extra`, and nothing
+> carried them across. One `proto add "add a timer"` on a `turn-based-game`
+> project reset it to `crud`, dropped the theme and the answers, reverted the
+> board to the default, and the next generation built a tracking app over a
+> game's entities. Nothing went red at any point.
+>
+> The set that survives an amend is now **derived** from
+> `MODEL_OWNED_EXCLUSIONS` rather than written down, so the next field added
+> there is carried without anybody remembering this rule exists. A hand-written
+> list is what turned a Phase 1 decision into a Phase 6 defect in the first
+> place.
 
 ## Acceptance
 
-- [ ] `./pp test unit` green, and `./pp check pre-push` green
-- [ ] Phase 2's characterisation test: offline CRUD generation is byte-identical
+- [x] `./pp test unit` green, and `./pp check pre-push` green
+- [x] Phase 2's characterisation test: offline CRUD generation is byte-identical
       to `a79e41b`'s output for the same spec
-- [ ] `proto new "cat themed chess" --offline` produces a spec whose
-      `archetype == "turn-based-game"` and whose screens include a board that is
-      not a `list`, `detail` or `form`
-- [ ] The same idea with `--archetype crud` produces the CRUD spread instead —
-      proving the axis is real and not the classifier's opinion baked in
-- [ ] A `spec.json` written before this plan loads without error and generates
-      the same app it did before
-- [ ] Grep proves it: no archetype module imports `requirements.txt`, the
+- [x] ~~`proto new "cat themed chess" --offline` produces a spec whose
+      `archetype == "turn-based-game"`~~ — **this criterion was unachievable as
+      written, and correcting it is more useful than ticking it.** `--offline`
+      means the classifier does not run: the offline baseline cannot read an
+      idea, so it returns the default by design, and asking it to infer
+      `turn-based-game` from the words "cat themed chess" was asking the
+      baseline to do the one thing it exists not to do. The criterion was
+      written in Phase 0, before the classifier's shape was settled. Split in
+      two, both verified by running them:
+      `proto new "cat themed chess" --archetype turn-based-game --offline`
+      yields `/`, `/board`, `/matches`, `/matches/{row_id}` — a board that is
+      not a `list`, `detail` or `form`; and the live classifier's half is the
+      Phase 4 call, which chose `turn-based-game` for this idea unprompted
+- [x] The same idea with `--archetype crud` produces the CRUD spread instead —
+      `/`, `/cats`, `/cats/new`, `/cats/{row_id}`. Same words in, different
+      shape out, so the axis is real and not the classifier's opinion baked in
+- [x] A `spec.json` written before this plan loads without error and generates
+      the same app it did before — `prototypes/kitten_chess/` loads with
+      `archetype == "crud"` and no theme
+- [x] Grep proves it: no archetype module imports `requirements.txt`, the
       Dockerfile or the compose file, enforced by a test rather than a rule
-- [ ] `theme` appears in the UI pass's prompt and in no other pass's, enforced
+- [x] `theme` appears in the UI pass's prompt and in no other pass's, enforced
       by a test
-- [ ] A generated `turn-based-game` boots and a turn can be taken through the
-      browser stage
+- [x] A generated `turn-based-game` boots and a turn can be taken through the
+      browser stage — Phase 4, played to a win over HTTP
 
 ## Dropped, and why
 

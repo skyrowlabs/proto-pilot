@@ -15,16 +15,15 @@ from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from protopilot import __version__
 from protopilot import build as builder
 from protopilot import registry
 from protopilot.build import is_test_path
 from protopilot.jobs import STORE
 from protopilot.llm import build_llm
-from protopilot.passes import PassContext, clarify, intake
+from protopilot.passes import PassContext, clarify
 from protopilot.render import render_skeleton
 from protopilot.runner import SubprocessRunner, docker_available
-from protopilot.spec import Screen, Spec, Theme, checkable_paths
+from protopilot.spec import Spec, Theme, checkable_paths
 from protopilot.verify import Verifier
 
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -60,26 +59,15 @@ def run_generation(
     chosen = job.archetype or archetypes_default()
 
     log("intake...")
-    ctx = PassContext(project_dir=Path("."), change=job.direction, archetype=chosen)
-    if llm.offline:
-        data = intake.offline(job.idea, ctx)
-    else:
-        system, user = intake.build(job.idea, ctx)
-        data = llm.structured(system=system, user=user, schema=intake.SCHEMA, label=intake.NAME)
-
-    spec = Spec.model_validate(data)
-    spec.port = free_port()
-    spec.direction = job.direction or spec.direction
-    spec.protopilot_version = __version__
-    # Set here, never by the model: intake is not shown these fields precisely
-    # so it cannot produce a second opinion that overwrites the human's.
-    spec.archetype = chosen
-    spec.answers = dict(job.answers)
-    theme = Theme(**job.theme) if job.theme else Theme()
-    spec.theme = None if theme.is_empty() else theme
-    from protopilot import archetypes
-
-    spec.screens = [Screen(**item) for item in archetypes.screens_for(spec, spec.screens)]
+    spec = builder.spec_from_idea(
+        job.idea,
+        llm,
+        archetype=chosen,
+        port=free_port(),
+        direction=job.direction,
+        theme=Theme(**job.theme) if job.theme else None,
+        answers=dict(job.answers),
+    )
 
     target = Path(workspace) / spec.slug
     if target.exists():
@@ -169,13 +157,7 @@ def run_amend(
     subprocess.call(["docker", "compose", "down", "-v"], cwd=str(target))  # noqa: S603
 
     log("amending spec...")
-    system, user = intake.build_amend(spec, change)
-    data = llm.structured(system=system, user=user, schema=intake.SCHEMA, label="amend")
-    updated = Spec.model_validate(data)
-    # Identity is not the model's to change: the slug is the database name and
-    # the port is what the user has open in a tab.
-    updated.slug, updated.port = spec.slug, spec.port
-    updated.protopilot_version = __version__
+    updated = builder.amend_spec(spec, change, llm)
     log(updated.summary())
     updated.save(target)
 

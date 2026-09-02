@@ -19,10 +19,10 @@ from protopilot import __version__
 from protopilot import build as builder
 from protopilot import containers, registry
 from protopilot.llm import ClaudeCodeLLM, ClaudeLLM, LLMError, build_llm
-from protopilot.passes import PassContext, clarify, intake
+from protopilot.passes import PassContext, clarify
 from protopilot.render import render_skeleton
 from protopilot.runner import SubprocessRunner, docker_available
-from protopilot.spec import SPEC_DIR, SPEC_FILENAME, Screen, Spec, Theme, checkable_paths
+from protopilot.spec import SPEC_DIR, SPEC_FILENAME, Spec, Theme, checkable_paths
 from protopilot.verify import Verifier
 
 PORT_RANGE = range(8080, 8180)
@@ -247,31 +247,18 @@ def new(
     chosen, theme = _classify(llm, idea, direction, archetype_name)
 
     _echo("intake...")
-    ctx = PassContext(project_dir=Path("."), change=direction, archetype=chosen)
     try:
-        if llm.offline:
-            data = intake.offline(idea, ctx)
-        else:
-            system, user = intake.build(idea, ctx)
-            data = llm.structured(system=system, user=user, schema=intake.SCHEMA, label=intake.NAME)
+        spec = builder.spec_from_idea(
+            idea,
+            llm,
+            archetype=chosen,
+            port=free_port(port),
+            direction=direction,
+            theme=theme,
+            answers=_parse_answers(chosen, answers),
+        )
     except LLMError as exc:
         raise click.ClickException(str(exc)) from exc
-
-    spec = Spec.model_validate(data)
-    spec.port = free_port(port)
-    spec.direction = direction or spec.direction
-    spec.protopilot_version = __version__
-    # Set after validation, never by the model: intake is not shown these
-    # fields precisely so it cannot produce a second opinion about them.
-    spec.archetype = chosen
-    spec.theme = theme
-    spec.answers = _parse_answers(chosen, answers)
-    # Screens are the contract the smoke tests and the routes are both
-    # generated from, and the rule belongs to the archetype -- so they are
-    # resolved AFTER `spec.archetype` is set, never before.
-    from protopilot import archetypes
-
-    spec.screens = [Screen(**s) for s in archetypes.screens_for(spec, spec.screens)]
 
     target = Path(directory).resolve() if directory else Path.cwd() / spec.slug
 
@@ -343,17 +330,10 @@ def add(
     _compose(target, "down", "-v")
 
     _echo("amending spec...")
-    system, user = intake.build_amend(spec, change)
     try:
-        data = llm.structured(system=system, user=user, schema=intake.SCHEMA, label="amend")
+        updated = builder.amend_spec(spec, change, llm)
     except LLMError as exc:
         raise click.ClickException(str(exc)) from exc
-
-    updated = Spec.model_validate(data)
-    # Identity is not the model's to change: the slug is the database name and
-    # the port is what the user has open in a tab.
-    updated.slug, updated.port = spec.slug, spec.port
-    updated.protopilot_version = __version__
 
     _echo("")
     _echo(updated.summary())
