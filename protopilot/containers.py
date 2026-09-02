@@ -112,6 +112,15 @@ def known_paths(runner: Runner) -> set[str]:
     own listing command; images are not, because `docker image ls` has no
     `.Label` formatter -- they are found by exact-value filter at removal time,
     which is all `gc` needs.
+
+    That last clause is a workaround, not an intention, and it is flagged as one
+    deliberately: it is true of Docker today and would stop being true the day
+    `image ls` grows the formatter. The conclusion survives either way -- the
+    filter works regardless -- which is exactly the case where nothing goes red
+    and nobody re-reads the reason. If you are here because that formatter now
+    exists, this function can ask images the same question it asks the other
+    three, and this paragraph is what tells you that is a simplification rather
+    than a rewrite.
     """
     fmt = f'{{{{.Label "{LABEL_PATH}"}}}}'
     queries = (

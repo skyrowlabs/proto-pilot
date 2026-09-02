@@ -311,6 +311,32 @@ first thing that goes wrong is `proto check docs` appearing in a user's shell.
 Rule 5 ("keep the CLI in sync") is about `./pp`. A new *product* command belongs
 in `protopilot/cli.py` and in the README's command table.
 
+
+### 16. A Reason That Names a Broken Thing Has an Expiry Nobody Wrote Down
+
+When you fix a defect, **everything that was justified by that defect is now
+justified by nothing.** The dangerous case is the one where the conclusion
+survives: nothing goes red, so nobody re-reads the reason, and a workaround
+quietly persists as though it were a design.
+
+The tell is whether a stated reason is a **workaround** or an **intention**:
+
+- *"Pinned to the release branch because an unpinned badge would read no-status
+  forever"* — a workaround. It was falsifiable by a fix somewhere else, and a
+  fix somewhere else duly falsified it.
+- *"Pinned to the release branch because a badge is a claim about what was
+  released"* — an intention. It survives anything.
+
+Both sentences defend the same line of config. Only one of them is still true
+after the push trigger is fixed.
+
+So: when a reason names something broken, absent or unimplemented — ours or a
+dependency's — say so explicitly and say what changes if it is fixed. See
+`containers.py::known_paths` for the shape. And when you close a defect, grep
+for what cited it. This session produced two instances in one afternoon: a
+neighbour's badge rule, and this repo's own README, which still listed a gap
+Phase 2 had closed an hour earlier.
+
 ---
 
 ## Documentation Reference

@@ -115,6 +115,17 @@ is only a pointer at it).
   dry-run output either way, as the real-world confirmation their gate's decoys
   only model.
 
+  **The `ci.yml` conflict is confirmed and does not gate us.** skeletor
+  reproduced our tree shape at our exact ref and ran the whole sequence: the
+  conflict is real and on the line we predicted (base `[main]`, ours
+  `[main, develop]`, theirs `[develop, main]` — every three-way merge conflicts
+  there, nothing to fix in the mechanism), but the upgraded tree's suite is
+  green **with our `ci.yml` left unmerged**, because their new gate parses the
+  branch list and asserts the set rather than the text. So: upgrade, leave our
+  file alone, resolve when we want their comment and their install step — not
+  before we can commit. The hunk lands in `tmp/upgrade/` and the resolution is
+  "take theirs wholesale".
+
   **Both field reports we sent back were accepted and fixed in the template**,
   so `.github/workflows/ci.yml` will be a genuine three-way merge on upgrade —
   our push-trigger and project-install edits sit in the same region the template

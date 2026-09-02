@@ -207,9 +207,10 @@ Early, and honest about it. Known gaps, in the order they will bite:
   worst of the three.
 - `jobs` and `external_apis` are recorded and otherwise ignored — a spec that
   needs either will generate an app that does not have it.
-- The offline baseline ignores `spec.screens` and always generates its own
-  CRUD set. Only the model path honours custom screens, so the thing the test
-  suite exercises and the thing you get differ on exactly that point.
+
+(The third gap that used to be listed here — the offline baseline ignoring
+`spec.screens` — was closed on 2026-09-01. `spec.screens` is now authoritative
+and every custom screen gets a route, a template and a smoke test.)
 
 The prompts in `passes/` have been run against the live API; the baseline is
 what CI covers, for the reason given above. `NOTES.md` is the live parking lot —
