@@ -27,11 +27,15 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     branches: [develop, main]
   push:
-    # `develop` is here because work lands on it by direct commit in this repo
-    # (AGENTS.md Rule 7) rather than through a pull request. The scaffold ships
-    # `[main]` alone, which is correct for a PR-only flow and silently ungates
-    # every commit under this one: no PR event, no push event, no CI.
-    branches: [main, develop]
+    # BOTH branches, not just the release one. A repo that commits directly to
+    # develop — every project does, while it is one person — otherwise
+    # runs nothing at all on those commits, and "no workflow ran" is
+    # indistinguishable from "the workflow passed" anywhere you would look for
+    # the answer. That is the expensive half; the cost is the cheap half: a PR
+    # flow tests the merge commit a second time, which is one bounded extra run
+    # per merge and is not even pure duplication, since a squash merge is a
+    # different commit than the PR head ever tested.
+    branches: [develop, main]
   workflow_dispatch:
 
 concurrency:
@@ -152,11 +156,13 @@ jobs:
       # skips its whole suite reports green.
       PP_CI: '1'
     steps:
-      # Full history, not the default shallow clone. `test_docs_name_live_code`
-      # asks git whether a symbol was ever defined here, and against a shallow
-      # clone the answer is always no -- so it would pass by seeing nothing
-      # rather than by finding nothing. It asserts the clone is deep instead of
-      # trusting this line, but this line is what keeps it green.
+      # Full history, not the default shallow clone.
+      # `tests/test_docs_name_live_code.py` asks git whether a symbol was ever
+      # defined here, and `git log --all` answers "no" for everything in a
+      # shallow clone — so the suite would go green having looked at nothing.
+      # That test asserts the clone is not shallow rather than trusting it, so
+      # without this the job fails loudly instead; the depth is what makes it
+      # pass honestly. The gate job above already pays this cost.
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
@@ -167,14 +173,41 @@ jobs:
           cache-dependency-path: pyproject.toml
 
       # Two installs, two audiences: `scripts/requirements.txt` is the repo's own
-      # tooling, `.[dev]` is the product and the generated app's stack — the
-      # end-to-end test runs a generated tree in process. Neither is a superset
-      # of the other.
+      # tooling, and the step below is the product plus the generated app's
+      # stack — the end-to-end test runs a generated tree in process, so every
+      # dependency that tree needs is in this repo's `dev` extra. Neither
+      # install is a superset of the other.
+      #
+      # The step is the template's and is deliberately taken unchanged. On this
+      # tree it does exactly what `pip install -e ".[dev]"` did, `dev` being the
+      # only extra — so keeping a hand-written line here would buy nothing and
+      # conflict on every future upgrade.
       #
       # No API key and no Docker daemon: the offline baseline is what makes the
       # pipeline testable here, which is the point of having one.
       - run: pip install -r scripts/requirements.txt
-      - run: pip install -e ".[dev]"
+
+      - name: Install the project, if it is one
+        run: |
+          if [ ! -f pyproject.toml ] || ! grep -q '^\[project\]' pyproject.toml; then
+            echo "no [project] block in this tree — nothing to install"
+            exit 0
+          fi
+          # One line because a heredoc cannot be indented into a YAML block —
+          # its terminator has to sit at column 0, and the Python inside would
+          # carry this block's indent. Reads the extra NAMES only; it never
+          # decides anything, so a malformed pyproject.toml fails the step
+          # loudly — GitHub runs this under `bash -eo pipefail`, so the failing
+          # substitution stops it — rather than quietly resolving to "no extras"
+          # and installing the wrong thing. Verified, not assumed.
+          extras=$(python -c 'import importlib.util as u, sys; sys.exit(0) if u.find_spec("tomllib") is None else None; import tomllib; d = tomllib.load(open("pyproject.toml", "rb")); print(",".join(sorted((d.get("project") or {}).get("optional-dependencies") or {})))')
+          if [ -n "$extras" ]; then
+            echo "pyproject.toml declares [project] with extras: $extras — installing all of them"
+            pip install -e ".[$extras]"
+          else
+            echo "pyproject.toml declares [project], no extras — installing it editable"
+            pip install -e .
+          fi
 
       - name: Unit suite
         run: python -m pytest tests/ -m unit -q --durations=25
@@ -206,7 +239,28 @@ jobs:
       # the 5 the tolerance below is written for. The job then fails for a
       # reason that has nothing to do with integration tests.
       - run: pip install -r scripts/requirements.txt
-      - run: pip install -e ".[dev]"
+
+      - name: Install the project, if it is one
+        run: |
+          if [ ! -f pyproject.toml ] || ! grep -q '^\[project\]' pyproject.toml; then
+            echo "no [project] block in this tree — nothing to install"
+            exit 0
+          fi
+          # One line because a heredoc cannot be indented into a YAML block —
+          # its terminator has to sit at column 0, and the Python inside would
+          # carry this block's indent. Reads the extra NAMES only; it never
+          # decides anything, so a malformed pyproject.toml fails the step
+          # loudly — GitHub runs this under `bash -eo pipefail`, so the failing
+          # substitution stops it — rather than quietly resolving to "no extras"
+          # and installing the wrong thing. Verified, not assumed.
+          extras=$(python -c 'import importlib.util as u, sys; sys.exit(0) if u.find_spec("tomllib") is None else None; import tomllib; d = tomllib.load(open("pyproject.toml", "rb")); print(",".join(sorted((d.get("project") or {}).get("optional-dependencies") or {})))')
+          if [ -n "$extras" ]; then
+            echo "pyproject.toml declares [project] with extras: $extras — installing all of them"
+            pip install -e ".[$extras]"
+          else
+            echo "pyproject.toml declares [project], no extras — installing it editable"
+            pip install -e .
+          fi
 
       # There is no stack to stand up. proto.pilot's only real integration is
       # generating a tree and booting it under Docker, and CI deliberately does

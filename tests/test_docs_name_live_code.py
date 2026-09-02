@@ -1,128 +1,157 @@
-"""A reference doc may not name a callable this repo used to have and no longer does.
+"""A reference doc may not name a callable this repo used to define and no longer does.
 
-The narrow, decidable half of a problem whose useful half is not. skeletor's
-framing, after we each found an instance in the same afternoon: **when you fix a
-defect, everything justified by it is now justified by nothing**, and the
-dangerous case is where the conclusion survives, because then nothing goes red.
+The narrow, decidable half of a problem whose useful half is not.
 
-No test can read "because X is broken" and go check whether X is still broken —
-that is semantic, the input is prose, and it belongs to something that reads
-across the repo periodically and reports. What a test *can* do is catch the
-mechanical cousin: a doc that tells you to use a function that has been renamed
-or deleted.
+**When you fix a defect, everything justified by it is now justified by nothing** —
+and the dangerous case is the one where the conclusion survives, because then
+nothing goes red and nobody re-reads the reason. No test can find that: it would
+have to read "because X is broken" and go check whether X is still broken, which
+is semantic, and the input is prose. That belongs to something which reads across
+the repo periodically and *reports*.
+
+What a test can do is catch the mechanical cousin — a doc that tells you to call
+something that has been renamed or deleted.
 
 ## Why the predicate is "it was ours, and now it isn't"
 
-The obvious version — every backticked `foo()` in the docs must resolve — has a
-false-positive rate that makes it useless. Run on this repo it flagged five
-things, and four were correct: `cross_check()` and `reset_to_base()` belong to
-skeletor, `os.getenv()` and `datetime.utcnow()` are stdlib. A gate you have to
-allowlist four things into is describing the wrong shape.
+The obvious version, every backticked ``foo()`` in the docs must resolve, has a
+false-positive rate that makes it useless: it flags the standard library, other
+people's libraries, and anything you referred to in passing. A gate you have to
+allowlist four things into on its first run is describing the wrong shape.
 
 Asking git instead makes it exact. A name this repository once defined and no
 longer defines is unambiguously ours and unambiguously gone. Everything that was
-never ours is excluded by construction rather than by exemption, and the
-allowlist is empty because there is nothing to put in it.
+never ours is excluded by construction rather than by exemption, which is why
+there is no allowlist here to keep up to date.
 
 ## Why narrative documents are out of scope
 
-A plan in `docs/TODO/` says "this phase takes `standard_screens()` and moves
-it". That sentence is *correct* and naming a dead symbol is the whole point of
-it. Same for the archive, the reports, and `NOTES.md`'s resolved section —
-their job is to describe what happened, not what is.
+A plan in ``docs/TODO/`` saying "this phase takes ``old_helper()`` and moves it"
+is *correct*, and naming the dead symbol is the entire point of the sentence.
+Same for the archive and the reports: their job is to describe what happened, not
+what is. Those stages are excluded by role, and the set of them is read from
+``scripts.paths`` rather than spelled again here.
 
-So those lifecycle directories are excluded by role, and everything else is
-enrolled by default. That direction matters: a new reference doc is covered by
-existing, which is the same reason the test suites are marker-based and the
-archetype registry is discovered rather than listed.
+Everything else is enrolled by default. That direction is the one that matters —
+a reference doc added next month is covered without anybody remembering to add
+it, which is the same reason the suites are marker-based rather than listed.
+
+## What it costs
+
+Nothing on a fresh tree: a scaffold has one commit, so a symbol that was ever
+defined is still defined and this finds zero. It is a ratchet at 0, and it starts
+paying the first time you delete something.
 """
 
 from __future__ import annotations
 
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
-# Host-side: no key, no Docker daemon, no network. The offline baseline is
-# what makes the whole pipeline testable under one marker.
-pytestmark = pytest.mark.unit
+pytestmark = [pytest.mark.unit]
 
-REPO = Path(__file__).resolve().parents[1]
+# Bootstrap only: put the package on sys.path so `scripts.paths` — which owns
+# every path below — can be imported. See scripts/paths.py.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-#: Lifecycle stages whose job is to narrate what happened. `docs/rules/docs.md`
-#: defines them; naming a since-removed mechanism is correct usage there.
-NARRATIVE = ("docs/TODO/", "docs/implementations/", "docs/reports/", "NOTES.md")
+from scripts.paths import DOCS_DIR, IMPL_DIR, PROJECT_ROOT, TODO_DIR  # noqa: E402
 
-#: A backticked call. The parentheses are the whole signal -- they are what
-#: separates a code reference from a word that happens to be in a code span.
+#: Lifecycle stages whose job is to narrate what happened, so a since-removed
+#: name is correct usage in them. `docs/rules/docs.md` defines the lifecycle;
+#: the directories come from `scripts.paths`, which owns them. `reports` is
+#: taken at its parent so the regular, release and occasional editions are all
+#: covered without naming three constants.
+NARRATIVE = (TODO_DIR, IMPL_DIR, DOCS_DIR / "reports")
+
+#: Local addition to the template's set, and the only thing kept from this
+#: file's own earlier version. `NOTES.md` is proto.pilot's parking lot -- it
+#: records what was tried and what it was called at the time -- so naming a
+#: symbol that has since gone is the file doing its job. A file rather than a
+#: directory, hence matched separately.
+#:
+#: It exempts nothing today: enrolling `NOTES.md` finds zero dead references as
+#: of writing. That is worth saying, because an exclusion nobody can see the
+#: effect of is indistinguishable from one hiding a failure. This one is
+#: scoping by role, the same basis as the three directories above, not an
+#: allowlist entry -- and this repo's own rule is that a gate needing allowlist
+#: entries to ship is describing the wrong shape.
+NARRATIVE_FILES = ("NOTES.md",)
+
+#: A backticked call. The parentheses are the whole signal — they are what
+#: separates a code reference from a word that happens to sit in a code span.
 CALL = re.compile(r"`([A-Za-z_][\w.]*)\(\)`")
 
-
-def _git(*args: str) -> str:
-    return subprocess.run(["git", *args], cwd=REPO, capture_output=True, text=True, check=True).stdout
-
-
-def _tracked(pattern: str) -> list[Path]:
-    return [REPO / line for line in _git("ls-files", pattern).split() if line.strip()]
+#: `def` and `class`, because a doc says `Thing()` for a constructor too.
+DEFINITION = re.compile(r"^\s*(?:async\s+)?(?:def|class)\s+(\w+)", re.M)
 
 
-def reference_docs() -> list[Path]:
-    return [p for p in _tracked("*.md") if not _label(p).startswith(NARRATIVE)]
+def _git(*args: str, root: Path = PROJECT_ROOT) -> str:
+    return subprocess.run(["git", *args], cwd=str(root), capture_output=True, text=True, check=True).stdout
 
 
-def defined_now() -> set[str]:
+def _tracked(pattern: str, root: Path = PROJECT_ROOT) -> list[Path]:
+    """Tracked files only. An untracked scratch file is not this repo's claim."""
+    return [root / line for line in _git("ls-files", pattern, root=root).splitlines() if line.strip()]
+
+
+def reference_docs(root: Path = PROJECT_ROOT) -> list[Path]:
+    narrative = tuple(str(d.relative_to(PROJECT_ROOT)) for d in NARRATIVE)
+    return [
+        p
+        for p in _tracked("*.md", root=root)
+        if not str(p.relative_to(root)).startswith(narrative) and str(p.relative_to(root)) not in NARRATIVE_FILES
+    ]
+
+
+def defined_now(root: Path = PROJECT_ROOT) -> set[str]:
     """Every callable this repo currently defines."""
     names: set[str] = set()
-    for path in _tracked("*.py"):
-        source = path.read_text(encoding="utf-8", errors="replace")
-        names.update(re.findall(r"^\s*(?:async\s+)?(?:def|class)\s+(\w+)", source, re.M))
+    for path in _tracked("*.py", root=root):
+        names.update(DEFINITION.findall(path.read_text(encoding="utf-8", errors="replace")))
     return names
 
 
-def was_ever_ours(symbol: str) -> bool:
+def was_ever_ours(symbol: str, root: Path = PROJECT_ROOT) -> bool:
     """Did this repository ever define `symbol`?
 
-    `-S` on the definition line rather than the bare name: a symbol merely
-    *mentioned* in a commit is not one we owned.
+    `-S` against the *definition* line, not the bare name: a symbol merely
+    mentioned in some commit was never ours, and matching it would put every
+    third-party call back in scope — the false-positive problem this predicate
+    exists to avoid.
     """
-    return bool(_git("log", "--all", "-S", f"def {symbol}", "--oneline", "--", "*.py").strip())
+    return bool(_git("log", "--all", "-S", f"def {symbol}", "--oneline", "--", "*.py", root=root).strip())
 
 
-def _label(path: Path) -> str:
-    """Repo-relative where possible. The negative-case test drives a file from
-    a tmp directory, and a reporting helper must not be the thing that raises."""
-    try:
-        return str(path.relative_to(REPO))
-    except ValueError:
-        return str(path)
-
-
-def dead_references() -> list[tuple[str, str]]:
-    live = defined_now()
+def dead_references(root: Path = PROJECT_ROOT, docs: list[Path] | None = None) -> list[tuple[str, str]]:
+    live = defined_now(root=root)
     found: list[tuple[str, str]] = []
-    for path in reference_docs():
+    for path in reference_docs(root=root) if docs is None else docs:
         for match in CALL.finditer(path.read_text(encoding="utf-8")):
             symbol = match.group(1).rsplit(".", 1)[-1]
             if symbol in live:
                 continue
-            if was_ever_ours(symbol):
-                found.append((_label(path), match.group(1)))
+            if was_ever_ours(symbol, root=root):
+                found.append((str(path.relative_to(root)), match.group(1)))
     return sorted(set(found))
 
 
 def test_history_is_available():
-    """The check is worthless against a shallow clone -- `git log --all` would
-    find nothing and every reference would look like it was never ours, so the
-    test would pass by seeing nothing rather than by finding nothing.
+    """Worthless against a shallow clone, and silently so.
 
-    That is the "worked fine, told nobody" shape, so it is asserted rather than
-    assumed. CI checks out with `fetch-depth: 0` for this.
+    `git log --all` finds nothing in one, so every reference would look like it
+    was never ours and this file would pass by *seeing* nothing rather than by
+    *finding* nothing. That is the "green because it never ran" shape, so it is
+    asserted rather than assumed — and ci.yml checks the unit job out with
+    `fetch-depth: 0` to keep it true.
     """
-    assert not (
-        REPO / ".git" / "shallow"
-    ).exists(), "shallow clone: this test needs history and would silently pass without it"
+    assert not (PROJECT_ROOT / ".git" / "shallow").exists(), (
+        "shallow clone: this check needs history and would pass without it, having looked at nothing. "
+        "Fetch the full history (`fetch-depth: 0`) or run it somewhere that has it."
+    )
 
 
 def test_no_reference_doc_names_a_callable_we_removed():
@@ -132,17 +161,29 @@ def test_no_reference_doc_names_a_callable_we_removed():
     )
 
 
-def test_the_check_would_actually_catch_one(tmp_path, monkeypatch):
+def test_the_check_would_actually_catch_one(tmp_path):
     """A gate nobody has seen fail is a gate nobody knows works.
 
-    `standard_screens` is the real case: it lived in `baseline.py` until Phase 2
-    of the archetypes plan moved it to `crud.screens()`. A reference doc still
-    saying to call it would be wrong, and this proves the predicate says so.
+    Driven against a real throwaway repository rather than a stubbed predicate,
+    because the predicate *is* the interesting part: it has to tell a name this
+    repo deleted from a name that was never ours, and only git history can. The
+    stdlib reference alongside is the negative half — it must not be flagged.
     """
-    doc = tmp_path / "REFERENCE.md"
-    doc.write_text("Call `standard_screens()` to get the screen set, and `os.getenv()` for config.\n")
-    monkeypatch.setattr("test_docs_name_live_code.reference_docs", lambda: [doc])
+    identity = ["-c", "user.name=t", "-c", "user.email=t@t.invalid"]
+    _git("init", "-q", "-b", "main", root=tmp_path)
 
-    found = dead_references()
+    (tmp_path / "mod.py").write_text("def gone_away():\n    return 1\n", encoding="utf-8")
+    (tmp_path / "REFERENCE.md").write_text(
+        "Call `gone_away()` for that, and `os.getenv()` for config.\n", encoding="utf-8"
+    )
+    _git("add", "-A", root=tmp_path)
+    _git(*identity, "commit", "-q", "-m", "add it", root=tmp_path)
 
-    assert [s for _, s in found] == ["standard_screens"], f"expected exactly the removed symbol, got {found}"
+    (tmp_path / "mod.py").write_text("def something_else():\n    return 1\n", encoding="utf-8")
+    _git("add", "-A", root=tmp_path)
+    _git(*identity, "commit", "-q", "-m", "remove it", root=tmp_path)
+
+    found = dead_references(root=tmp_path)
+    assert [symbol for _, symbol in found] == [
+        "gone_away"
+    ], f"expected exactly the removed symbol and not the stdlib one, got {found}"
