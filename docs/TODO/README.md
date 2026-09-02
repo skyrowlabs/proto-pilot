@@ -12,9 +12,17 @@ checking whether a capability already exists (parked) before rebuilding it.
 
 **Machine-readable index**: [`../todo_index.json`](../todo_index.json).
 
-**0 open plans** · **0 agent-managed**
+**1 open plans** · **0 agent-managed**
 
 ---
+
+## 🔴 Planned
+
+_Not started — intended future work._
+
+| Plan | Priority | Updated | Summary |
+| ---- | -------- | ------- | ------- |
+| [Archetypes and Theme](archetypes-and-theme.md) | high | 2026-09-01 | Give the spec a shape axis and a look axis, so a chess app and a gear tracker stop being the same CRUD app with a different adjective. |
 
 ---
 

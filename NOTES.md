@@ -26,6 +26,32 @@ is only a pointer at it).
 - **The offline baseline ignores `spec.screens`** and always generates its own
   CRUD set. Only the model path honours custom screens — so the thing the test
   suite exercises and the thing users get differ on exactly this point.
+  **Closed by Phase 2 of [Archetypes and Theme](docs/TODO/archetypes-and-theme.md)**,
+  which needs it before any archetype can have non-CRUD screens. Fix it there
+  rather than separately.
+
+## Open — the direction
+
+- **[Archetypes and Theme](docs/TODO/archetypes-and-theme.md) is the next real
+  piece of work**, and it is filed rather than summarised here. Short version:
+  `Spec` is a CRUD data model, so every idea flattens into an admin panel and
+  `intake.py`'s system prompt carries a five-paragraph essay compensating for
+  what the type cannot say. Two orthogonal axes — `archetype` (shape) and
+  `theme` (look) — with the archetype owning its questions, screens, prompt
+  fragments and baseline.
+
+  It is `planned`, not `ready`: the design is complete but unreviewed, and
+  promoting a plan to `ready` is the act of handing it to an agent.
+
+- **The improvement loop comes after it**, and is not filed yet. The primitives
+  arrived with the skeletor `agentic` tier — `scripts/reporting/jobs.py`,
+  `run_ledger.py` with its two rails, `agent_runner.py`'s argv contract,
+  `fix_policy` defaulting to `none`, `declined` as a first-class outcome. What
+  is missing and is proto.pilot's own to design is the **ratchet**: an iteration
+  must leave the tree at least as green as it found it or be reverted, which the
+  per-tree `git init` already makes nearly free. Note the two loops are
+  different: skeletor's tier maintains *this repo*; the ratchet governs
+  *generated prototypes*. They share primitives, not a schedule.
 
 ## Open — going public
 

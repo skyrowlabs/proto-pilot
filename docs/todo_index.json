@@ -1,8 +1,32 @@
 {
   "_generated_by": "scripts/docs/gen_todo_index.py",
   "_note": "Generated — never hand-edit. Edit the plan's frontmatter or header lines and rerun.",
-  "count": 0,
-  "by_status": {},
+  "count": 1,
+  "by_status": {
+    "planned": [
+      "archetypes-and-theme"
+    ]
+  },
   "ready_queue": [],
-  "plans": []
+  "plans": [
+    {
+      "slug": "archetypes-and-theme",
+      "title": "Archetypes and Theme",
+      "path": "docs/TODO/archetypes-and-theme.md",
+      "shelf_status": "planned",
+      "priority": "high",
+      "queue_order": null,
+      "blocked_on": null,
+      "updated": "2026-09-01",
+      "tags": [
+        "spec",
+        "passes",
+        "intake",
+        "ux"
+      ],
+      "summary": "Give the spec a shape axis and a look axis, so a chess app and a gear tracker stop being the same CRUD app with a different adjective.",
+      "open_tasks": 37,
+      "auto_generated": false
+    }
+  ]
 }
