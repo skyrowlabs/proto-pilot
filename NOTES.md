@@ -115,6 +115,24 @@ is only a pointer at it).
   dry-run output either way, as the real-world confirmation their gate's decoys
   only model.
 
+  **Pruned 2026-09-01: 228 → 114 entries.** Every foreign path is gone and the
+  114 that remain are all genuine scaffold output (`scripts/`, `docs/`,
+  `.github/`, `tests/`, `cli/`, `.claude/`). Their recipe needed a loop rather
+  than one pass — the drift report prints 20 of 115 and truncates the rest, so
+  a single regex sweep over it only ever sees a fifth. Six rounds converged.
+
+  **Still blocked, on one file and a different failure.** `.github/DOCS_INDEX.md`
+  reports *"recorded hash does not match the base render"*, which is not the
+  "not produced" class and so is not prunable. Cause: at scaffold time that file
+  already carried the `AGENTIC_AUTOMATION` and `hosted.md` rows, added by
+  skeletor's own post-copy `register_shipped_docs` step — so the old
+  `tree_hashes()` recorded the *post-processed* content while `cross_check`
+  renders the pristine base, which has neither row. Same root cause as the
+  foreign entries (recording what it found rather than what it made), one layer
+  in, and not fixable from this side: the correct hash is of a render only
+  skeletor can produce. Reported; awaiting their ruling. The upgrade still
+  refuses, which is the guard working.
+
   **The `ci.yml` conflict is confirmed and does not gate us.** skeletor
   reproduced our tree shape at our exact ref and ran the whole sequence: the
   conflict is real and on the line we predicted (base `[main]`, ours
