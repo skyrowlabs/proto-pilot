@@ -18,7 +18,6 @@ from fastapi.templating import Jinja2Templates
 from protopilot import __version__
 from protopilot import build as builder
 from protopilot import registry
-from protopilot.archetypes import crud
 from protopilot.build import is_test_path
 from protopilot.jobs import STORE
 from protopilot.llm import build_llm
@@ -74,8 +73,9 @@ def run_generation(
     spec.answers = dict(job.answers)
     theme = Theme(**job.theme) if job.theme else Theme()
     spec.theme = None if theme.is_empty() else theme
-    if not spec.screens:
-        spec.screens = [Screen(**item) for item in crud.screens(spec)]
+    from protopilot import archetypes
+
+    spec.screens = [Screen(**item) for item in archetypes.screens_for(spec, spec.screens)]
 
     target = Path(workspace) / spec.slug
     if target.exists():

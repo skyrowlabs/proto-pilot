@@ -162,8 +162,32 @@ def test_every_archetype_declares_the_interface_the_passes_rely_on():
     """Recomputed over the package rather than listed, so archetype number two
     cannot ship half-implemented."""
     for name, module in archetypes.all().items():
-        for attribute in ("NAME", "LABEL", "MATCHES", "QUESTIONS", "ASSETS", "screens", "brief", "offline"):
+        for attribute in ("NAME", "LABEL", "MATCHES", "QUESTIONS", "ASSETS", "screens", "brief"):
             assert hasattr(module, attribute), f"{name} is missing {attribute}"
+
+
+def test_generator_overrides_are_optional_and_resolve():
+    """An archetype replaces a baseline generator by defining it, and gets the
+    baseline's by not defining it. `crud` defines none — the baseline IS its
+    implementation — so every kind must resolve to None for it."""
+    from protopilot import baseline
+    from protopilot.spec import Spec
+
+    kinds = ("models_py", "seed_py", "routes_py", "smoke_py", "templates_for")
+    crud_spec = Spec(name="X", slug="x", purpose="p", archetype="crud")
+    for kind in kinds:
+        assert archetypes.generator(crud_spec, kind) is None, f"crud should not override {kind}"
+        # And the name it would fall through to actually exists.
+        assert hasattr(baseline, kind), f"baseline has no {kind} to fall through to"
+
+
+def test_a_spec_naming_an_archetype_this_build_lacks_still_generates():
+    """Falling back beats refusing: a tree that will not build is worse than a
+    tree of the wrong shape, and a spec can name a shape a newer version had."""
+    from protopilot.spec import Spec
+
+    stale = Spec(name="X", slug="x", purpose="p", archetype="from-the-future")
+    assert archetypes.for_spec(stale).NAME == archetypes.DEFAULT
 
 
 def test_fixed_questions_carry_stable_unique_ids():

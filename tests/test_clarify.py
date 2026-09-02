@@ -49,6 +49,18 @@ def test_the_prompt_lists_every_installed_archetype():
         assert name in system
 
 
+def test_the_prompt_shows_what_each_archetype_already_asks():
+    """The classifier is told not to repeat the archetype's fixed questions.
+    Until the menu carried them it could not comply — it had never seen them —
+    and a live call came back with `rules_depth` beside a fixed
+    `rules_enforcement`. It cannot be deferred past classification either: the
+    questions are wanted in the same response as the choice."""
+    system, _ = clarify.build("anything")
+    for name in archetypes.names():
+        for question in archetypes.get(name).QUESTIONS:
+            assert question["id"] in system, f"{name}.{question['id']} is not shown to the classifier"
+
+
 def test_the_prompt_names_the_fallback():
     system, _ = clarify.build("anything")
     assert archetypes.DEFAULT in system

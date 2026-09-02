@@ -56,8 +56,20 @@ def build(spec, ctx) -> tuple[str, str]:
     return STACK_BRIEF + TASK, user
 
 
+def _generate(spec) -> str:
+    """This archetype's generator, or the baseline's.
+
+    An archetype whose pages are not CRUD has to be able to replace this; one
+    whose pages are CRUD must not have to. See `archetypes.generator`.
+    """
+    from protopilot import archetypes
+
+    override = archetypes.generator(spec, "routes_py")
+    return override(spec) if override else baseline.routes_py(spec)
+
+
 def offline(spec, ctx) -> dict:
     return {
-        "files": [{"path": "app/routes.py", "content": baseline.routes_py(spec)}],
+        "files": [{"path": "app/routes.py", "content": _generate(spec)}],
         "notes": "baseline: seven CRUD routes per entity plus an index.",
     }

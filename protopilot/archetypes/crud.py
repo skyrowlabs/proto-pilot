@@ -108,23 +108,7 @@ def brief() -> str:
     )
 
 
-def offline(spec: Spec, ctx) -> dict:
-    """Deterministic generation, with no model.
-
-    `baseline.py` **is** this archetype's baseline — it was written before
-    archetypes existed, when CRUD was the only shape there was. So this
-    delegates rather than duplicating seven hundred lines, and the import is
-    local because `baseline` imports this module's `screens()` for its own
-    fallback.
-
-    A second archetype does not get to do this. It writes its own.
-    """
-    from protopilot import baseline
-
-    return {
-        "app/models.py": baseline.models_py(spec),
-        "app/seed.py": baseline.seed_py(spec),
-        "app/routes.py": baseline.routes_py(spec),
-        "tests/test_smoke.py": baseline.smoke_py(spec),
-        **baseline.templates_for(spec),
-    }
+# No generator overrides. `baseline.py` **is** this archetype's implementation
+# -- it was written when CRUD was the only shape there was -- so every pass
+# falls through to it. A second archetype writes its own; see
+# `archetypes/__init__.py::generator`.

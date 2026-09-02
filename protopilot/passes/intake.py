@@ -10,8 +10,7 @@ from __future__ import annotations
 
 import re
 
-from protopilot.archetypes import crud
-from protopilot.spec import Spec, intake_schema
+from protopilot.spec import intake_schema
 
 NAME = "intake"
 WRITES: tuple[str, ...] = ()
@@ -131,7 +130,8 @@ def offline(idea: str, ctx) -> dict:
         "protopilot_version": "0.1.0",
         "direction": ctx.change,
     }
-    data["screens"] = crud.screens(Spec.model_validate(data))
+    # Screens are the archetype's, and this function does not know which one
+    # it is. The caller fills them in through `archetypes.screens_for`.
     return data
 
 

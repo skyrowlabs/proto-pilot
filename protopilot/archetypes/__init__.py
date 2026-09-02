@@ -13,10 +13,19 @@ sits beside — module-level constants and plain functions, no classes:
     LABEL     one human phrase, shown when a person is choosing
     MATCHES   one line of examples, handed to the classifier
     QUESTIONS the fixed question set, each with a stable id
+    EXTRA     a pydantic model validating this archetype's slice of spec.extra
     screens() the screen-generation rule for this shape
-    brief()   the fragment the routes / ui / smoke passes are given
-    offline() the deterministic baseline -- see below
+    brief()   the fragment every code pass is given, in the user message
     ASSETS    fixed files this archetype adds to the skeleton
+
+and, optionally, any of the five baseline generators it wants to replace:
+
+    models_py(spec) seed_py(spec) routes_py(spec) smoke_py(spec)
+    templates_for(spec)
+
+An archetype that defines none of them gets `baseline.py`'s, which is what
+`crud` does -- the baseline *is* its implementation. Defining one is how a
+shape whose pages are a board rather than a list gets built offline.
 
 **Discovery is by module presence.** A file in this directory is a registered
 archetype. There is deliberately no list to update alongside it, because a
@@ -121,5 +130,71 @@ def matches() -> str:
         module = _modules()[name]
         label = getattr(module, "LABEL", "")
         examples = getattr(module, "MATCHES", "")
-        lines.append(f"- {name}: {label}" + (f" — {examples}" if examples else ""))
+        line = f"- {name}: {label}" + (f" — {examples}" if examples else "")
+        # What this shape already asks. The classifier is told not to repeat the
+        # archetype's fixed questions, and until this was here it could not
+        # comply: it was never shown them. A live call duly came back with
+        # `rules_depth` next to a fixed `rules_enforcement`. It cannot be
+        # deferred until after classification either -- the questions are wanted
+        # in the same response as the choice.
+        asks = ", ".join(q["id"] for q in getattr(module, "QUESTIONS", ()))
+        if asks:
+            line += f"\n  (already asks: {asks})"
+        lines.append(line)
     return "\n".join(lines)
+
+
+def for_spec(spec) -> ModuleType:
+    """The archetype module a spec belongs to, never raising.
+
+    A spec can name an archetype this build does not have -- one written by a
+    newer version, or hand-edited. Falling back beats refusing to generate: the
+    default produces something usable for any spec, and a tree that will not
+    build is worse than a tree of the wrong shape.
+    """
+    try:
+        return get(getattr(spec, "archetype", "") or DEFAULT)
+    except MissingArchetype:
+        return get(DEFAULT)
+
+
+def generator(spec, kind: str):
+    """An archetype's override for one baseline generator, or None.
+
+    `kind` is the `baseline` function name -- `models_py`, `seed_py`,
+    `routes_py`, `smoke_py`, `templates_for`. An archetype that does not define
+    one gets the baseline's, which is why `crud` defines none of them: the
+    baseline *is* its implementation.
+    """
+    return getattr(for_spec(spec), kind, None)
+
+
+def brief_for(spec) -> str:
+    """The archetype's prompt fragment, or nothing."""
+    fragment = getattr(for_spec(spec), "brief", None)
+    return fragment() if callable(fragment) else ""
+
+
+def screens_for(spec, proposed=None) -> list[dict]:
+    """This spec's screens: the archetype's set, plus any extra custom pages.
+
+    The archetype owns the rule -- that is the whole point of the axis, and
+    hardcoding `crud.screens()` at the call sites is how a generated board game
+    ended up being checked for `/kittens`, `/kittens/new` and `/kittens/1`. The
+    browser stage found it; nothing else could, because every unit test built
+    the spec by calling the right archetype directly.
+
+    Model-proposed `custom` screens survive on top, because intake is allowed to
+    add a page the archetype did not think of. Its list/detail/form screens do
+    not: those are the archetype's to decide, and a model second-guessing them
+    is how the tests and the routes come to disagree.
+    """
+    base = for_spec(spec).screens(spec)
+    known = {s["path"] for s in base}
+    extra = [
+        dict(s)
+        for s in (proposed or [])
+        if (s.get("kind") if isinstance(s, dict) else getattr(s, "kind", None)) == "custom"
+        and (s.get("path") if isinstance(s, dict) else getattr(s, "path", None)) not in known
+    ]
+    return base + extra

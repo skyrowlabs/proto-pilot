@@ -118,8 +118,16 @@ def build(spec, ctx) -> tuple[str, str]:
     return STACK_BRIEF + TASK, user
 
 
+def _templates(spec) -> dict:
+    """This archetype's templates, or the baseline's. See `archetypes.generator`."""
+    from protopilot import archetypes
+
+    override = archetypes.generator(spec, "templates_for")
+    return override(spec) if override else baseline.templates_for(spec)
+
+
 def offline(spec, ctx) -> dict:
-    files = [{"path": path, "content": body} for path, body in sorted(baseline.templates_for(spec).items())]
+    files = [{"path": path, "content": body} for path, body in sorted(_templates(spec).items())]
     return {
         "files": files,
         "notes": "baseline: nav, index, and list/detail/form per entity.",

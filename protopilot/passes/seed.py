@@ -43,8 +43,20 @@ def build(spec, ctx) -> tuple[str, str]:
     return STACK_BRIEF + TASK, user
 
 
+def _generate(spec) -> str:
+    """This archetype's generator, or the baseline's.
+
+    An archetype whose pages are not CRUD has to be able to replace this; one
+    whose pages are CRUD must not have to. See `archetypes.generator`.
+    """
+    from protopilot import archetypes
+
+    override = archetypes.generator(spec, "seed_py")
+    return override(spec) if override else baseline.seed_py(spec)
+
+
 def offline(spec, ctx) -> dict:
     return {
-        "files": [{"path": "app/seed.py", "content": baseline.seed_py(spec)}],
+        "files": [{"path": "app/seed.py", "content": _generate(spec)}],
         "notes": "baseline: five rows per parent, two per child, guarded and deterministic.",
     }

@@ -225,19 +225,58 @@ most obviously cannot express, and because it needs **no runtime capability the
 skeleton does not already have** — a grid of squares where each square is a
 form button, re-rendered per submit, is a complete two-player board game.
 
-- [ ] Fixed questions with stable ids: `players`, `turn_order`, `win_condition`,
+- [x] Fixed questions with stable ids: `players`, `turn_order`, `win_condition`,
       `board_shape`
-- [ ] `EXTRA` fields: board dimensions, the piece vocabulary, whose turn it is
-- [ ] `screens()` yields a `/board` custom screen plus a minimal record set —
+- [x] `EXTRA` fields: board dimensions, the piece vocabulary, whose turn it is
+- [x] `screens()` yields a `/board` custom screen plus a minimal record set —
       not the full CRUD spread, which is the point
-- [ ] `brief()` fragments for routes (the turn state machine), ui (inline SVG
+- [x] `brief()` fragments for routes (the turn state machine), ui (inline SVG
       pieces, the form-button grid) and smoke (a test that *takes a turn* and
       asserts the state changed — a suite that only checks for 200s cannot tell
       a working game from a static picture of one)
-- [ ] `offline()` — a deterministic tic-tac-toe. Small enough to be honest,
+- [x] `offline()` — a deterministic tic-tac-toe. Small enough to be honest,
       real enough to exercise a non-CRUD screen end to end in CI
-- [ ] End-to-end against real Docker, not only fakes: generate, boot, take a
+- [x] End-to-end against real Docker, not only fakes: generate, boot, take a
       turn through the browser stage, confirm the board changed
+
+> **Phase 4 landed, and the design holds.** `turn-based-game` replaces all five
+> baseline generators; `crud` replaces none. Those are the two ends of the
+> interface and both work.
+>
+> **Three defects, none of which a unit test found.**
+>
+> 1. *Winning silently started a new game.* `/board` showed the most recent
+>    **unfinished** match, so the instant somebody won, the result was replaced
+>    by a fresh empty board. Found by playing it. The generated suite had
+>    passed — it never played as far as a win. Fixed, and the generated suite
+>    now carries `test_playing_to_a_win_shows_the_result`, which is the one
+>    assertion a static picture of a board cannot satisfy.
+> 2. *The seed order was load-bearing and wrong.* The board shows the most
+>    recent match, so seeding the finished game **second** opened the app on a
+>    finished board where every move was refused — indistinguishable from a
+>    broken game.
+> 3. *The CLI hardcoded `crud.screens()` regardless of archetype*, so a
+>    generated board game was checked for `/kittens`, `/kittens/new` and
+>    `/kittens/1`. **Only the browser stage could find this**: every unit test
+>    built its spec by calling the right archetype directly, so the real call
+>    path was the one nothing exercised. `archetypes.screens_for()` now owns it
+>    at every call site, and intake no longer sets screens at all — it does not
+>    know which archetype it is.
+>
+> **The second live call.** Same idea as Phase 3's, so the two are comparable.
+> With both archetypes installed it classified *"a cat and dog themed 3d chess
+> app"* as `turn-based-game`, high confidence, and still refused the 3D
+> honestly. Discrimination works.
+>
+> It found a second prompt defect on the way: the model returned `rules_depth`
+> beside the archetype's own fixed `rules_enforcement`. The prompt told it not
+> to repeat the fixed questions and **never showed them** — and could not defer
+> that, because the questions are wanted in the same response as the choice. The
+> generated menu now carries each archetype's question ids. Unverified, like the
+> Phase 3 confidence fix; both re-test on the next live call.
+>
+> The low-confidence path is still undemonstrated live. It needs an idea that
+> fits neither shape, which is a third call and has not been spent.
 
 ## Phase 5 — Theme
 

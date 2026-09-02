@@ -117,6 +117,16 @@ def spec_block(spec) -> str:
     model actually reads."""
     import json
 
-    return (
+    from protopilot import archetypes
+
+    parts = [
         "## The spec\n\n```json\n" + json.dumps(spec.model_dump(mode="json"), indent=2) + "\n```\n\n" + spec.summary()
-    )
+    ]
+    # The archetype's fragment goes in the USER message, never into
+    # STACK_BRIEF: that prefix is byte-identical across passes on purpose so it
+    # stays a prompt cache prefix, and text that varies by archetype would stop
+    # it being one. One place, so every pass gets it without five edits.
+    brief = archetypes.brief_for(spec)
+    if brief:
+        parts.append("## What kind of thing this is\n\n" + brief)
+    return "\n\n".join(parts)

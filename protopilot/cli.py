@@ -18,7 +18,6 @@ import click
 from protopilot import __version__
 from protopilot import build as builder
 from protopilot import containers, registry
-from protopilot.archetypes import crud
 from protopilot.llm import ClaudeCodeLLM, ClaudeLLM, LLMError, build_llm
 from protopilot.passes import PassContext, clarify, intake
 from protopilot.render import render_skeleton
@@ -267,10 +266,12 @@ def new(
     spec.archetype = chosen
     spec.theme = theme
     spec.answers = _parse_answers(chosen, answers)
-    if not spec.screens:
-        # Screens are the contract the smoke tests and the routes are both
-        # generated from, so an empty list is not something to pass along.
-        spec.screens = [Screen(**s) for s in crud.screens(spec)]
+    # Screens are the contract the smoke tests and the routes are both
+    # generated from, and the rule belongs to the archetype -- so they are
+    # resolved AFTER `spec.archetype` is set, never before.
+    from protopilot import archetypes
+
+    spec.screens = [Screen(**s) for s in archetypes.screens_for(spec, spec.screens)]
 
     target = Path(directory).resolve() if directory else Path.cwd() / spec.slug
 

@@ -145,6 +145,11 @@ class Spec(BaseModel):
     # Model-invented questions have model-invented ids and no contract, so they
     # keep going to `direction`; this field is the half that has a schema.
     answers: dict[str, str] = Field(default_factory=dict)
+    # The archetype's own typed slice, validated by its `EXTRA` model rather
+    # than by this one. `Spec` stays a single loadable type -- a subclass per
+    # archetype would break `Spec.load`, which does not know the archetype
+    # until after it has parsed the file.
+    extra: dict = Field(default_factory=dict)
     # Free-text direction the user gave, carried through to every pass so
     # "make it feel like a kanban board" survives past intake.
     direction: str = ""
@@ -255,7 +260,7 @@ def _pluralise(word: str) -> str:
 #: are classified by the clarify pass, and `answers` is assembled by the tool
 #: from what the human actually chose -- asking intake to guess any of the three
 #: would produce a confident second opinion that silently overwrites the first.
-MODEL_OWNED_EXCLUSIONS = ("archetype", "theme", "answers")
+MODEL_OWNED_EXCLUSIONS = ("archetype", "theme", "answers", "extra")
 
 
 def intake_schema() -> dict:
