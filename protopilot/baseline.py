@@ -11,6 +11,7 @@ floor, and having a floor is what lets the interesting output be checked.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from protopilot.spec import Entity, Field_, Spec
@@ -330,6 +331,17 @@ def routes_py(spec: Spec) -> str:
         )
     blocks = [_INDEX_ROUTE.replace("__SECTIONS__", "\n".join(sections))]
 
+    # Screens the spec asked for that are not a list, a form or a record.
+    # Without these the path is in `checkable_paths()` and served by nothing,
+    # so the browser stage fetches a 404 and reports the screen as broken.
+    for screen in extra_pages(spec):
+        slug = page_slug(screen["path"])
+        blocks.append(
+            f'@router.get("{screen["path"]}", response_class=HTMLResponse)\n'
+            f"def {slug}(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:\n"
+            f'    return templates.TemplateResponse(request, "{slug}.html", {{}})'
+        )
+
     for entity in spec.entities:
         assign, update, parents = [], [], ""
         for field in entity.fields:
@@ -455,6 +467,19 @@ _PARENT_SELECT = """    <label for="__FK__">__PARENT_LABEL__
     </label>"""
 
 
+_CUSTOM = """{% extends "base.html" %}
+{% block title %}__TITLE__{% endblock %}
+{% block content %}
+  <h1>__TITLE__</h1>
+  <p class="muted">
+    This screen was asked for by name, and the offline generator builds it as a
+    real page rather than skipping it -- a path the app does not serve is a 404
+    the browser stage reports as a broken screen. What goes on it is the model
+    path's job; this is the deterministic floor.
+  </p>
+{% endblock %}"""
+
+
 def _cell(field: Field_) -> str:
     if field.type == "bool":
         return "        <td>{% if row.__N__ %}yes{% else %}no{% endif %}</td>".replace("__N__", field.name)
@@ -493,6 +518,12 @@ def templates_for(spec: Spec) -> dict[str, str]:
     links = "\n".join(f'  <a href="/{e.plural}">{e.plural.replace("_", " ").capitalize()}</a>' for e in spec.entities)
     out["app/templates/_nav.html"] = _NAV.replace("__LINKS__", links or "")
     out["app/templates/index.html"] = _INDEX
+
+    for screen in extra_pages(spec):
+        slug = page_slug(screen["path"])
+        out[f"app/templates/{slug}.html"] = _apply(
+            _CUSTOM, {"__TITLE__": screen.get("name") or slug.replace("_", " ").capitalize()}
+        )
 
     for entity in spec.entities:
         title = entity.plural.replace("_", " ").capitalize()
@@ -679,40 +710,52 @@ def smoke_py(spec: Spec) -> str:
             f"    after = db.scalar(select(func.count()).select_from({name}))\n"
             "    assert after == (before or 0) + 1"
         )
+
+    for screen in extra_pages(spec):
+        slug = page_slug(screen["path"])
+        blocks.append(
+            f"def test_{slug}_renders(client) -> None:\n"
+            f'    """A screen named in the spec and served by nothing is a 404."""\n'
+            f'    response = client.get("{screen["path"]}")\n'
+            "    assert response.status_code == 200, response.text"
+        )
     return _blocks(header, blocks)
 
 
 # -- screens -----------------------------------------------------------
 
 
-def standard_screens(spec: Spec) -> list[dict]:
-    """The CRUD screen set every generated app has.
+def pages(spec: Spec) -> list[dict]:
+    """The screens to build. `spec.screens` is authoritative when it is set.
 
-    Screens are the contract the smoke pass tests and the routes pass must
-    satisfy, so they need a predictable shape. A model free to invent URL
-    conventions per app produces tests and routes that disagree.
+    The baseline used to re-derive a CRUD set from `spec.entities` and ignore
+    `spec.screens` entirely -- so a spec asking for a page that is not a list,
+    a form or a record got one from the model path and nothing from this one.
+    `checkable_paths()` still handed that path to the browser stage, which then
+    fetched a 404 and called the screen broken.
+
+    The fallback is `crud`'s rule, not "no screens": a spec that reached here
+    without screens is one the tool failed to fill in, and generating nothing is
+    a worse answer than generating the shape it would have had.
     """
-    screens: list[dict] = [{"name": "Home", "path": "/", "entity": None, "kind": "custom"}]
-    for entity in spec.entities:
-        title = entity.plural.replace("_", " ").capitalize()
-        screens += [
-            {
-                "name": title,
-                "path": f"/{entity.plural}",
-                "entity": entity.name,
-                "kind": "list",
-            },
-            {
-                "name": f"New {entity.name}",
-                "path": f"/{entity.plural}/new",
-                "entity": entity.name,
-                "kind": "form",
-            },
-            {
-                "name": f"{entity.name} detail",
-                "path": f"/{entity.plural}/{{row_id}}",
-                "entity": entity.name,
-                "kind": "detail",
-            },
-        ]
-    return screens
+    from protopilot.archetypes import crud
+
+    if not spec.screens:
+        return crud.screens(spec)
+    return [s.model_dump() if hasattr(s, "model_dump") else dict(s) for s in spec.screens]
+
+
+def extra_pages(spec: Spec) -> list[dict]:
+    """Custom screens the CRUD generators do not already build.
+
+    "/" is excluded because the index route and template are always generated;
+    everything else with `kind: custom` is a page somebody asked for by name and
+    nothing downstream would otherwise produce.
+    """
+    return [s for s in pages(spec) if s.get("kind") == "custom" and s.get("path") != "/"]
+
+
+def page_slug(path: str) -> str:
+    """A python identifier for a screen path. `/score/board` -> `score_board`."""
+    cleaned = re.sub(r"[^a-z0-9]+", "_", path.lower()).strip("_")
+    return cleaned or "page"

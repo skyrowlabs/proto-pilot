@@ -1,9 +1,12 @@
-"""Phase 1 of the archetypes plan: the two axes exist and carry.
+"""The two axes, and the registry that reads them.
 
-Nothing reads them yet — that is the point of the phase. What is pinned here is
-that they survive a round trip, that a spec written before they existed still
-loads, that the human review checkpoint shows them, and that the intake model is
-not asked to invent the ones it does not own.
+Phase 1 added `archetype`, `theme` and `answers` to the spec; Phase 2 put the
+first archetype behind them. What is pinned here is that the axes survive a
+round trip, that a spec written before they existed still loads, that the human
+review checkpoint shows them, that intake is not asked to invent the fields it
+does not own, and that the registry's contract is **recomputed** over whatever
+is installed rather than listed — so archetype number two cannot ship
+half-implemented or reach for the stack.
 
 See docs/TODO/archetypes-and-theme.md.
 """
@@ -133,9 +136,53 @@ def test_an_unknown_archetype_names_what_does_exist():
     assert "this build has" in message
 
 
-def test_the_registry_is_empty_until_phase_2_adds_crud():
-    """Honest about where the plan is. Phase 2 extracts `crud`; until then the
-    package is the mechanism with nothing in it, and a test asserting otherwise
-    would be asserting a future."""
-    assert archetypes.names() == []
-    assert archetypes.matches() == ""
+def test_crud_is_registered_by_existing():
+    """Discovery is by module presence — no list to keep in sync."""
+    assert "crud" in archetypes.names()
+    assert archetypes.get("crud").NAME == "crud"
+
+
+def test_the_default_archetype_is_one_that_actually_exists():
+    """`DEFAULT` is the fallback for a low-confidence classification, so a
+    default naming a module nobody wrote would fail at the worst moment."""
+    assert archetypes.DEFAULT in archetypes.names()
+
+
+def test_the_classifier_menu_is_generated_from_what_is_installed():
+    """Adding an archetype must teach the classifier by existing. A hand-written
+    list in a prompt goes stale silently: a missing line does not fail, it just
+    means that archetype is never chosen."""
+    menu = archetypes.matches()
+    for name in archetypes.names():
+        assert name in menu
+    assert archetypes.get("crud").MATCHES in menu
+
+
+def test_every_archetype_declares_the_interface_the_passes_rely_on():
+    """Recomputed over the package rather than listed, so archetype number two
+    cannot ship half-implemented."""
+    for name, module in archetypes.all().items():
+        for attribute in ("NAME", "LABEL", "MATCHES", "QUESTIONS", "ASSETS", "screens", "brief", "offline"):
+            assert hasattr(module, attribute), f"{name} is missing {attribute}"
+
+
+def test_fixed_questions_carry_stable_unique_ids():
+    """The ids key `spec.answers` and the passes read them by name. A duplicate
+    or a missing id silently drops an answer."""
+    for name, module in archetypes.all().items():
+        ids = [q["id"] for q in module.QUESTIONS]
+        assert all(ids), f"{name} has a question with no id"
+        assert len(ids) == len(set(ids)), f"{name} has duplicate question ids: {ids}"
+
+
+def test_no_archetype_reaches_for_the_stack():
+    """The constraint that keeps this from becoming a stack-picking generator.
+    An archetype contributes questions, a screen rule and prompt text — never
+    requirements.txt, the Dockerfile or the compose file."""
+    import inspect
+
+    forbidden = ("requirements.txt", "Dockerfile", "compose.yml")
+    for name, module in archetypes.all().items():
+        source = inspect.getsource(module)
+        for token in forbidden:
+            assert token not in source, f"{name} references {token}"

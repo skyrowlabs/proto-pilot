@@ -23,12 +23,12 @@ is only a pointer at it).
   at intake; silently accepting it is the worst of the three.
 - **`jobs` and `external_apis` are recorded and ignored.** Same shape of problem:
   the spec captures them, no pass consumes them.
-- **The offline baseline ignores `spec.screens`** and always generates its own
-  CRUD set. Only the model path honours custom screens — so the thing the test
-  suite exercises and the thing users get differ on exactly this point.
-  **Closed by Phase 2 of [Archetypes and Theme](docs/TODO/archetypes-and-theme.md)**,
-  which needs it before any archetype can have non-CRUD screens. Fix it there
-  rather than separately.
+- ~~**The offline baseline ignores `spec.screens`.**~~ **Closed 2026-09-01** by
+  Phase 2 of [Archetypes and Theme](docs/TODO/archetypes-and-theme.md).
+  `baseline.pages()` treats `spec.screens` as authoritative and generates a
+  route, a template and a smoke test for every custom screen. The bug had teeth:
+  `checkable_paths()` handed such a path to the browser stage, which fetched a
+  404 and reported the screen as broken.
 
 ## Open — the direction
 

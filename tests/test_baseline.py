@@ -7,6 +7,7 @@ import ast
 import pytest
 
 from protopilot import baseline
+from protopilot.archetypes import crud
 from protopilot.spec import Field_, Spec
 
 # Host-side: no key, no Docker daemon, no network. The offline baseline is
@@ -90,7 +91,7 @@ def test_required_fields_get_a_coercion_fallback(spec):
 
 
 def test_standard_screens_cover_every_entity(spec):
-    paths = {s["path"] for s in baseline.standard_screens(spec)}
+    paths = {s["path"] for s in crud.screens(spec)}
     assert "/" in paths
     for entity in spec.entities:
         assert f"/{entity.plural}" in paths

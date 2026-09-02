@@ -18,7 +18,7 @@ from fastapi.templating import Jinja2Templates
 from protopilot import __version__
 from protopilot import build as builder
 from protopilot import registry
-from protopilot.baseline import standard_screens
+from protopilot.archetypes import crud
 from protopilot.build import is_test_path
 from protopilot.jobs import STORE
 from protopilot.llm import build_llm
@@ -63,7 +63,7 @@ def run_generation(
     spec.direction = job.direction or spec.direction
     spec.protopilot_version = __version__
     if not spec.screens:
-        spec.screens = [Screen(**item) for item in standard_screens(spec)]
+        spec.screens = [Screen(**item) for item in crud.screens(spec)]
 
     target = Path(workspace) / spec.slug
     if target.exists():

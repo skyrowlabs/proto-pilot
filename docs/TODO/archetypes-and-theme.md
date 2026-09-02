@@ -132,18 +132,37 @@ carried that nothing reads yet.
 
 The safest possible first archetype: the one that already exists.
 
-- [ ] `protopilot/archetypes/crud.py`, taking `standard_screens()` from
+- [x] `protopilot/archetypes/crud.py`, taking `standard_screens()` from
       `baseline.py` as its `screens()` and the CRUD half of the intake prompt as
       its `brief()`
-- [ ] `intake.SYSTEM` loses the archetype-specific prose it no longer owns and
-      keeps only what is true of every app
-- [ ] `baseline.py` honours `spec.screens` instead of regenerating its own CRUD
+- [~] `intake.SYSTEM` loses the archetype-specific prose it no longer owns and
+      keeps only what is true of every app — **partially done, deliberately.**
+      The CRUD screen rule moved to `crud.screens()`. The board-game prose
+      did not: prose only stops being intake's when something else owns it,
+      and `turn-based-game` does not exist until Phase 4. Stripping it now
+      would regress the model path for exactly the ideas this plan is about,
+      with nothing to catch it — the offline baseline cannot read a prompt.
+      Moves in Phase 4, where it lands in `brief()`.
+- [x] `baseline.py` honours `spec.screens` instead of regenerating its own CRUD
       set — closing the standing NOTES item, and the precondition for any
       archetype whose screens are not CRUD
-- [ ] **Characterisation test**: the offline generation of a two-entity spec is
+- [x] **Characterisation test**: the offline generation of a two-entity spec is
       byte-identical before and after this phase. If `crud` is a faithful
       extraction this is free; if it is not, this is the only phase where that
       is cheap to discover
+
+> **Phase 2 landed.** The characterisation held: byte-identical output at every
+> step, `tests/golden/crud_offline_manifest.json` captured from `77c3772` before
+> a line of the extraction was written.
+>
+> Two things worth knowing for Phase 4. `crud.offline()` delegates to
+> `baseline.py` rather than moving seven hundred lines, because baseline *is*
+> the CRUD baseline — it was written when CRUD was the only shape there was. A
+> second archetype does not get to do that; it writes its own. And `brief()`
+> exists but is **not wired into any pass yet**: the fragment has to reach the
+> model through the per-pass user message and never through `passes/_shared.py`,
+> which is byte-identical across passes on purpose so it stays a prompt-cache
+> prefix. Text that varies by archetype must not go there or it stops being one.
 
 ## Phase 3 — Clarify becomes the classifier, and answers stay typed
 

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import re
 
-from protopilot.baseline import standard_screens
+from protopilot.archetypes import crud
 from protopilot.spec import Spec, intake_schema
 
 NAME = "intake"
@@ -131,7 +131,7 @@ def offline(idea: str, ctx) -> dict:
         "protopilot_version": "0.1.0",
         "direction": ctx.change,
     }
-    data["screens"] = standard_screens(Spec.model_validate(data))
+    data["screens"] = crud.screens(Spec.model_validate(data))
     return data
 
 

@@ -18,7 +18,7 @@ import click
 from protopilot import __version__
 from protopilot import build as builder
 from protopilot import containers, registry
-from protopilot.baseline import standard_screens
+from protopilot.archetypes import crud
 from protopilot.llm import ClaudeCodeLLM, ClaudeLLM, LLMError, build_llm
 from protopilot.passes import PassContext, intake
 from protopilot.render import render_skeleton
@@ -187,7 +187,7 @@ def new(
     if not spec.screens:
         # Screens are the contract the smoke tests and the routes are both
         # generated from, so an empty list is not something to pass along.
-        spec.screens = [Screen(**s) for s in standard_screens(spec)]
+        spec.screens = [Screen(**s) for s in crud.screens(spec)]
 
     target = Path(directory).resolve() if directory else Path.cwd() / spec.slug
 
