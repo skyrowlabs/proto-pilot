@@ -1,8 +1,33 @@
 {
   "_generated_by": "scripts/docs/gen_todo_index.py",
   "_note": "Generated — never hand-edit. Edit the plan's frontmatter or header lines and rerun.",
-  "count": 0,
-  "by_status": {},
+  "count": 1,
+  "by_status": {
+    "planned": [
+      "improvement-loop"
+    ]
+  },
   "ready_queue": [],
-  "plans": []
+  "plans": [
+    {
+      "slug": "improvement-loop",
+      "title": "The Improvement Loop",
+      "path": "docs/TODO/improvement-loop.md",
+      "shelf_status": "planned",
+      "priority": "high",
+      "queue_order": null,
+      "blocked_on": null,
+      "updated": "2026-09-01",
+      "tags": [
+        "loop",
+        "verify",
+        "docker",
+        "agent",
+        "safety"
+      ],
+      "summary": "Let a prototype be told to keep getting better, with a ratchet that reverts any iteration leaving it less green than it found it.",
+      "open_tasks": 28,
+      "auto_generated": false
+    }
+  ]
 }
