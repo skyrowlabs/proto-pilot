@@ -192,7 +192,14 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: '3.11'
+
+      # Both installs, for the same reason the unit job needs both: pytest
+      # imports every test module during collection, and a missing product
+      # dependency is an ImportError at collection time -- which exits 2, not
+      # the 5 the tolerance below is written for. The job then fails for a
+      # reason that has nothing to do with integration tests.
       - run: pip install -r scripts/requirements.txt
+      - run: pip install -e ".[dev]"
 
       # SCAFFOLD: stand up the stack here. If two workflows both do this, put
       # the steps in a composite action under .github/actions/ and have both

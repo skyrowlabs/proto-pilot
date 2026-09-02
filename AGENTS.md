@@ -69,7 +69,8 @@ stack-picking code generator.
 ### Naming: two "skeletons" in one tree
 
 `skeleton/` is the fixed application tree copied into every *generated
-prototype*. [skeletor](../skeletor) is the generator that produced *this
+prototype*. **skeletor** (a sibling checkout at `../skeletor`, not part of this
+repository) is the generator that produced *this
 repository's* shell. They are unrelated, and the collision is unfortunate but
 load-bearing in both directions — do not rename either to resolve it, and do
 not confuse `skeleton/` (product data) with `.skeletor.json` (repo metadata).

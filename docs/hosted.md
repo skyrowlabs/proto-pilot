@@ -30,7 +30,7 @@ It reclassifies proto.pilot **from an internal instrument to a minor product.**
 That is the real price, and it is not paid in dollars. A public endpoint means
 uptime, abuse handling, a privacy posture, and a support surface, all attached to
 a repo whose current job is to be useful to one operator on one machine. The
-[brief](../../skyrow-workspace/strategy/projects/proto-pilot.md) records
+brief (`skyrow-workspace/strategy/projects/proto-pilot.md`) records
 "whether proto.pilot is ever a released product or stays an internal instrument"
 as the open question. This is one answer to it — and answering it costs the
 freedom to change the tool without warning anyone.
@@ -158,7 +158,7 @@ should not be.
    collecting at all. **This work does not land in this repo.** Per the workspace
    seam, model creation — datasets, fine-tuning, eval, adapters — is mind.head's
    job, and hosting the result is breeze.brain's; see
-   [model-hosting-handoff](../../skyrow-workspace/strategy/seams/model-hosting-handoff.md).
+   `skyrow-workspace/strategy/seams/model-hosting-handoff.md`.
    proto.pilot's role in that chain is *producer of a dataset* and, later,
    *consumer of an endpoint* through the existing `LLM` Protocol — which is
    already a one-method interface with three backends, so a fourth is not an

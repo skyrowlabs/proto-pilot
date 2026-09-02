@@ -82,8 +82,16 @@ is only a pointer at it).
 
 ## Traps — not bugs, but they will get you
 
-_(Both of the traps that used to live here were fixed on 2026-09-01; see
-Resolved. Nothing currently qualifies.)_
+- **A relative link to a sibling repo resolves on your machine and nowhere
+  else.** Every skyrow.labs repo is a sibling checkout under one root, so
+  `../skeletor` and `../../skyrow-workspace/...` are valid locally and broken
+  for CI, which clones one repository, and for anyone who clones this one. It
+  cost three red CI runs behind a green `./pp check pre-push`.
+
+  Held now by `tests/test_doc_links_stay_in_repo.py`, which asks whether a link
+  **escapes the repo root** rather than whether the path exists — a question
+  with the same answer in both places. Name the sibling repo and its path in a
+  code span; never make it a markdown link.
 
 ## Ideas — not scheduled
 
@@ -96,8 +104,8 @@ Resolved. Nothing currently qualifies.)_
   (and whatever else is worth trying) on our own breeze.brain node and let `proto`
   drive it, so the pipeline is not bound to one vendor and a generation can cost
   electricity instead of API credit. This is the same internal-GPU-as-cost-play
-  argument as [the gpu-platform seam](../skyrow-workspace/strategy/seams/gpu-platform.md),
-  applied to proto.pilot instead of jam.sense, and it is what would make the free
+  argument as the gpu-platform seam (`skyrow-workspace/strategy/seams/gpu-platform.md`,
+  a sibling checkout), applied to proto.pilot instead of jam.sense, and it is what would make the free
   public tier in `docs/hosted.md` affordable at all.
 
   **The plumbing is nearly free.** `LLM` is a two-member Protocol — `offline: bool`
@@ -122,7 +130,7 @@ Resolved. Nothing currently qualifies.)_
 
   This is the engineering half. The research half — which open model, fine-tuned on
   what corpus, at what cost crossover, aimed at a public skyrow.ai — is
-  [R1 in the research queue](../skyrow-workspace/strategy/research.md).
+  R1 in the research queue (`skyrow-workspace/strategy/research.md`).
 
   Expectation-setting: the five passes each read the previous pass's real source, so
   context is long and quality-sensitive. Treat the first local backend as a way to
