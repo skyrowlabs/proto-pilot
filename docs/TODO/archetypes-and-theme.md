@@ -298,6 +298,48 @@ of work.
       is the one pass with no spec to read the archetype off. Removing the
       prose without that would have been a deletion, not a move
 
+> **Phase 5 landed, and the axis paid off exactly as designed.** The rule was
+> not true when the phase started, which is the first thing checking it found:
+> `spec_block()` dumps the entire spec as JSON into every code pass, so every
+> pass *was* being shown the theme. "The UI pass only" was a claim about
+> prompts that nothing could check. It is now a property of one tuple —
+> `_shared.PASS_HIDDEN` — with `ui.theme_block()` the only thing that puts the
+> theme back. Reverting that tuple to `()` fails three tests, which is the
+> check that the gate bites rather than decorates.
+>
+> **One live call, on the UI pass only.** Everything before it was the offline
+> baseline, so the call bought exactly the question the baseline cannot
+> answer: does a theme that exists only as prompt text reach the templates?
+>
+> It generated six templates for a `turn-based-game` themed *cats and dogs,
+> warm ginger and slate blue, paw prints, playful*. A drawn ginger kitten and
+> a slate-blue puppy, both real vector shapes; the paw print defined once as a
+> Jinja macro and reused as bullet, accent and board marker; every colour a
+> `fill` or `stroke` presentation attribute. **No `<style>`, no CSS, no
+> JavaScript** — the three things the block forbids in the same breath as it
+> asks for a palette, which was the part most likely to fail.
+>
+> Then the load-bearing check: the live templates were run against the
+> **offline baseline's own generated suite**, and passed 12/12 including
+> `test_playing_to_a_win_shows_the_result`. Same models, same routes, same
+> tests, different look. That is the axis being real, measured rather than
+> asserted — a theme that had reached anything but the templates would have
+> broken one of those twelve.
+>
+> **The call found a prompt defect, as every one of these has.** The UI task's
+> screen-shape rules told it a detail page carries Edit and Delete controls.
+> That is CRUD's shape, stated unconditionally, and `turn-based-game`'s routes
+> define neither endpoint — so the instruction was asking for a form posting
+> to a path no route serves, which is a 405. The model caught it and said so
+> in its notes rather than complying, which is the good outcome and not one to
+> rely on. The rule now says to read `routes.py` and offer only what it
+> serves.
+>
+> Worth naming: that is the same class as the intake prose this phase moved —
+> a shape-specific instruction living somewhere every shape pays for it. The
+> axis keeps finding them because it is the first thing that ever made the
+> distinction visible.
+
 ## Phase 6 — The journey, in the front end
 
 Last, deliberately: the web form is a *rendering* of the question set, and until

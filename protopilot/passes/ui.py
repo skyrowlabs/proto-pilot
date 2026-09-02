@@ -39,8 +39,11 @@ Shape:
   a `<p class="empty">` with a link to the create form -- not a blank page.
 - detail: `row.display` as the heading, a `<dl>` of the fields, a link back to
   the parent if there is one, a list of children if there are any, and Edit /
-  Delete controls. Delete is a `<form method="post">` with a button, never a
-  link -- a crawler or a prefetch must not be able to delete a row.
+  Delete controls IF the routes define endpoints for them. Read `routes.py`
+  and offer only what it serves: a form posting to a path no route matches is
+  a 405, and not every shape of app has an edit or a delete at all. Delete,
+  where it exists, is a `<form method="post">` with a button, never a link --
+  a crawler or a prefetch must not be able to delete a row.
 - form: one `<label>` per field wrapping its input, with the input type
   matching the field type (`text`, `textarea`, `number`, `checkbox`, `date`,
   `datetime-local`). Prefill from `obj` when it is set and leave blank when it
