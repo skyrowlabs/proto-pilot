@@ -3,7 +3,7 @@
   "_note": "Generated — never hand-edit. Edit the plan's frontmatter or header lines and rerun.",
   "count": 1,
   "by_status": {
-    "planned": [
+    "in-progress": [
       "archetypes-and-theme"
     ]
   },
@@ -13,9 +13,9 @@
       "slug": "archetypes-and-theme",
       "title": "Archetypes and Theme",
       "path": "docs/TODO/archetypes-and-theme.md",
-      "shelf_status": "planned",
+      "shelf_status": "in-progress",
       "priority": "high",
-      "queue_order": null,
+      "queue_order": 10,
       "blocked_on": null,
       "updated": "2026-09-01",
       "tags": [
@@ -25,7 +25,7 @@
         "ux"
       ],
       "summary": "Give the spec a shape axis and a look axis, so a chess app and a gear tracker stop being the same CRUD app with a different adjective.",
-      "open_tasks": 37,
+      "open_tasks": 31,
       "auto_generated": false
     }
   ]

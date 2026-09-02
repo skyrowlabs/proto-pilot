@@ -1,7 +1,7 @@
 ---
 title: "Archetypes and Theme"
 slug: archetypes-and-theme
-shelf_status: planned
+shelf_status: in-progress
 priority: high
 updated: 2026-09-01
 tags: [spec, passes, intake, ux]
@@ -10,9 +10,10 @@ summary: "Give the spec a shape axis and a look axis, so a chess app and a gear 
 
 # Archetypes and Theme
 
-> **Status**: 🔴 Planned
-> **Shelf-Status**: planned
+> **Status**: 🟢 In progress — Phase 1 landed 2026-09-01
+> **Shelf-Status**: in-progress
 > **Priority**: High — it is the difference between output that is correct and output that is recognisable, and every later idea about guided intake depends on it existing
+> **Queue-Order**: 10
 
 ## Problem
 
@@ -102,21 +103,30 @@ is no second list to forget to update.
 No behaviour change. The pipeline runs exactly as it does today, with two fields
 carried that nothing reads yet.
 
-- [ ] `Spec.archetype: str = "crud"` — defaulted, so every existing
+- [x] `Spec.archetype: str = "crud"` — defaulted, so every existing
       `spec.json` (including `prototypes/kitten_chess/`) still validates and
       `proto add` on an old tree still works
-- [ ] `Spec.theme: Theme | None = None` — `palette`, `motif`, `tone`, `subject`,
+- [x] `Spec.theme: Theme | None = None` — `palette`, `motif`, `tone`, `subject`,
       all optional strings, no enums (a closed set of themes is a set someone
       immediately wants to be outside of)
-- [ ] `Spec.answers: dict[str, str]` — answers to *fixed* questions, keyed by
+- [x] `Spec.answers: dict[str, str]` — answers to *fixed* questions, keyed by
       their stable id
-- [ ] `Spec.summary()` prints both axes at the review checkpoint. The checkpoint
+- [x] `Spec.summary()` prints both axes at the review checkpoint. The checkpoint
       is the only human gate in the tool; an axis it does not show is an axis
       nobody reviews
-- [ ] `protopilot/archetypes/__init__.py` — `all()`, `get(name)`, and a
+- [x] `protopilot/archetypes/__init__.py` — `all()`, `get(name)`, and a
       `MissingArchetype` that names what was asked for and lists what exists
-- [ ] Round-trip test: a spec saved and reloaded keeps both axes; a spec written
+- [x] Round-trip test: a spec saved and reloaded keeps both axes; a spec written
       before this change loads with `archetype == "crud"`
+
+> **Phase 1 landed.** One decision the plan had not specified: the intake
+> schema is generated from `Spec` and `_strictify` marks every property
+> required, so the three new fields would have become fields the model *must*
+> invent. `MODEL_OWNED_EXCLUSIONS` in `spec.py` now removes them — `archetype`
+> and `theme` are the clarify pass's to classify and `answers` is assembled
+> from what the human chose, so an intake guess would be a confident second
+> opinion silently overwriting the first. The registry is real but empty; the
+> test suite asserts that rather than asserting a future.
 
 ## Phase 2 — Extract `crud`, and prove nothing moved
 

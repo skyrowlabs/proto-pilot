@@ -94,6 +94,32 @@ class Screen(BaseModel):
         return v
 
 
+class Theme(BaseModel):
+    """How it should look and feel. Orthogonal to what it *is*.
+
+    A themed chess app is archetype `turn-based-game` and theme `cats`, and
+    keeping those on separate axes is what stops the work being the product of
+    the two: a theme costs one prompt fragment and no offline baseline at all.
+
+    Every field is free text, and deliberately not an enum. Whatever closed set
+    we picked, the first person to want something outside it would be refused --
+    and a theme the UI pass interprets loosely is a better outcome than a theme
+    the schema rejects.
+    """
+
+    palette: str = Field(default="", description="e.g. 'warm earth tones', 'high-contrast neon'")
+    motif: str = Field(default="", description="the recurring visual idea, e.g. 'paw prints'")
+    tone: str = Field(default="", description="e.g. 'playful', 'clinical', 'hand-drawn'")
+    subject: str = Field(default="", description="what the drawn artwork depicts, e.g. 'cats and dogs'")
+
+    def is_empty(self) -> bool:
+        return not any((self.palette, self.motif, self.tone, self.subject))
+
+    def describe(self) -> str:
+        parts = [p for p in (self.subject, self.palette, self.motif, self.tone) if p]
+        return ", ".join(parts)
+
+
 class Spec(BaseModel):
     """The whole app, as far as proto-pilot is concerned."""
 
@@ -107,6 +133,18 @@ class Spec(BaseModel):
     external_apis: list[str] = Field(default_factory=list)
     port: int = 8080
     protopilot_version: str = "0.1.0"
+    # What SHAPE of thing this is. Selects the question set, the screen rule,
+    # the prompt fragments the code passes are given, and the offline baseline.
+    # Defaulted rather than required, so every spec written before archetypes
+    # existed still loads and still generates the app it always did.
+    archetype: str = "crud"
+    # How it should LOOK. Read by the UI pass and by nothing else -- a theme
+    # that can reach routes or models is an archetype wearing the wrong name.
+    theme: Theme | None = None
+    # Answers to the archetype's FIXED questions, keyed by their stable id.
+    # Model-invented questions have model-invented ids and no contract, so they
+    # keep going to `direction`; this field is the half that has a schema.
+    answers: dict[str, str] = Field(default_factory=dict)
     # Free-text direction the user gave, carried through to every pass so
     # "make it feel like a kanban board" survives past intake.
     direction: str = ""
@@ -146,8 +184,13 @@ class Spec(BaseModel):
     def summary(self) -> str:
         """What gets printed for the human review checkpoint."""
         lines = [f"{self.name} ({self.slug})  ->  port {self.port}", f"  {self.purpose}"]
+        lines.append(f"  archetype: {self.archetype}")
+        if self.theme and not self.theme.is_empty():
+            lines.append(f"  theme: {self.theme.describe()}")
         if self.direction:
             lines.append(f"  direction: {self.direction}")
+        for key, value in self.answers.items():
+            lines.append(f"    {key}: {value}")
         lines.append("  entities:")
         for e in self.entities:
             parent = f" (belongs to {e.belongs_to})" if e.belongs_to else ""
@@ -205,14 +248,27 @@ def _pluralise(word: str) -> str:
     return word + "s"
 
 
+#: Spec fields the intake model does not decide, and is therefore not shown.
+#:
+#: `_strictify` marks every property in the schema as required, so a field left
+#: in here is a field the model MUST invent a value for. `archetype` and `theme`
+#: are classified by the clarify pass, and `answers` is assembled by the tool
+#: from what the human actually chose -- asking intake to guess any of the three
+#: would produce a confident second opinion that silently overwrites the first.
+MODEL_OWNED_EXCLUSIONS = ("archetype", "theme", "answers")
+
+
 def intake_schema() -> dict:
     """JSON Schema handed to the model for the intake pass.
 
     Generated from the pydantic model rather than hand-written, so a field
-    added above cannot silently fail to reach the model.
+    added above cannot silently fail to reach the model -- minus the fields
+    listed in `MODEL_OWNED_EXCLUSIONS`, which have an owner that is not intake.
     """
     schema = Spec.model_json_schema()
     schema = _inline_defs(schema)
+    for name in MODEL_OWNED_EXCLUSIONS:
+        schema.get("properties", {}).pop(name, None)
     _strictify(schema)
     return schema
 

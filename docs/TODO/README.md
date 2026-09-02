@@ -16,9 +16,9 @@ checking whether a capability already exists (parked) before rebuilding it.
 
 ---
 
-## 🔴 Planned
+## 🟡 In Progress
 
-_Not started — intended future work._
+_Actively being worked; partially shipped._
 
 | Plan | Priority | Updated | Summary |
 | ---- | -------- | ------- | ------- |
