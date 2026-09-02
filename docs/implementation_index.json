@@ -1,7 +1,31 @@
 {
   "_generated_by": "scripts/docs/gen_impl_index.py",
   "_note": "Generated — never hand-edit. Edit the doc's frontmatter and rerun.",
-  "count": 0,
-  "by_category": {},
-  "implementations": []
+  "count": 1,
+  "by_category": {
+    "spec": [
+      "archetypes-and-theme"
+    ]
+  },
+  "implementations": [
+    {
+      "slug": "archetypes-and-theme",
+      "title": "Archetypes and Theme",
+      "path": "docs/implementations/spec/archetypes-and-theme.md",
+      "priority": "high",
+      "updated": "2026-09-01",
+      "tags": [
+        "spec",
+        "passes",
+        "intake",
+        "ux"
+      ],
+      "summary": "Give the spec a shape axis and a look axis, so a chess app and a gear tracker stop being the same CRUD app with a different adjective.",
+      "open_tasks": 0,
+      "auto_generated": false,
+      "category": "spec",
+      "completed": "2026-09-01",
+      "agent_value": 1
+    }
+  ]
 }

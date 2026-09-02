@@ -1,6 +1,6 @@
 """What an offline CRUD generation produced before archetypes existed.
 
-Phase 2 of docs/TODO/archetypes-and-theme.md extracts today's behaviour into
+Phase 2 of docs/implementations/spec/archetypes-and-theme.md extracts today's behaviour into
 `archetypes/crud.py` and makes `baseline.py` derive its pages from
 `spec.screens` rather than re-deriving a CRUD set from `spec.entities`. If that
 extraction is faithful, every byte of the output is unchanged; if it is not,

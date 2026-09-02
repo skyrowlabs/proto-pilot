@@ -24,7 +24,7 @@ is only a pointer at it).
 - **`jobs` and `external_apis` are recorded and ignored.** Same shape of problem:
   the spec captures them, no pass consumes them.
 - ~~**The offline baseline ignores `spec.screens`.**~~ **Closed 2026-09-01** by
-  Phase 2 of [Archetypes and Theme](docs/TODO/archetypes-and-theme.md).
+  Phase 2 of [Archetypes and Theme](docs/implementations/spec/archetypes-and-theme.md).
   `baseline.pages()` treats `spec.screens` as authoritative and generates a
   route, a template and a smoke test for every custom screen. The bug had teeth:
   `checkable_paths()` handed such a path to the browser stage, which fetched a
@@ -32,16 +32,20 @@ is only a pointer at it).
 
 ## Open — the direction
 
-- **[Archetypes and Theme](docs/TODO/archetypes-and-theme.md) is the next real
-  piece of work**, and it is filed rather than summarised here. Short version:
-  `Spec` is a CRUD data model, so every idea flattens into an admin panel and
-  `intake.py`'s system prompt carries a five-paragraph essay compensating for
-  what the type cannot say. Two orthogonal axes — `archetype` (shape) and
-  `theme` (look) — with the archetype owning its questions, screens, prompt
-  fragments and baseline.
+- ~~**Archetypes and Theme is the next real piece of work.**~~ **Shipped
+  2026-09-01**, all six phases, and filed at
+  [docs/implementations/spec/](docs/implementations/spec/archetypes-and-theme.md).
+  `Spec` now has two orthogonal axes — `archetype` (shape) and `theme` (look) —
+  with the archetype owning its questions, screens, prompt fragments and
+  offline baseline, and the theme reaching the UI pass and nothing else.
 
-  It is `planned`, not `ready`: the design is complete but unreviewed, and
-  promoting a plan to `ready` is the act of handing it to an agent.
+  Read the landed-notes rather than this paragraph. Each phase spent one live
+  call on the half the offline baseline cannot reach, and **every one of them
+  found a prompt defect** — a confidence signal measuring the length of a list
+  rather than the quality of a fit, a menu that forbade repeating questions it
+  never showed, a CRUD-shaped instruction telling a board game to render a
+  delete form for a route that does not exist. None was findable from inside
+  the test suite.
 
 - **The improvement loop comes after it**, and is not filed yet. The primitives
   arrived with the skeletor `agentic` tier — `scripts/reporting/jobs.py`,

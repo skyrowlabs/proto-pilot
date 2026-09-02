@@ -140,8 +140,10 @@ most expensive shape of lie a verification loop can tell.
   are argued in [`README.md`](../README.md#how-it-works).
 - **What is unfinished, and what bit us** — [`NOTES.md`](../NOTES.md), the live
   parking lot, including traps that are fixed but worth knowing.
-- **Planned work** — [`TODO/README.md`](TODO/README.md). The next substantial
-  change is [Archetypes and Theme](TODO/archetypes-and-theme.md), which reshapes
-  `spec.py` and adds `protopilot/archetypes/`; read it before touching the spec.
+- **Planned work** — [`TODO/README.md`](TODO/README.md). The holding tank is
+  empty; the next plan goes there before any code does.
 - **Completed plans** — [`implementations/README.md`](implementations/README.md).
-  Empty until the first plan is filed.
+  [Archetypes and Theme](implementations/spec/archetypes-and-theme.md) is the
+  first one filed, and the one to read before touching the spec: it is what
+  reshaped `spec.py` and added `protopilot/archetypes/`. Its landed-notes
+  carry what each phase's live call found, which is the half no test records.

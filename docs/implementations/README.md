@@ -16,9 +16,15 @@ that were dropped, and the constraints that shaped what landed.
 
 **Machine-readable index**: [`../implementation_index.json`](../implementation_index.json).
 
-**0 archived plans** across 0 categories.
+**1 archived plans** across 1 categories.
 
 ---
+
+## Spec
+
+| Value | Plan | Completed | Summary |
+| ----- | ---- | --------- | ------- |
+| ⭐ | [Archetypes and Theme](spec/archetypes-and-theme.md) | 2026-09-01 | Give the spec a shape axis and a look axis, so a chess app and a gear tracker stop being the same CRUD app with a different adjective. |
 
 ---
 

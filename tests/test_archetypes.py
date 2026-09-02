@@ -8,7 +8,7 @@ does not own, and that the registry's contract is **recomputed** over whatever
 is installed rather than listed — so archetype number two cannot ship
 half-implemented or reach for the stack.
 
-See docs/TODO/archetypes-and-theme.md.
+See docs/implementations/spec/archetypes-and-theme.md.
 """
 
 from __future__ import annotations

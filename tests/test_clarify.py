@@ -8,7 +8,7 @@ was already given.
 
 The half these cannot cover is whether the classifier is any *good* — that
 needs a live call, and the offline baseline cannot read an idea. Phase 3 of
-docs/TODO/archetypes-and-theme.md spent one deliberately.
+docs/implementations/spec/archetypes-and-theme.md spent one deliberately.
 """
 
 from __future__ import annotations
