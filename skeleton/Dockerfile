@@ -2,6 +2,13 @@
 # debugged once rather than once per prototype.
 FROM python:3.12-slim
 
+# Same vocabulary as compose.yml. Without this every prototype leaves an
+# untraceable image behind -- the largest thing `gc` collects, and the one
+# nothing else can attribute to a tree.
+LABEL com.protopilot.slug="@@APP_SLUG@@" \
+      com.protopilot.path="@@PROJECT_PATH@@" \
+      com.protopilot.project="@@PROJECT@@"
+
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 WORKDIR /srv
 

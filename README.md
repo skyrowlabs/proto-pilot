@@ -83,7 +83,18 @@ never as green**; `web` is the front end behind `proto serve`.
 | `proto add CHANGE` | amend the spec, regenerate, re-verify |
 | `proto up` / `down` / `logs` / `test` | the obvious things |
 | `proto spec` | what this project actually promised |
+| `proto ls` | every prototype on this machine, and which are running |
+| `proto rm` | delete one: containers, data and the tree |
+| `proto prune` | forget registry entries whose directory is gone |
+| `proto gc` | collect Docker resources a deleted tree left behind |
 | `proto doctor` | why it will not work here |
+
+`ls` is read-only, and `down --all` stops everything at once. `gc` exists
+because only `proto rm` cleans up after itself: a tree removed with `rm -rf`
+leaves a container, a volume, a network and an image with nothing on disk
+pointing at them. Every generated `compose.yml` stamps the tree's absolute path
+onto each resource as a Docker label, so those orphans stay findable by asking
+Docker — after the registry has been pruned, wiped, or never written.
 
 Useful flags on `new`: `--offline` (no API calls, see below), `--no-verify`
 (generate without booting), `--port`, `--attempts N`, `--yes`.

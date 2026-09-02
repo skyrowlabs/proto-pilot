@@ -164,11 +164,15 @@ def create_app(workspace: Path, backend: str | None = None, demo: bool = True) -
 
     @app.get("/", response_class=HTMLResponse)
     def index(request: Request):
+        # `load`, never `prune`: this used to prune on every page view, so
+        # merely opening the front end deleted every entry whose directory
+        # had gone. Same trap `proto ls` had, one refresh away instead of
+        # one command away.
         ok, why = docker_available(SubprocessRunner())
         return TEMPLATES.TemplateResponse(
             request,
             "index.html",
-            {"projects": registry.prune(), "jobs": STORE.all(), "docker_ok": ok, "docker_why": why, "demo": demo},
+            {"projects": registry.load(), "jobs": STORE.all(), "docker_ok": ok, "docker_why": why, "demo": demo},
         )
 
     @app.post("/clarify")

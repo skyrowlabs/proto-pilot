@@ -7,6 +7,7 @@ proto up | down | logs | test | spec | doctor
 
 from __future__ import annotations
 
+import re
 import socket
 import subprocess
 import sys
@@ -16,7 +17,7 @@ import click
 
 from protopilot import __version__
 from protopilot import build as builder
-from protopilot import registry
+from protopilot import containers, registry
 from protopilot.baseline import standard_screens
 from protopilot.llm import ClaudeCodeLLM, ClaudeLLM, LLMError, build_llm
 from protopilot.passes import PassContext, intake
@@ -59,6 +60,61 @@ def _project(directory: str | None) -> Path:
 
 def _verifier(project_dir: Path, spec: Spec) -> Verifier:
     return Verifier(project_dir, spec.port, SubprocessRunner(), screens=checkable_paths(spec))
+
+
+def _port_is_ours(project_dir: Path, port: int) -> bool:
+    """Whether starting on `port` is safe: it is free, or we already hold it."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            sock.bind(("127.0.0.1", port))
+            return True
+        except OSError:
+            pass
+    return containers.publishes_port(SubprocessRunner(), str(project_dir.resolve()), port)
+
+
+PORT_LINE = re.compile(r'^(\s*-\s*")(\d+)(:8000"\s*)$', re.M)
+
+
+def set_port(project_dir: Path, spec: Spec, port: int) -> None:
+    """Move a prototype to another host port, permanently.
+
+    Both halves or neither: the port lives in `compose.yml` (what docker
+    binds) and in `spec.json` (what every command prints and what `free_port`
+    avoids). Updating one leaves a prototype that runs somewhere other than
+    where it says it does.
+    """
+    compose = project_dir / "compose.yml"
+    text = compose.read_text()
+    updated, count = PORT_LINE.subn(rf"\g<1>{port}\g<3>", text)
+    if count != 1:
+        raise click.ClickException(
+            f"{compose} does not have exactly one host port mapping ({count} found); " "edit it by hand"
+        )
+    compose.write_text(updated)
+    spec.port = port
+    spec.save(project_dir)
+
+
+def _down_all(purge: bool) -> None:
+    """Stop every prototype on this machine.
+
+    Registered trees only, and only those still on disk. Resources whose tree
+    is gone are `proto gc`'s job -- stopping them here would half-clean them
+    and leave the volume, which is the state that is hardest to notice.
+    """
+    alive = [e for e in registry.load() if e.exists]
+    if not alive:
+        _echo("nothing to stop")
+        return
+    args = ["down", "-v"] if purge else ["down"]
+    stopped = 0
+    for entry in alive:
+        code = _compose(Path(entry.path), *args)
+        stopped += code == 0
+        _echo(f"  {'stopped' if code == 0 else 'FAILED '} {entry.slug}")
+    _echo(f"\n  {stopped}/{len(alive)} stopped" + ("; data dropped" if purge else "; data kept"))
 
 
 def _compose(project_dir: Path, *args: str) -> int:
@@ -278,10 +334,27 @@ def show_spec(directory: str | None, as_json: bool) -> None:
 
 @main.command()
 @click.option("--dir", "directory", default=None)
-def up(directory: str | None) -> None:
+@click.option("--port", type=int, default=None, help="Move this prototype to another host port, permanently.")
+def up(directory: str | None, port: int | None) -> None:
     """Start the app."""
     target = _project(directory)
     spec = Spec.load(target)
+
+    if port is not None and port != spec.port:
+        set_port(target, spec, port)
+        spec = Spec.load(target)
+        _echo(f"port set to {spec.port}")
+    elif not _port_is_ours(target, spec.port):
+        # `free_port` runs at generation, and the answer is then frozen into
+        # compose.yml -- so two prototypes generated months apart can hold the
+        # same port, and the second `up` fails with a docker bind error that
+        # names neither prototype. Said here instead, with the fix.
+        suggestion = free_port()
+        raise click.ClickException(
+            f"port {spec.port} is already in use by something else.\n"
+            f"  `proto up --port {suggestion}` moves this prototype and remembers it."
+        )
+
     code = _compose(target, "up", "-d", "--build")
     if code == 0:
         _echo(f"http://localhost:{spec.port}")
@@ -291,8 +364,12 @@ def up(directory: str | None) -> None:
 @main.command()
 @click.option("--dir", "directory", default=None)
 @click.option("--purge", is_flag=True, help="Also delete saved data (the database volume).")
-def down(directory: str | None, purge: bool) -> None:
+@click.option("--all", "every", is_flag=True, help="Every prototype on this machine, not just this one.")
+def down(directory: str | None, purge: bool, every: bool) -> None:
     """Stop the app. Saved data survives unless --purge."""
+    if every:
+        _down_all(purge)
+        return
     target = _project(directory)
     args = ["down", "-v"] if purge else ["down"]
     code = _compose(target, *args)
@@ -356,15 +433,106 @@ def serve(port: int, workspace: str | None, backend: str | None, demo: bool) -> 
 
 @main.command(name="ls")
 def list_projects() -> None:
-    """List every prototype generated on this machine."""
-    entries = registry.prune()
+    """List every prototype generated on this machine.
+
+    Read-only. This used to call `prune()`, which deletes every entry whose
+    directory has gone -- so looking at the list was enough to empty it, and
+    that is exactly how the whole registry was lost when a scratch directory
+    was wiped. A missing tree is now *reported* as missing; `proto prune`
+    is the command that acts on it.
+    """
+    entries = registry.load()
     if not entries:
         _echo('no prototypes yet -- `proto new "an idea"`')
         return
+
+    running = containers.running_paths(SubprocessRunner())
     width = max(len(e.slug) for e in entries)
+    missing = 0
     for entry in entries:
-        _echo(f"  {entry.slug:<{width}}  :{entry.port}  {entry.path}")
+        if not entry.exists:
+            state, missing = "gone", missing + 1
+        elif entry.path in running:
+            state = "up"
+        else:
+            state = "down"
+        _echo(f"  {state:<5} {entry.slug:<{width}}  :{entry.port}  {entry.path}")
+
     _echo(f"\n  {len(entries)} prototype(s)")
+    if missing:
+        _echo(f"  {missing} whose directory is gone -- `proto prune` to forget them,")
+        _echo("  `proto gc` to collect the Docker resources they left behind")
+
+
+@main.command()
+@click.option("--yes", "-y", is_flag=True)
+def prune(yes: bool) -> None:
+    """Forget registry entries whose directory no longer exists.
+
+    Only the index is touched. Containers and volumes those trees left behind
+    are `proto gc`'s job, and running this first makes them harder to find --
+    so `gc` is the one to reach for when both are true.
+    """
+    gone = [e for e in registry.load() if not e.exists]
+    if not gone:
+        _echo("nothing to prune; every registered tree is still on disk")
+        return
+    for entry in gone:
+        _echo(f"  {entry.slug:<20} {entry.path}")
+    if not yes and not click.confirm(f"\nForget {len(gone)} entr(y/ies)?", default=True):
+        raise click.Abort()
+    registry.prune()
+    _echo(f"forgot {len(gone)}")
+
+
+@main.command()
+@click.option("--yes", "-y", is_flag=True)
+@click.option("--dry-run", is_flag=True, help="List what would be removed and stop.")
+def gc(yes: bool, dry_run: bool) -> None:
+    """Collect Docker resources whose prototype tree is gone.
+
+    `proto rm` cleans up after itself. Nothing else does: a tree removed with
+    `rm -rf`, a wiped scratch directory, a `git clean` -- each leaves a
+    container, a named volume, a network and an image with nothing on disk
+    pointing at them, and they accumulate silently.
+
+    This finds them by asking Docker, not the registry. Every generated
+    `compose.yml` stamps the tree's absolute path onto each resource, so an
+    orphan is still findable after the registry has been pruned, wiped, or
+    never written.
+    """
+    runner = SubprocessRunner()
+    ok, why = docker_available(runner)
+    if not ok:
+        raise click.ClickException(f"{why}; nothing to collect without a daemon")
+
+    orphans = containers.find_orphans(runner)
+    if not orphans:
+        _echo("nothing to collect; every labelled resource has a tree behind it")
+        return
+
+    for orphan in orphans:
+        _echo(f"  {orphan.describe()}")
+    total = sum(o.total for o in orphans)
+    if dry_run:
+        _echo(f"\n  {total} resource(s) from {len(orphans)} tree(s); nothing removed")
+        return
+    if not yes and not click.confirm(
+        f"\nRemove {total} resource(s) from {len(orphans)} deleted tree(s)?", default=False
+    ):
+        raise click.Abort()
+
+    collected = 0
+    for orphan in orphans:
+        removed = containers.remove(runner, orphan.path)
+        collected += sum(removed.values())
+        still = orphan.total - sum(removed.values())
+        note = f"  ({still} would not go -- still in use?)" if still else ""
+        _echo(f"  collected {sum(removed.values())} from {orphan.path}{note}")
+        # The registry entry goes too, but only once its resources have. The
+        # other order loses the path that finds them.
+        registry.forget(Path(orphan.path))
+    _echo(f"\n  {collected} resource(s) collected")
 
 
 @main.command(name="rm")

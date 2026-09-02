@@ -6,6 +6,14 @@ name: @@PROJECT@@
 services:
   db:
     image: postgres:16-alpine
+    labels:
+      # Read back by `proto gc` and `proto ls`. The path is what makes an
+      # orphan findable: a tree removed with `rm -rf` leaves these resources
+      # behind, and this label is the only thing left pointing at what they
+      # were for. See protopilot/containers.py, which owns the vocabulary.
+      com.protopilot.slug: "@@APP_SLUG@@"
+      com.protopilot.path: "@@PROJECT_PATH@@"
+      com.protopilot.project: "@@PROJECT@@"
     environment:
       POSTGRES_USER: app
       POSTGRES_PASSWORD: app
@@ -27,6 +35,10 @@ services:
 
   app:
     build: .
+    labels:
+      com.protopilot.slug: "@@APP_SLUG@@"
+      com.protopilot.path: "@@PROJECT_PATH@@"
+      com.protopilot.project: "@@PROJECT@@"
     depends_on:
       db:
         condition: service_healthy
@@ -44,3 +56,16 @@ services:
 
 volumes:
   pgdata:
+    labels:
+      com.protopilot.slug: "@@APP_SLUG@@"
+      com.protopilot.path: "@@PROJECT_PATH@@"
+      com.protopilot.project: "@@PROJECT@@"
+
+# The default network is labelled too. Compose creates it whether or not it
+# is declared here, and an undeclared network is one `gc` cannot find.
+networks:
+  default:
+    labels:
+      com.protopilot.slug: "@@APP_SLUG@@"
+      com.protopilot.path: "@@PROJECT_PATH@@"
+      com.protopilot.project: "@@PROJECT@@"

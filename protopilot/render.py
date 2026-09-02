@@ -46,6 +46,13 @@ def substitutions(spec: Spec, target: Path | None = None) -> dict[str, str]:
         "APP_PURPOSE": spec.purpose,
         "PORT": str(spec.port),
         "PROJECT": project_name(spec, target),
+        # Absolute, and resolved. This is stamped into every container, volume,
+        # network and image as a Docker label, and it is what makes an orphan
+        # findable after the tree is gone -- so a relative path, which means
+        # nothing once the cwd has changed, would defeat the point. Empty only
+        # when there is no target, which is a caller inspecting substitutions
+        # rather than writing a tree.
+        "PROJECT_PATH": str(Path(target).resolve()) if target else "",
     }
 
 

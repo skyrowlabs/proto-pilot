@@ -56,12 +56,8 @@ is only a pointer at it).
 
 ## Traps — not bugs, but they will get you
 
-- **`proto ls` calls `prune()`, which deletes registry entries whose directory is
-  missing.** Running `ls` merely to look at the list is what emptied the whole
-  registry when `/tmp` was wiped. Do not point generated prototypes at a volatile
-  scratch dir.
-- **Orphaned Docker volumes survive a deleted tree.** `registry.delete` drops
-  them; a tree removed any other way leaks one.
+_(Both of the traps that used to live here were fixed on 2026-09-01; see
+Resolved. Nothing currently qualifies.)_
 
 ## Ideas — not scheduled
 
@@ -109,6 +105,37 @@ is only a pointer at it).
   the natural scoreboard. It is an experiment with a built-in grader, not a swap.
 
 ## Resolved
+
+- **2026-09-01 — Phase 0 of the lifecycle work: both standing traps are gone.**
+
+  **`proto ls` no longer prunes.** Reading a list must not delete from it, and
+  this one did: `ls` called `prune()`, so merely *looking* at the prototypes
+  removed every entry whose directory had gone — which is how the whole registry
+  was lost when a scratch directory was wiped. The web front end was worse, since
+  it pruned on every page view. `ls` now reports a missing tree as `gone` and
+  `proto prune` is the explicit command that acts on it.
+
+  **Docker is now a second, independent source of truth.** Every generated
+  `compose.yml` and `Dockerfile` stamps `com.protopilot.slug` / `.path` /
+  `.project` onto all four resource kinds — container, volume, network, image.
+  `proto gc` reads them back and collects anything whose tree no longer exists.
+  That closes the orphan leak properly rather than by remembering to use
+  `proto rm`: the label survives `rm -rf`, a wiped scratch dir and a pruned
+  registry, so an orphan stays findable when nothing on disk points at it.
+
+  The label vocabulary lives once, in `protopilot/containers.py`, and
+  `tests/test_containers.py` renders a real skeleton and fails if the writer
+  stops emitting a label the reader filters on — the one defect class a
+  same-file test cannot see.
+
+  Also: `proto up` now refuses a port something else holds and offers
+  `--port N`, which moves compose.yml and the spec together (the port is frozen
+  into compose.yml at generation, so two prototypes generated months apart can
+  collide and the docker bind error names neither). `proto down --all` stops
+  everything. Verified against real Docker end to end, not just fakes: booted a
+  generated tree, confirmed `ls` reported it `up`, deleted the tree with
+  `rm -rf`, and `gc` found and collected all five resources.
+
 
 - **2026-09-01 — the repo was re-housed on skeletor's `agentic` shell.**
   `skeletor-new . --force --tier agentic --cli pp`, then the pipeline was kept
