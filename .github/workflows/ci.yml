@@ -201,14 +201,22 @@ jobs:
       - run: pip install -r scripts/requirements.txt
       - run: pip install -e ".[dev]"
 
-      # SCAFFOLD: stand up the stack here. If two workflows both do this, put
-      # the steps in a composite action under .github/actions/ and have both
-      # use it — never hand-copy. See AGENTS.md Critical Rule 11.
-      # Exit 5 is pytest for "the marker selected nothing", and a scaffold ships
-      # no integration test — so a bare call is red on arrival, which is how a
-      # team learns that red is normal. An empty selection is REPORTED, never
-      # passed off as a run; every other non-zero status still fails the job.
-      # The unit job above gets no such tolerance: tests ship for it.
+      # There is no stack to stand up. proto.pilot's only real integration is
+      # generating a tree and booting it under Docker, and CI deliberately does
+      # not do that -- the offline baseline exists precisely so the whole
+      # pipeline (skeleton, five passes, write guard, repair loop) is exercised
+      # here with no daemon, no key and no credit. Those all run in the unit job.
+      #
+      # So this job is a placeholder that reports honestly rather than a gate
+      # that lies. A Docker-backed suite is a real candidate later -- an offline
+      # generation needs no credentials and would catch the class only a running
+      # container can (a compose file that parses but will not boot). It is not
+      # here yet, and pretending otherwise by deleting the job would remove the
+      # reminder.
+      #
+      # Exit 5 is pytest for "the marker selected nothing". An empty selection is
+      # REPORTED, never passed off as a run; every other non-zero status still
+      # fails the job. The unit job gets no such tolerance: tests ship for it.
       - name: Integration suite
         run: |
           python -m pytest tests/ -m integration -q --durations=25 || status=$?

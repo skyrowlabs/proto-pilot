@@ -10,11 +10,19 @@ stamped onto every report as frontmatter plus a prose line under the H1.
 
 | Report | Cadence | Produced by |
 | ------ | ------- | ----------- |
-|        |         |             |
+| `repository-report.md` | Sat 22:00 America/Chicago | `pp report repo-report` |
 
-<!-- SCAFFOLD: one row per scheduled report. A report with no owner here is one
-     that is refreshed by hand or never — the exact condition anchoring exists
-     to make visible. -->
+<!-- One row per scheduled report. A report with no owner here is one that is
+     refreshed by hand or never — the exact condition anchoring exists to make
+     visible. -->
+
+**Nothing is installed in a crontab yet.** The `agentic` tier was taken on
+2026-09-01 for its primitives — the job registry, the run ledger and its two
+rails, `fix_policy` — which the prototype improvement loop will be built on.
+The schedule above is *registered*, not *running*: `pp report cron --print`
+emits the block, and `pp report cron --check` will disagree with the live
+crontab until somebody installs it. That gap is deliberate and should stay
+visible rather than being papered over by deleting the row.
 
 **Cadence did not change when anchoring landed.** A weekly job still runs
 weekly; only the window it describes moved from "since this last ran" to "since

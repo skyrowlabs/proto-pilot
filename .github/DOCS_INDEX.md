@@ -20,8 +20,16 @@ and makes the relevant part harder to find, not easier.
 | **Was this built before?**| todo_index.json            | `docs/todo_index.json`      |
 | **Agentic Automation** | AGENTIC_AUTOMATION.md | `docs/AGENTIC_AUTOMATION.md` |
 | **Hosted proto.pilot** | hosted.md | `docs/hosted.md` |
+| **Why the pipeline is shaped this way** | README.md | `README.md` |
+| **Open items / what bit us** | NOTES.md | `NOTES.md` |
+| **The rules for changing anything** | AGENTS.md | `AGENTS.md` |
 
-<!-- SCAFFOLD: extend as docs are added. `pp check docs` fails on an unregistered doc. -->
+<!-- Extend as docs are added. `pp check docs` fails on an unregistered doc. -->
+
+**Working on the generation pipeline?** `docs/ARCHITECTURE.md` for the component
+map and the patterns a change can violate silently, then the one pass module you
+are touching under `protopilot/passes/`. Do not load all five — each is
+self-contained, and the stack brief they share is in `passes/_shared.py`.
 
 ---
 

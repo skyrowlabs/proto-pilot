@@ -26,7 +26,7 @@ python -m venv .venv && .venv/bin/pip install -r scripts/requirements.txt
 .venv/bin/pre-commit install --install-hooks
 ./pp check pre-push   # everything CI blocks on; green on a fresh tree
 ./pp test unit        # the fast suite
-./pp check health     # is the local stack up? (SCAFFOLD: wire the probes)
+./pp check health     # can this checkout generate? (runs `proto doctor`)
 ```
 
 These are rendered from the same source as the README's Setup block, and every
@@ -329,8 +329,8 @@ Load on-demand only. Full mapping in `.github/DOCS_INDEX.md`.
 | Live parking lot           | `NOTES.md`                       |
 | Hosted-service idea        | `docs/hosted.md`                 |
 
-<!-- SCAFFOLD: add a row per doc as it is written. `pp check docs` fails on a
-     doc registered in neither this table nor .github/DOCS_INDEX.md — an
+<!-- Add a row per doc as it is written. `pp check docs` fails on a doc
+     registered in neither this table nor .github/DOCS_INDEX.md — an
      unregistered doc is one no agent will load, which is the same, from the
      agent's point of view, as a doc that does not exist. -->
 

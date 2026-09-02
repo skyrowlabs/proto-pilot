@@ -29,8 +29,14 @@ for the routing table — load only the documents a task needs.
 | [ARCHITECTURE.md](ARCHITECTURE.md)   | System design, components, critical patterns  |
 | [DEVELOPMENT.md](DEVELOPMENT.md)     | Setup, configuration, CI/CD, testing          |
 | [CLI.md](CLI.md)                     | CLI architecture and command reference        |
+| [AGENTIC_AUTOMATION.md](AGENTIC_AUTOMATION.md) | Scheduled self-maintenance jobs     |
+| [hosted.md](hosted.md)               | The hosted-proto.pilot idea, not scheduled    |
 
-<!-- SCAFFOLD: add this project's own reference docs here and in DOCS_INDEX.md -->
+Two documents that live outside `docs/` and are read more often than anything
+in it: [`README.md`](../README.md) is the **design document** — the five
+decisions the pipeline is built on — and [`NOTES.md`](../NOTES.md) is the live
+parking lot. `ARCHITECTURE.md` is the map and links to both rather than
+restating them.
 
 ---
 

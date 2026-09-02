@@ -12,7 +12,7 @@ import sys
 
 import click
 
-from cli.helpers import PROJECT_ROOT, fail, module, ok, run, script, summarize
+from cli.helpers import PROJECT_ROOT, fail, module, run, script, summarize
 
 
 @click.group()
@@ -125,6 +125,16 @@ def pre_push(quick: bool) -> None:
 
 @check.command()
 def health() -> None:
-    """Is the local stack up and answering?"""
-    # SCAFFOLD: replace with this project's real health probes.
-    ok("nothing to probe yet — wire this to the project's services")
+    """Can this checkout actually generate a prototype?
+
+    Delegated to `proto doctor` rather than reimplemented. That command already
+    answers this exact question for a user -- Docker, the SDK, credentials, the
+    browser stage, a free port -- and a second copy here would be a second
+    answer to a question with one owner, drifting the moment either side gains
+    a check. See AGENTS.md Rule 1.
+
+    Note which tool is being asked: `./pp` is this repo's tooling, `proto` is
+    the product, and "is the repo healthy" here genuinely means "is the product
+    runnable from this tree".
+    """
+    sys.exit(module("protopilot.cli", "doctor"))
