@@ -6,7 +6,7 @@
 
 {% if job.status in ["pending", "running"] %}
   <div class="card"><span class="pill run">thinking&hellip;</span>
-    <div class="muted small" style="margin-top:8px">Working out what to ask you.</div></div>
+    <div class="muted small" style="margin-top:8px">Working out what kind of thing this is.</div></div>
   <script>setTimeout(() => location.reload(), 2000);</script>
 
 {% elif job.status == "failed" %}
@@ -17,6 +17,7 @@
       <input type="hidden" name="idea" value="{{ job.idea }}">
       <input type="hidden" name="direction" value="{{ job.direction }}">
       <button class="primary" type="submit">Generate anyway</button>
+      <span class="muted small">falls back to the default shape</span>
     </form>
   </div>
 
@@ -32,32 +33,90 @@
     <input type="hidden" name="idea" value="{{ job.idea }}">
     <input type="hidden" name="direction" value="{{ job.direction }}">
 
-    {% for q in job.result.questions %}
+    {# The classification, and the chance to overrule it. This is the highest
+       leverage thing on the page: everything below is downstream of it, and
+       the cheapest moment to correct it is before any tokens are spent. #}
+    <input type="hidden" name="archetype" value="{{ selected }}">
+    <div class="card">
+      <strong>What kind of thing this is</strong>
+      <div class="muted small" style="margin-top:3px">
+        Change it if that is wrong &mdash; the questions below follow from it, and
+        switching costs nothing (they come from this build, not from the model).
+      </div>
+      <div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap">
+        {% for name in job.result.choices %}
+          {% if name == selected %}
+            <span class="pill done">{{ name }}</span>
+          {% else %}
+            <a class="btn small" href="/clarify/{{ job.id }}?archetype={{ name }}">{{ name }}</a>
+          {% endif %}
+        {% endfor %}
+      </div>
+      {% if selected != job.result.archetype %}
+      <div class="muted small" style="margin-top:8px">
+        You changed this from <strong>{{ job.result.archetype }}</strong>, which is what the idea looked like.
+      </div>
+      {% endif %}
+    </div>
+
+    {# Fixed questions: the archetype's own, with stable ids. These are the
+       answers that reach the passes as typed fields rather than as prose. #}
+    {% for q in job.result.fixed %}
     <div class="card">
       <strong>{{ q.question }}</strong>
       <div class="muted small" style="margin-top:3px">{{ q.why }}</div>
       <div style="margin-top:10px">
         {% for opt in q.options %}
         <label class="row" style="gap:7px;margin:5px 0;cursor:pointer">
-          <input type="radio" name="answer::{{ q.question }}" value="{{ opt }}"
+          <input type="radio" name="answer::{{ q.id }}" value="{{ opt }}"
                  {% if opt == q.recommended %}checked{% endif %} style="width:auto">
           <span>{{ opt }}{% if opt == q.recommended %} <span class="muted small">&mdash; suggested</span>{% endif %}</span>
         </label>
         {% endfor %}
-        <label class="row" style="gap:7px;margin:5px 0;cursor:pointer">
-          <input type="radio" name="answer::{{ q.question }}" value="" style="width:auto">
-          <span class="muted">something else &mdash;</span>
-          <input type="text" name="answer::{{ q.question }}" placeholder="in your own words"
-                 style="flex:1;min-width:180px"
-                 oninput="this.previousElementSibling.previousElementSibling.checked=false">
+        <label class="row" style="gap:7px;margin:5px 0">
+          <span class="muted small">{% if q.options %}or{% endif %}</span>
+          <input type="text" name="answer::{{ q.id }}" placeholder="in your own words" style="flex:1;min-width:180px">
         </label>
       </div>
     </div>
     {% endfor %}
 
-    {% if not job.result.questions %}
-      <div class="card"><div class="muted small">No questions &mdash; the idea is clear enough.</div></div>
-    {% endif %}
+    {# The model's own questions, rendered as a distinct kind of thing because
+       they are one: no stable id, no consumer reading them by name, so their
+       answers travel as direction rather than as typed fields. #}
+    {% for q in job.result.questions %}
+    <div class="card" style="border-style:dashed">
+      <strong>{{ q.question }}</strong>
+      <div class="muted small" style="margin-top:3px">{{ q.why }} &middot; asked about this idea specifically</div>
+      <div style="margin-top:10px">
+        {% for opt in q.options %}
+        <label class="row" style="gap:7px;margin:5px 0;cursor:pointer">
+          <input type="radio" name="answer::{{ q.id }}" value="{{ opt }}"
+                 {% if opt == q.recommended %}checked{% endif %} style="width:auto">
+          <span>{{ opt }}{% if opt == q.recommended %} <span class="muted small">&mdash; suggested</span>{% endif %}</span>
+        </label>
+        {% endfor %}
+        <label class="row" style="gap:7px;margin:5px 0">
+          <span class="muted small">or</span>
+          <input type="text" name="answer::{{ q.id }}" placeholder="in your own words" style="flex:1;min-width:180px">
+        </label>
+      </div>
+    </div>
+    {% endfor %}
+
+    {# Theme is its own axis, not a sentence buried in a free-text box. #}
+    <div class="card">
+      <strong>How it should look</strong>
+      <div class="muted small" style="margin-top:3px">Optional. Anything the idea already said is filled in.</div>
+      <div class="row" style="gap:10px;margin-top:10px;flex-wrap:wrap">
+        {% for key, label in [("subject","drawn subject"),("palette","palette"),("motif","motif"),("tone","tone")] %}
+        <label style="flex:1;min-width:150px">
+          <span class="muted small">{{ label }}</span>
+          <input type="text" name="theme::{{ key }}" value="{{ job.result.theme.get(key, '') }}">
+        </label>
+        {% endfor %}
+      </div>
+    </div>
 
     <div class="row"><button class="primary" type="submit">Generate</button>
       <a class="btn" href="/">start over</a>

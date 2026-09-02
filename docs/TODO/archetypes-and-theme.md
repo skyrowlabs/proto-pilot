@@ -166,24 +166,57 @@ The safest possible first archetype: the one that already exists.
 
 ## Phase 3 — Clarify becomes the classifier, and answers stay typed
 
-- [ ] `clarify` returns `archetype`, `theme` and up to two *extra* questions,
+- [x] `clarify` returns `archetype`, `theme` and up to two *extra* questions,
       alongside the `heads_up` it already returns. One call, not two: the
       archetype's own fixed questions are merged in locally from the registry,
       so nothing is spent asking the model to repeat what we wrote down
-- [ ] The classifier is given each archetype's `MATCHES` line, generated from the
+- [x] The classifier is given each archetype's `MATCHES` line, generated from the
       registry — so adding an archetype teaches the classifier by existing
-- [ ] A low-confidence classification falls back to `crud`. `crud` is the one
+- [x] A low-confidence classification falls back to `crud`. `crud` is the one
       archetype that produces something usable for any idea, which makes it the
       correct answer to "I am not sure"
-- [ ] **Answers stop being prose.** Fixed questions carry stable ids and land in
+- [x] **Answers stop being prose.** Fixed questions carry stable ids and land in
       `spec.answers`; model-invented questions have model-invented ids and no
       schema, so they keep going to `direction`. The split is honest about which
       answers have a contract and which do not
-- [ ] `answers_to_direction()` is deleted, not deprecated — a second path from
+- [x] `answers_to_direction()` is deleted, not deprecated — a second path from
       answers to prose is how the typed one silently stops being used
-- [ ] The human review checkpoint can override the archetype
+- [x] The human review checkpoint can override the archetype
       (`proto new --archetype turn-based-game`), because a classifier that
       cannot be overruled is a classifier that has to be right
+
+> **Phase 3 landed, and one live call was spent verifying the half the offline
+> baseline cannot reach.** It found a real prompt defect.
+>
+> Asked to classify *"a cat and dog themed 3d chess app"*, the model returned
+> valid structured output, extracted the theme precisely (`subject: cats and
+> dogs`, `motif: paw prints`, `tone: playful`, and `palette` correctly left
+> **empty** rather than invented), fired `heads_up` in the user's own words
+> — *"The board can't be 3d here"* — and asked exactly two extra questions,
+> neither repeating the fixed set.
+>
+> And it returned **`confidence: high`** for filing a chess game as `crud`.
+> Correctly, by the prompt's own wording: it asked for `low` "when the idea
+> genuinely could be more than one of these", and with one archetype installed
+> there is nothing to be ambiguous *between*. So the signal was measuring the
+> length of the list rather than the quality of the fit, which made the fallback
+> dead code in exactly the case it exists for — a game confidently filed as a
+> tracker. The prompt now asks about **fit**, and says outright that a one-entry
+> list does not make that entry a good fit.
+>
+> **The fix is not verified.** One call was the budget and it was spent finding
+> the bug; Phase 4's call re-tests it with two archetypes, which is also the
+> first point at which discrimination is testable at all. With one archetype the
+> enum has one value, so nothing about *choosing* could be tested here.
+>
+> Two other things that call settled. The CLI never invoked `clarify` — the plan
+> did not notice, and Phase 3 had to answer it: `proto new` now classifies
+> unless `--archetype` is given, and `--answer id=value` reaches the typed
+> channel without a browser. And the model's own two questions were
+> `play_or_record` and `rules_enforcement` — both of which are *the archetype's
+> job*, and both of which become fixed questions with stable ids in Phase 4.
+> That is direct evidence the axis is real: with the right archetype installed,
+> those two model slots free up for something genuinely idea-specific.
 
 ## Phase 4 — `turn-based-game`, with its baseline
 

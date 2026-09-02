@@ -20,10 +20,10 @@ from protopilot import build as builder
 from protopilot import containers, registry
 from protopilot.archetypes import crud
 from protopilot.llm import ClaudeCodeLLM, ClaudeLLM, LLMError, build_llm
-from protopilot.passes import PassContext, intake
+from protopilot.passes import PassContext, clarify, intake
 from protopilot.render import render_skeleton
 from protopilot.runner import SubprocessRunner, docker_available
-from protopilot.spec import SPEC_DIR, SPEC_FILENAME, Screen, Spec, checkable_paths
+from protopilot.spec import SPEC_DIR, SPEC_FILENAME, Screen, Spec, Theme, checkable_paths
 from protopilot.verify import Verifier
 
 PORT_RANGE = range(8080, 8180)
@@ -49,6 +49,67 @@ def free_port(preferred: int | None = None) -> int:
                 continue
             return port
     raise click.ClickException(f"no free port in {PORT_RANGE.start}-{PORT_RANGE.stop}")
+
+
+def _classify(llm, idea: str, direction: str, override: str | None) -> tuple[str, "Theme | None"]:
+    """Which shape this is, and how it should look.
+
+    One cheap call before intake, and the only place `proto new` spends tokens
+    on something other than generating. `--archetype` skips it entirely: an
+    explicit answer should not cost a request, and it is also the escape hatch
+    for a classifier that gets it wrong.
+
+    A failure here is not fatal. The default archetype produces something usable
+    for any idea, so a classifier that could not be reached costs a worse guess
+    rather than the whole generation -- which is the same floor every other
+    stage in this tool has.
+    """
+    from protopilot import archetypes
+
+    if override:
+        if override not in archetypes.names():
+            raise click.ClickException(
+                f"unknown archetype {override!r}; this build has: {', '.join(archetypes.names())}"
+            )
+        return override, None
+    if llm.offline:
+        return archetypes.DEFAULT, None
+
+    _echo("classifying...")
+    system, user = clarify.build(idea, direction)
+    try:
+        result = llm.structured(system=system, user=user, schema=clarify.schema(), label=clarify.NAME)
+    except LLMError as exc:
+        _echo(f"  could not classify ({exc}); falling back to {archetypes.DEFAULT}")
+        return archetypes.DEFAULT, None
+
+    if result.get("heads_up"):
+        _echo(f"  heads up: {result['heads_up']}")
+    theme = Theme(**result["theme"]) if result.get("theme") else None
+    return clarify.chosen_archetype(result), (theme if theme and not theme.is_empty() else None)
+
+
+def _parse_answers(archetype_name: str, given: tuple[str, ...]) -> dict[str, str]:
+    """`--answer id=value`, checked against the archetype's own question ids.
+
+    Refused rather than accepted-and-ignored: an id nobody reads is an answer
+    the user believes they gave, and silently dropping it is the failure that
+    looks exactly like success.
+    """
+    known = clarify.fixed_ids(archetype_name)
+    out: dict[str, str] = {}
+    for item in given:
+        key, sep, value = item.partition("=")
+        if not sep:
+            raise click.ClickException(f"--answer expects ID=VALUE, got {item!r}")
+        key = key.strip()
+        if key not in known:
+            listed = ", ".join(sorted(known)) or "none"
+            raise click.ClickException(
+                f"{key!r} is not a question the {archetype_name!r} archetype asks; it asks: {listed}"
+            )
+        out[key] = value.strip()
+    return out
 
 
 def _project(directory: str | None) -> Path:
@@ -131,6 +192,19 @@ def main() -> None:
 @click.argument("idea")
 @click.option("--dir", "directory", default=None, help="Target directory (default: ./<slug>).")
 @click.option("--direction", default="", help="Extra steer: look, feel, emphasis.")
+@click.option(
+    "--archetype",
+    "archetype_name",
+    default=None,
+    help="What shape this is. Skips the classifier call entirely; `proto archetypes` lists them.",
+)
+@click.option(
+    "--answer",
+    "answers",
+    multiple=True,
+    metavar="ID=VALUE",
+    help="Answer a fixed question without being asked. Repeatable.",
+)
 @click.option("--port", type=int, default=None, help="Host port (default: first free from 8080).")
 @click.option(
     "--attempts", type=int, default=3, show_default=True, help="Repair attempts before handing back a RUNBOOK."
@@ -150,6 +224,8 @@ def new(
     idea: str,
     directory: str | None,
     direction: str,
+    archetype_name: str | None,
+    answers: tuple[str, ...],
     port: int | None,
     attempts: int,
     offline: bool,
@@ -169,6 +245,8 @@ def new(
             # is when the tokens have already been spent.
             raise click.ClickException(f"{why}. Start Docker, or pass --no-verify to generate without booting.")
 
+    chosen, theme = _classify(llm, idea, direction, archetype_name)
+
     _echo("intake...")
     ctx = PassContext(project_dir=Path("."), change=direction)
     try:
@@ -184,6 +262,11 @@ def new(
     spec.port = free_port(port)
     spec.direction = direction or spec.direction
     spec.protopilot_version = __version__
+    # Set after validation, never by the model: intake is not shown these
+    # fields precisely so it cannot produce a second opinion about them.
+    spec.archetype = chosen
+    spec.theme = theme
+    spec.answers = _parse_answers(chosen, answers)
     if not spec.screens:
         # Screens are the contract the smoke tests and the routes are both
         # generated from, so an empty list is not something to pass along.
@@ -429,6 +512,22 @@ def serve(port: int, workspace: str | None, backend: str | None, demo: bool) -> 
     _echo(f"workspace: {root}")
     _echo(f"http://localhost:{port}" + ("  (demo mode: tests hidden)" if demo else ""))
     uvicorn.run(create_app(root, backend=backend, demo=demo), host="127.0.0.1", port=port, log_level="warning")
+
+
+@main.command(name="archetypes")
+def list_archetypes() -> None:
+    """What shapes this build can generate, and what each one asks you."""
+    from protopilot import archetypes
+
+    for name in archetypes.names():
+        module = archetypes.get(name)
+        default = "  (default)" if name == archetypes.DEFAULT else ""
+        _echo(f"{name}{default}")
+        _echo(f"  {module.LABEL}")
+        _echo(f"  fits: {module.MATCHES}")
+        for question in module.QUESTIONS:
+            _echo(f"    --answer {question['id']}=...  {question['question']}")
+        _echo("")
 
 
 @main.command(name="ls")

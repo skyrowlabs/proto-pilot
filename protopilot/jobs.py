@@ -37,6 +37,12 @@ class Job:
     # Whatever this job produced, for jobs that answer rather than build
     # (the clarify pass). Kept generic so a new job kind needs no new field.
     result: dict = field(default_factory=dict)
+    # What the journey collected between clarify and generate. Named fields
+    # rather than more of `result`, because these three are read by the
+    # generation step by name and a typo in a dict key would be silent.
+    archetype: str = ""
+    answers: dict = field(default_factory=dict)
+    theme: dict = field(default_factory=dict)
 
     def log(self, message: str) -> None:
         for line in str(message).splitlines() or [""]:

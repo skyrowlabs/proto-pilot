@@ -25,10 +25,16 @@ from protopilot.llm import build_llm
 from protopilot.passes import PassContext, clarify, intake
 from protopilot.render import render_skeleton
 from protopilot.runner import SubprocessRunner, docker_available
-from protopilot.spec import Screen, Spec, checkable_paths
+from protopilot.spec import Screen, Spec, Theme, checkable_paths
 from protopilot.verify import Verifier
 
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+
+
+def archetypes_default() -> str:
+    from protopilot import archetypes
+
+    return archetypes.DEFAULT
 
 
 def run_generation(
@@ -62,6 +68,12 @@ def run_generation(
     spec.port = free_port()
     spec.direction = job.direction or spec.direction
     spec.protopilot_version = __version__
+    # Set here, never by the model: intake is not shown these fields precisely
+    # so it cannot produce a second opinion that overwrites the human's.
+    spec.archetype = job.archetype or archetypes_default()
+    spec.answers = dict(job.answers)
+    theme = Theme(**job.theme) if job.theme else Theme()
+    spec.theme = None if theme.is_empty() else theme
     if not spec.screens:
         spec.screens = [Screen(**item) for item in crud.screens(spec)]
 
@@ -93,14 +105,39 @@ def run_generation(
 
 
 def run_clarify(job, backend: str | None = None) -> None:
-    """Ask a few questions. One call, before anything is generated."""
+    """Classify the idea and assemble the questions. One call, before anything
+    is generated.
+
+    The model is asked only for what it can see and we cannot: the shape, the
+    theme, and up to two questions specific to this idea. The archetype's own
+    fixed questions are merged in here, from the registry, so no tokens are
+    spent asking it to repeat what we already wrote down.
+    """
+    from protopilot import archetypes
+
     llm = build_llm(backend=backend)
     if llm.offline:
-        # The baseline cannot read an idea, so it has no questions to ask.
-        job.result = {"heads_up": "", "questions": []}
+        # The baseline cannot read an idea, so it cannot classify one either.
+        # It still gets the default archetype's questions: those are ours and
+        # need no model.
+        chosen = archetypes.DEFAULT
+        job.result = {
+            "archetype": chosen,
+            "choices": archetypes.names(),
+            "theme": {},
+            "heads_up": "",
+            "fixed": clarify.fixed_questions(chosen),
+            "questions": [],
+        }
         return
+
     system, user = clarify.build(job.idea, job.direction)
-    job.result = llm.structured(system=system, user=user, schema=clarify.SCHEMA, label=clarify.NAME)
+    result = llm.structured(system=system, user=user, schema=clarify.schema(), label=clarify.NAME)
+    chosen = clarify.chosen_archetype(result)
+    result["archetype"] = chosen
+    result["fixed"] = clarify.fixed_questions(chosen)
+    result["choices"] = archetypes.names()
+    job.result = result
 
 
 def run_amend(
@@ -182,11 +219,19 @@ def create_app(workspace: Path, backend: str | None = None, demo: bool = True) -
         return RedirectResponse(f"/clarify/{job.id}", status_code=303)
 
     @app.get("/clarify/{job_id}", response_class=HTMLResponse)
-    def clarify_page(request: Request, job_id: str):
+    def clarify_page(request: Request, job_id: str, archetype: str = ""):
         job = STORE.get(job_id)
         if job is None:
             return RedirectResponse("/", status_code=303)
-        return TEMPLATES.TemplateResponse(request, "clarify.html", {"job": job, "demo": demo})
+
+        # Overruling the classifier is a GET with no model call: the fixed
+        # questions come from the registry, so switching shape re-renders from
+        # what this build already knows rather than asking again.
+        selected = job.result.get("archetype", "")
+        if archetype and archetype in job.result.get("choices", []):
+            selected = archetype
+            job.result["fixed"] = clarify.fixed_questions(selected)
+        return TEMPLATES.TemplateResponse(request, "clarify.html", {"job": job, "demo": demo, "selected": selected})
 
     @app.post("/generate")
     async def generate(request: Request):
@@ -195,9 +240,16 @@ def create_app(workspace: Path, backend: str | None = None, demo: bool = True) -
         direction = str(form.get("direction", "")).strip()
         # Answers arrive as answer::<question text>; folding them into
         # `direction` means they reach every pass with no new plumbing.
+        # Keyed by question ID now, not by question text: the id is what makes
+        # an answer addressable by the pass that eventually reads it.
         answers = {key.split("::", 1)[1]: str(value) for key, value in form.items() if key.startswith("answer::")}
-        direction = clarify.answers_to_direction(direction, answers)
+        chosen = str(form.get("archetype") or "").strip() or archetypes_default()
+        typed, prose = clarify.split_answers(chosen, answers)
+        direction = clarify.merge_direction(direction, prose)
         job = STORE.create(idea, direction)
+        job.archetype = chosen
+        job.answers = typed
+        job.theme = {k: str(form.get(f"theme::{k}", "")).strip() for k in ("palette", "motif", "tone", "subject")}
         STORE.run(job, _generate)
         return RedirectResponse(f"/jobs/{job.id}", status_code=303)
 
