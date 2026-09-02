@@ -76,9 +76,34 @@ is only a pointer at it).
   consumer, which is the point: `bin/skeletor-verify` scaffolds into empty
   directories, so nothing in skeletor can see this.
 
-  **Report it to skeletor; do not fix it from here** — the workspace rule is
-  that the finder is not the owner. Until it is fixed, treat
-  `bin/skeletor-upgrade` as unsafe on this repo.
+  Reported 2026-09-01. **skeletor confirmed it, fixed it, and corrected the
+  half I had inferred rather than verified** — which is the useful part of the
+  exchange and the reason the report said which was which.
+
+  I guessed `skeletor-upgrade` would treat this repo's source as template
+  output and merge over it. It would not: `cross_check()` renders the base and
+  requires every recorded hash to match a file that base produces, so all 114
+  foreign entries fail and it **refuses outright** before the merge loop runs.
+  So nothing was ever going to be overwritten. The real damage was narrower and
+  more annoying — `bin/skeletor-upgrade` was permanently unusable on the one
+  case skeletor's own AGENTS.md calls "the usual case", failing with a message
+  that reads as though *this* tree is at fault.
+
+  So the accurate word is **unusable, not unsafe**. Stopping to report rather
+  than running it was still right, but for a weaker reason than I gave.
+
+  Their fix records what the scaffolder *did* rather than what it found, and is
+  gated by `populated_tree_gate` in `bin/skeletor-verify`, which scaffolds into
+  a seeded directory and an empty one and requires identical manifest keys.
+
+  **Still open on our side, and it waits on them.** Our `.skeletor.json` keeps
+  its 114 foreign entries until skeletor is committed and tagged; `skeletor_ref`
+  here is `v0.1.0-8-gabcac22` and the remedy is a prune driven by
+  `skeletor-upgrade --dry-run --from-dir .` (whose report goes to **stderr**).
+  Do it once, after their tag — not before, and not twice. Do **not** re-scaffold
+  to fix it: that would clobber the seven hand-merges. We owe them a
+  `--dry-run` on this tree once tagged, as the real-world confirmation their
+  gate's decoys only model.
 
 ## Traps — not bugs, but they will get you
 
