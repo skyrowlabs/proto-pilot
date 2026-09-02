@@ -330,12 +330,25 @@ The tell is whether a stated reason is a **workaround** or an **intention**:
 Both sentences defend the same line of config. Only one of them is still true
 after the push trigger is fixed.
 
-So: when a reason names something broken, absent or unimplemented — ours or a
-dependency's — say so explicitly and say what changes if it is fixed. See
-`containers.py::known_paths` for the shape. And when you close a defect, grep
-for what cited it. This session produced two instances in one afternoon: a
-neighbour's badge rule, and this repo's own README, which still listed a gap
-Phase 2 had closed an hour earlier.
+**The safest state is not one reason. It is both reasons, with the perishable
+one labelled.** You cannot always avoid citing a broken thing — sometimes it
+genuinely is why you did it — but you can refuse to let it be the only reason on
+the page. State the durable reason too, mark which one is load-bearing, and the
+day the broken thing is fixed nobody has to re-derive whether the decision still
+holds. `containers.py::known_paths` is the worked example here.
+
+When you close a defect, grep for what cited it. Two things make that harder
+than it sounds, and both bit in the same afternoon:
+
+- **The distance that matters is audience, not files.** This repo's README still
+  listed a gap that had been closed an hour earlier, one commit away, because
+  `NOTES.md` is the parking lot I have the habit of updating and the README is
+  for a stranger. Check the widest-audience document, not the nearest one.
+- **No test can do the semantic half.** Nothing can read "because X is broken"
+  and go check whether X is still broken. `tests/test_docs_name_live_code.py`
+  catches the mechanical cousin — a reference doc naming a callable this repo
+  used to define — and that is the whole of what a gate can offer here. The rest
+  is a reading pass.
 
 ---
 

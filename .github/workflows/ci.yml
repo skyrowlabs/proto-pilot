@@ -152,7 +152,14 @@ jobs:
       # skips its whole suite reports green.
       PP_CI: '1'
     steps:
+      # Full history, not the default shallow clone. `test_docs_name_live_code`
+      # asks git whether a symbol was ever defined here, and against a shallow
+      # clone the answer is always no -- so it would pass by seeing nothing
+      # rather than by finding nothing. It asserts the clone is deep instead of
+      # trusting this line, but this line is what keeps it green.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
