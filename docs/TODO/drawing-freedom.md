@@ -108,10 +108,33 @@ Cheap, and first because every later phase reasons from these sentences.
       only thing that has ever enforced no-CDN, and it is three lines of regex
       over `app/templates/*.html`. It belongs in `verify`, not only in tests,
       because it is a property of the generated app rather than of this repo
-- [ ] Decide and record whether the container *should* be isolated. It is a
-      separate question from the rule above and the answer is probably no: the
-      spec has an `external_apis` field, and an app that legitimately calls one
-      would be broken by an isolation that never enforced the CDN rule anyway
+- [x] **Decided by experiment, 2026-09-02: isolate egress, and do it with the
+      NAT switch rather than `internal: true`.** A generated `turn-based-game`
+      was booted three ways and measured:
+
+      | Setting | Egress | Host → app | db | Suite |
+      |---|---|---|---|---|
+      | as shipped | **open** (CDN reachable, HTTP 200) | 200 | ok | 12/12 |
+      | `internal: true` | blocked | **dead — no published port** | ok | 12/12 |
+      | `enable_ip_masquerade: "false"` | blocked | 200 | ok | 12/12 |
+
+      `internal: true` is the obvious knob and it is a trap: it removes the
+      route the published port needs, so the app becomes unreachable from the
+      host — which is the entire point of the tool. `driver_opts:
+      com.docker.network.bridge.enable_ip_masquerade: "false"` drops the NAT
+      that gives a container a way out while leaving the bridge routable, so
+      `0.0.0.0:8081->8000/tcp` still works.
+
+      Runtime egress is worth **zero** to a generated app: with it blocked, the
+      app boots, serves every page and passes its own suite. The cost is a
+      compose line.
+
+      Two things this does NOT buy, and the plan must not claim them. It does
+      not enforce the no-CDN rule — that is browser-side, and still needs the
+      grep above. And it pre-empts the `external_apis` field, which no pass
+      consumes today but which would make egress a per-spec decision rather
+      than a global one; the honest shape is default-off with a spec able to
+      opt in, not a hardcoded no
 - [ ] `intake.SYSTEM`'s capability list is re-checked against what is actually
       true after this phase, since it is the prompt that decides what goes in
       `limits` — and a wrong `limits` line is the tool promising less than it

@@ -18,6 +18,29 @@ is only a pointer at it).
 
 ## Open — pipeline gaps, in the order they bite
 
+- **The generated smoke suite is not idempotent against a persistent volume.**
+  Found 2026-09-02 by running it twice. A `turn-based-game` tree on a fresh
+  volume: `12 passed`. The same command again, same container, no changes:
+  `1 failed, 11 passed`. `test_playing_a_square_changes_the_board` plays a real
+  move and leaves it played, so the second run starts from a board the seed did
+  not create, and eventually from a game that has finished.
+
+  Nothing catches this. CI runs the suite once against a fresh tree, `proto new`
+  runs it once, and the repair loop only re-runs it after regenerating — so
+  every path that exists today gets the fresh-volume answer.
+
+  It is not cosmetic and it lands squarely on the improvement loop: that plan's
+  ratchet re-runs the suite against the same tree every iteration, so a suite
+  that goes red on its second run would revert every iteration after the first
+  and report the app as regressing when nothing changed. **Fix this before
+  building the ratchet**, or the ratchet's first honest test will be against a
+  broken measurement.
+
+  The fix is a decision, not a patch: either the generated suite resets the
+  rows it depends on (a fixture that reseeds), or the tests assert against
+  state they create rather than state the seed left. The second is better and
+  is a change to the smoke prompt and to every archetype's `smoke_py`.
+
 - **`auth: "password"` is accepted by the spec and implemented by no pass.** A
   spec can ask for it and nothing will build it. Either implement it or reject it
   at intake; silently accepting it is the worst of the three.
