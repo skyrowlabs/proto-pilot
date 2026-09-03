@@ -100,24 +100,41 @@ is only a pointer at it).
   gated by `populated_tree_gate` in `bin/skeletor-verify`, which scaffolds into
   a seeded directory and an empty one and requires identical manifest keys.
 
-  **Still open on our side, and it waits on them.** Our `.skeletor.json` keeps
-  its 114 foreign entries until skeletor is committed and tagged.
+  **Closed 2026-09-01.** The manifest is repaired and the upgrade has run;
+  skeletor is at `v0.2.1`. Kept because the sequence is the record of a class
+  of defect neither repo could find alone, and because the recipe changed twice
+  while we followed it.
 
-  The remedy, corrected by skeletor on 2026-09-01 — **do not pass `--from-dir`**.
-  With no base flag, `skeletor-upgrade` renders the base at the `skeletor_ref`
-  our manifest records (`v0.1.0-8-gabcac22`), which is exactly the base our 114
-  hashes describe. That is correct by construction and stays correct however far
-  their template moves ahead of us; the `--from-dir .` version they first gave
-  was only valid while their fix stayed under `bin/`, and a template change has
-  since landed, so it has already expired.
+  Pruning the 228 entries to 114 got us to a *second* message class — not a
+  surplus entry but a **wrong hash** on `.github/DOCS_INDEX.md`, which pruning
+  cannot repair: a prune removes an entry that should not exist, and this one
+  should exist with a different value. The cause was the same defect one layer
+  in — `register_shipped_docs` scans the tree it writes into, so scaffolding
+  over a repo that already had `docs/hosted.md` gave that doc a routing row,
+  correctly, and the manifest then recorded the post-processed file rather than
+  the render. Guessing the hash would have been worse than useless: the offline
+  fallback uses the recorded hash on **both** sides of the matrix, so a wrong
+  one reads an untouched file as "template moved, user untouched" and
+  overwrites it.
 
-      bin/skeletor-upgrade <this tree> --dry-run     # drift list on STDERR
+  So the whole prune recipe was thrown away in favour of
+  `bin/skeletor-upgrade <tree> --repair-manifest`, which re-derives the map
+  from the base render — one line changed, idempotent. **Do not pass
+  `--from-dir`**: with no base flag it renders at the `skeletor_ref` the
+  manifest records (`v0.1.0-8-gabcac22`), which stays correct however far their
+  template moves ahead.
 
-  Prune the reported keys from `.skeletor.json`, re-run until it stops
-  complaining, then run the real upgrade. Do it once, after their tag. Do
-  **not** re-scaffold: that would clobber the hand-merges. We owe them the raw
-  dry-run output either way, as the real-world confirmation their gate's decoys
-  only model.
+  Two things came back to us in the upgrade. `ci.yml` conflicted and was ported
+  by hand, taking their side on the install step, the push-branches comment and
+  the `fetch-depth` comment — all three are our own reports written back
+  better, and keeping our wording would have been keeping a divergence for
+  sentiment. And `tests/test_docs_name_live_code.py` came back as a
+  **collision** rather than an edit: we wrote it here, and their template now
+  ships one at that path *because of our report*, so the first thing it
+  collided with was the repo the idea came from. Theirs won — it reads the
+  narrative directory list from `scripts/paths.py` instead of listing it, which
+  is our own recompute-don't-list rule applied one level further than we
+  applied it in the file that argues for it.
 
   **Pruned 2026-09-01: 228 → 114 entries.** Every foreign path is gone and the
   114 that remain are all genuine scaffold output (`scripts/`, `docs/`,
