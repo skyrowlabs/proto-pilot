@@ -12,7 +12,7 @@ checking whether a capability already exists (parked) before rebuilding it.
 
 **Machine-readable index**: [`../todo_index.json`](../todo_index.json).
 
-**1 open plans** · **0 agent-managed**
+**2 open plans** · **0 agent-managed**
 
 ---
 
@@ -22,6 +22,7 @@ _Not started — intended future work._
 
 | Plan | Priority | Updated | Summary |
 | ---- | -------- | ------- | ------- |
+| [Drawing Freedom](drawing-freedom.md) | high | 2026-09-02 | Raise the visual ceiling of a generated app by ranking display options on whether the verifier can tell they worked — not on what Docker permits. |
 | [The Improvement Loop](improvement-loop.md) | high | 2026-09-01 | Let a prototype be told to keep getting better, with a ratchet that reverts any iteration leaving it less green than it found it. |
 
 ---
