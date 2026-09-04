@@ -168,12 +168,27 @@ def helper():
     Copied, this file would be testing its own copy and would stay green while
     the shipped one rotted — which is the exact shape of the defect this whole
     group exists to prevent, one level up.
+
+    `sys.dont_write_bytecode` rather than `PYTHONDONTWRITEBYTECODE`, and the
+    distinction is the whole of why this works: the environment variable is
+    read once, at interpreter start, into that attribute — so setting it from
+    inside a running test does nothing at all. Without it, `exec_module` writes
+    a `__pycache__` into `skeleton/tui/tests/`, which is source data copied
+    byte-for-byte into every generated prototype. It is gitignored, so the cost
+    today is cosmetic; `_source_files()` above already excludes `__pycache__`
+    by name, because a `.pyc` read as text is a `UnicodeDecodeError` in a test
+    whose failure message is then about nothing.
     """
     path = TUI_SKELETON / "tests" / "screen.py"
     spec_ = importlib.util.spec_from_file_location("skeleton_tui_screen", path)
     assert spec_ and spec_.loader
     module = importlib.util.module_from_spec(spec_)
-    spec_.loader.exec_module(module)
+    previous = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        spec_.loader.exec_module(module)
+    finally:
+        sys.dont_write_bytecode = previous
     return module
 
 

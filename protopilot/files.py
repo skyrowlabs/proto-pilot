@@ -30,11 +30,17 @@ class UnsafePath(ValueError):
 
 @dataclass(frozen=True)
 class GeneratedFile:
+    """One file a pass returned: where it wants to go, and what is in it.
+
+    Deliberately no `rel()` helper. It returned `Path(self.path)` and had no
+    callers left once path handling moved to `check_path`, which normalises and
+    authorises in the same step -- so a second, unauthorised way to turn a
+    model-supplied string into a path was sitting next to the one that checks
+    it. Nothing was calling the wrong one; something eventually would have.
+    """
+
     path: str
     content: str
-
-    def rel(self) -> Path:
-        return Path(self.path)
 
 
 def check_path(path: str, writable: Sequence[str], protected: Sequence[str] = ()) -> Path:
