@@ -311,16 +311,57 @@ four baselines to keep green in CI, growing as either axis does.
 
 The reason to be optimistic about the whole plan.
 
-- [ ] A `Verifies` implementation for the terminal target: start the app under
+- [x] A `Verifies` implementation for the terminal target: start the app under
       `App.run_test`, drive the pilot, run the smoke suite, capture output
-- [ ] The blank-screen check. This is the direct analogue of `PAINTED_JS` and
+- [x] The blank-screen check. This is the direct analogue of `PAINTED_JS` and
       of the browser stage, and it is **cheaper and more deterministic than
       either**: compare the rendered screen buffer to an empty one. No browser,
       no headless Chrome, no optional extra that gets reported as skipped
-- [ ] `/healthz`, the Postgres wait, and the race the whole verify loop is built
+- [x] `/healthz`, the Postgres wait, and the race the whole verify loop is built
       around all disappear. Assert that they are gone rather than left dead
-- [ ] The repair loop is unchanged in shape: same three attempts, same floor,
+- [x] The repair loop is unchanged in shape: same three attempts, same floor,
       same `RUNBOOK.md` naming the red stage. Only the stages differ
+
+> **Phase 5 landed 2026-09-04.** `protopilot/verify_tui.py` and
+> `protopilot/tui_probe.py`, with stages `import → boot → tests → paint` in the
+> web target's attribution order. `tests/test_tui_verify.py` runs the whole of
+> it in the unit suite with no daemon, no browser and no port, which is the
+> claim this phase was making.
+>
+> **There are two blank-screen guards, not one, and only the outer one fires in
+> a real tree.** `skeleton/tui/tests/test_boots.py` asserts the buffer is
+> non-empty, so a generated app that paints nothing goes red at `tests` before
+> `paint` ever sees it. The paint stage is the backstop for the case the plan
+> describes — an app that mounts and answers every query and shows nothing —
+> and it is demonstrated by silencing the tree's own suite and building a
+> `HomeScreen` whose `compose()` yields nothing.
+>
+> **The tester's finding landed here rather than being worked around.**
+> `verify.Verifier` bound `getter=http_get` as a default argument, evaluated at
+> `def` time, so monkeypatching `verify.http_get` could not reach a verifier
+> built through `targets.web.verifier()` — the middle of that class had never
+> run under a test. Both verifiers now take `None` and resolve in the body, and
+> `test_no_seam_is_welded_shut` is a structural gate over both: no constructor
+> default in either may be a callable.
+>
+> **Three things the plan did not list, all of them the same defect in
+> different clothes — a Docker assumption outliving the target that needed
+> it.** `proto new` asked `docker_available` unconditionally, so a terminal
+> generation was refused on a machine with no daemon for a dependency it does
+> not have; that is `targets.<name>.preflight(runner)` now. `write_runbook`
+> listed `app/routes.py` and told the reader to run `docker compose logs -f
+> app`; the file list is derived from the target's `WRITABLE` and the commands
+> come from `targets.<name>.MANUAL`. And every `docker compose` the CLI runs
+> goes through `_compose`, which now refuses for a tree with no `compose.yml`
+> and says what to type instead — one guard covering `up`, `down`, `reset`,
+> `logs` and `test`.
+>
+> **`textual` and `sqlalchemy` became runtime dependencies.** This target
+> verifies **in process**: there is no container between proto.pilot and a
+> generated terminal tree, so the framework has to be importable wherever
+> `proto` is installed. That is a real cost and it is stated rather than
+> hidden — the web target still needs neither at runtime, which is why they
+> were an extra until now.
 
 ## Phase 6 — The offline baseline, without which none of this is tested
 

@@ -74,6 +74,39 @@ PROTECTED = ("app/templates/base.html",)
 ARCHETYPES = ("crud", "turn-based-game")
 
 
+#: What a person types to start this prototype, once they have the tree.
+#:
+#: Printed by `proto new --no-verify` and used nowhere else. It belongs to the
+#: target because it is a fact about the medium: `make up` is a compose project
+#: and there is no such thing in a one-process tree.
+RUN_HINT = "cd {directory} && make up"
+
+#: What the RUNBOOK's captured second stream actually is.
+LOGS_LABEL = "Container logs"
+
+#: The RUNBOOK's "carrying on by hand" block.
+MANUAL = """\
+```bash
+docker compose up -d --build           # bring it up
+docker compose logs -f app             # watch it
+docker compose exec -T app pytest -q   # the failing suite
+```"""
+
+
+def preflight(runner) -> tuple[bool, str]:
+    """What has to be true before generating for this target.
+
+    Asked before the classifier and before intake, so a machine with no daemon
+    is told now rather than after the tokens are spent. It is the target's
+    question and not the CLI's: `docker_available` is the right check for a
+    tree with a `compose.yml` in it and is meaningless for one process and a
+    SQLite file.
+    """
+    from protopilot.runner import docker_available
+
+    return docker_available(runner)
+
+
 def verifier(project_dir: Path, spec: Spec, runner=None) -> Verifies:
     """Boot the stack, wait on `/healthz`, run the smoke suite, capture logs.
 

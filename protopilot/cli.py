@@ -185,6 +185,28 @@ def _down_all(purge: bool) -> None:
 
 
 def _compose(project_dir: Path, *args: str) -> int:
+    """Every `docker compose` this CLI runs goes through here.
+
+    Which makes it the one place to refuse for a tree that has no containers.
+    `up`, `down`, `reset`, `logs` and `test` are all Docker verbs, and a
+    terminal prototype has no image to build, nothing to detach and no log
+    stream to follow -- so a compose command against one fails with an error
+    about a missing `compose.yml` that reads as a broken generation.
+
+    The condition is a fact about the TREE rather than a flag on the target,
+    deliberately: `proto up` is run inside somebody's prototype, and asking the
+    directory what it is beats asking a registry what it should have been.
+    """
+    if not (project_dir / "compose.yml").exists():
+        from protopilot import targets
+
+        spec = Spec.load(project_dir)
+        hint = targets.for_spec(spec).RUN_HINT.format(directory=project_dir)
+        raise click.ClickException(
+            f"the {spec.target!r} target does not run in Docker; there is nothing here to "
+            f"`docker compose {args[0] if args else '...'}`.\n"
+            f"  Run it with `{hint}`, or read this tree's README."
+        )
     return subprocess.call(["docker", "compose", *args], cwd=str(project_dir))  # noqa: S603
 
 
@@ -262,7 +284,12 @@ def new(
         raise click.ClickException(str(targets.MissingTarget(chosen_target, targets.names())))
 
     if not no_verify:
-        ok, why = docker_available(SubprocessRunner())
+        # The TARGET's question, not this function's. `docker_available` is the
+        # right check for a tree with a `compose.yml` in it and is meaningless
+        # for one process and a SQLite file -- and a CLI that asked it anyway
+        # would refuse to build a terminal app on a machine with no daemon, for
+        # a dependency that target does not have.
+        ok, why = targets.get(chosen_target).preflight(SubprocessRunner())
         if not ok:
             # Said now rather than after the generation passes, because after
             # is when the tokens have already been spent.
@@ -318,7 +345,8 @@ def new(
         _git_init(target)
 
     if no_verify:
-        _echo(f"\nGenerated (not verified). `cd {target} && make up`")
+        hint = targets.get(chosen_target).RUN_HINT.format(directory=target)
+        _echo(f"\nGenerated (not verified). `{hint}`")
         return
 
     _finish(spec, ctx, llm, target, attempts)

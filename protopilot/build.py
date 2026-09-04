@@ -288,7 +288,7 @@ Stage: **{stage}**
 {output}
 ```
 
-## Container logs
+## {logs_label}
 
 ```
 {logs}
@@ -300,11 +300,7 @@ Stage: **{stage}**
 
 ## Carrying on by hand
 
-```bash
-docker compose up -d --build        # bring it up
-docker compose logs -f app          # watch it
-docker compose exec -T app pytest -q   # the failing suite
-```
+{manual}
 
 Generated files -- rewritten whole by the next `proto add`, so fix them here
 only if you are done generating:
@@ -368,17 +364,41 @@ def write_generation_runbook(project_dir: Path, pass_name: str, reason: str, don
     return path
 
 
+def generated_paths(project_dir: Path, spec: Spec) -> list[str]:
+    """Every generated file in this tree, resolved against the target's list.
+
+    Derived rather than written down. It used to be four literal web paths plus
+    a glob of `app/templates/`, which named a tree the terminal target does not
+    have -- so a terminal RUNBOOK would have told somebody to go and fix
+    `app/routes.py`. Globs are expanded against the tree because that is where
+    the answer is; `app/templates/*.html` cannot be listed without looking.
+    """
+    target = targets.for_spec(spec)
+    out: list[str] = []
+    for pattern in target.WRITABLE:
+        if "*" in pattern:
+            out += sorted(
+                str(match.relative_to(project_dir))
+                for match in project_dir.glob(pattern)
+                if match.is_file() and str(match.relative_to(project_dir)) not in target.PROTECTED
+            )
+        elif (project_dir / pattern).exists():
+            out.append(pattern)
+    return out
+
+
 def write_runbook(project_dir: Path, spec: Spec, outcome: Outcome) -> Path:
+    """The floor. A known-broken prototype beats a mystery.
+
+    Everything medium-specific in it -- what the second captured stream is,
+    what to type to carry on by hand, which files were generated -- comes from
+    the target. A runbook that tells a terminal user to run `docker compose
+    logs -f app` is worse than no runbook: it is a confident wrong answer at
+    the moment somebody has nothing else to go on.
+    """
+    target = targets.for_spec(spec)
     result = outcome.result
-    generated = "\n".join(
-        f"- `{p}`"
-        for p in ["app/models.py", "app/seed.py", "app/routes.py", SMOKE_PATH]
-        + sorted(
-            f"app/templates/{q.name}"
-            for q in (project_dir / "app" / "templates").glob("*.html")
-            if q.name != "base.html"
-        )
-    )
+    generated = "\n".join(f"- `{p}`" for p in generated_paths(project_dir, spec)) or "- none"
     repairs = (
         "\n".join(f"{i}. {r}" for i, r in enumerate(outcome.repairs, 1))
         or "Nothing -- the first verify failed and no repair was attempted."
@@ -390,8 +410,10 @@ def write_runbook(project_dir: Path, spec: Spec, outcome: Outcome) -> Path:
             stage=result.stage if result else "unknown",
             summary=result.summary if result else "no verify result was produced",
             output=(result.output if result else "").strip()[-4000:] or "(none)",
+            logs_label=target.LOGS_LABEL,
             logs=(result.logs if result else "").strip()[-4000:] or "(none)",
             repairs=repairs,
+            manual=target.MANUAL,
             generated=generated,
         )
     )

@@ -107,14 +107,27 @@ def test_the_repair_pass_may_write_everything_the_others_can():
     assert TUI.REPAIR.NAME == "repair"
 
 
-def test_the_verifier_is_not_here_yet_and_says_so(tui_spec, tmp_path):
-    """Phase 5 replaces this. Stated rather than left to be discovered: a
-    target module registered with a half-built verifier is exactly the
-    "half-works" the plan warns about, and the only defence against it being
-    silent is a test that names the state while it is true."""
-    with pytest.raises(NotImplementedError) as caught:
-        TUI.verifier(tmp_path, tui_spec)
-    assert "Phase 5" in str(caught.value)
+def test_the_verifier_is_the_terminal_one(tui_spec, tmp_path):
+    """The factory hands back a `Verifies`, and it is not the Docker one.
+
+    `tests/test_tui_verify.py` covers what it does; this is the assertion that
+    the registry points at it at all, which is what `cli._verifier` and the web
+    front end both go through.
+    """
+    from protopilot.verify import Verifier
+    from protopilot.verify_tui import TuiVerifier
+
+    made = TUI.verifier(tmp_path, tui_spec)
+    assert isinstance(made, TuiVerifier)
+    assert not isinstance(made, Verifier)
+
+
+def test_the_target_needs_nothing_to_be_running(tui_spec):
+    """`preflight` is what `proto new` asks before it spends anything. For this
+    target the answer is always yes, and that is the point: a terminal app on a
+    machine with no Docker daemon is a generation that should happen."""
+    ok, why = TUI.preflight(runner=None)
+    assert ok and why
 
 
 def test_every_declared_archetype_has_a_terminal_brief():

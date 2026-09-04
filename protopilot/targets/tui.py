@@ -39,9 +39,11 @@ from protopilot.passes.tui import screens as screens_pass
 from protopilot.passes.tui import seed as seed_pass
 from protopilot.passes.tui import smoke as smoke_pass
 from protopilot.passes.tui import ui as ui_pass
+from protopilot.runner import SubprocessRunner
 from protopilot.spec import Spec
 from protopilot.targets import SKELETON_ROOT
 from protopilot.verify import Verifies
+from protopilot.verify_tui import TuiVerifier
 
 NAME = "tui"
 LABEL = "A terminal app you run in a shell"
@@ -109,19 +111,48 @@ PROTECTED: tuple[str, ...] = ()
 ARCHETYPES = ("crud",)
 
 
-def verifier(project_dir: Path, spec: Spec, runner=None) -> Verifies:
-    """Not yet. Phase 5 of `docs/TODO/terminal-target.md` builds this.
+#: What a person types to start this prototype. One process, no port.
+RUN_HINT = "cd {directory} && make run"
 
-    Deliberately explicit rather than absent. The alternative was to leave this
-    module out until the verifier existed, and that is what Phase 3 did -- but
-    it means `--target tui` is refused as an unknown target, which reads as
-    "this build does not have it" rather than "this build cannot check it yet".
+#: What the RUNBOOK's captured second stream actually is. Not "container logs":
+#: there is no container, and the stream is whatever the app itself printed to
+#: stderr while the probe was driving it.
+LOGS_LABEL = "What the app printed"
 
-    `tests/test_tui_target.py` asserts this raises, so the half-built state is
-    a stated one for the single commit it exists in rather than something a
-    reader has to notice.
+#: The RUNBOOK's "carrying on by hand" block.
+MANUAL = """\
+```bash
+pip install -r requirements.txt   # into a virtualenv you have activated
+python -m app.main                # the app, in this terminal
+python -m pytest -q               # the failing suite
+```"""
+
+
+def preflight(runner) -> tuple[bool, str]:
+    """Nothing has to be true. That is the point of this target.
+
+    No daemon, no port, no image to pull. It exists as a function rather than
+    a `NEEDS_DOCKER = False` flag so the CLI asks one question of the target
+    instead of branching on a property of it -- a third target that needs
+    something else entirely answers here and changes nothing upstream.
     """
-    raise NotImplementedError(
-        "the terminal verifier arrives with Phase 5 of docs/TODO/terminal-target.md; "
-        "`proto new --target tui --no-verify` generates a tree without checking it"
-    )
+    return True, "a terminal app needs nothing but Python"
+
+
+def verifier(project_dir: Path, spec: Spec, runner=None) -> Verifies:
+    """Import, boot under `App.run_test`, run the smoke suite, check it painted.
+
+    The same two arguments and the same Protocol the web target's factory
+    returns, so `drive_to_green` never learns which one it got -- and the same
+    place the constructor arguments are decided once, for both front ends.
+
+    `spec` is unused, deliberately. The web verifier needs `spec.port` and
+    `checkable_paths(spec)`; a terminal app has neither a port nor a URL, and
+    the argument stays in the signature because the signature is the contract
+    `targets.for_spec(spec).verifier(...)` calls through.
+
+    `SubprocessRunner` is resolved from this module's namespace rather than
+    frozen into a default, so a test can substitute it -- see the note in
+    `verify_tui.py` about the seam the web factory does not have.
+    """
+    return TuiVerifier(project_dir, runner=runner or SubprocessRunner())

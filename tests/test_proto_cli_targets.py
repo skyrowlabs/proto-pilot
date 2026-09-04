@@ -141,10 +141,15 @@ def test_the_target_is_checked_before_anything_is_spent(run, tmp_path, monkeypat
     that the assertion is vacuous anywhere a daemon happens to be running,
     which is every developer laptop and no CI runner — the exact split where a
     reordering would pass here and fail there.
-    """
-    from protopilot import cli
 
-    monkeypatch.setattr(cli, "docker_available", lambda runner: (False, "the docker daemon is not running"))
+    Patched on the *target* rather than on `cli.docker_available`: the CLI
+    stopped asking that question directly when the terminal target arrived,
+    because it is meaningless for one process and a SQLite file. Patching the
+    old name would still pass and would prove nothing.
+    """
+    from protopilot.targets import web as web_target
+
+    monkeypatch.setattr(web_target, "preflight", lambda runner: (False, "the docker daemon is not running"))
 
     # No `--no-verify`, so the docker probe is live and would answer first if
     # it were reached first.
@@ -153,6 +158,28 @@ def test_the_target_is_checked_before_anything_is_spent(run, tmp_path, monkeypat
     assert result.exit_code != 0
     assert "unknown target 'hologram'" in result.output
     assert "docker daemon" not in result.output.lower()
+
+
+def test_a_target_that_needs_nothing_is_not_asked_for_docker(run, tmp_path, monkeypatch):
+    """`proto new --target tui` on a machine with no daemon must generate.
+
+    The preflight is the target's question. Before it was, this path called
+    `docker_available` unconditionally and refused to build a terminal app --
+    which has no container, no port and nothing to wait for -- because a
+    daemon the tree would never touch was not running.
+
+    The web target is forced unavailable so the test fails if the CLI ever asks
+    the wrong target, rather than passing on a laptop that happens to have
+    Docker up.
+    """
+    from protopilot.targets import web as web_target
+
+    monkeypatch.setattr(web_target, "preflight", lambda runner: (False, "the docker daemon is not running"))
+
+    result = run("new", IDEA, "--dir", str(tmp_path / "t"), "--target", "tui", "--offline", "--no-verify", "-y")
+    assert result.exit_code == 0, result.output + repr(result.exception)
+    assert "docker" not in result.output.lower()
+    assert "make run" in result.output, "a terminal tree was told to start itself with a compose command"
 
 
 def test_new_writes_the_chosen_target_into_the_spec(run, tmp_path):

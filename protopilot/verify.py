@@ -70,8 +70,8 @@ class Verifier:
         project_dir: Path,
         port: int,
         runner: Runner,
-        getter: Callable[[str, float], tuple[int, str]] = http_get,
-        sleep: Callable[[float], None] = time.sleep,
+        getter: Callable[[str, float], tuple[int, str]] | None = None,
+        sleep: Callable[[float], None] | None = None,
         health_timeout: float = 180.0,
         build_timeout: float = 900.0,
         screens: list[str] | None = None,
@@ -82,8 +82,15 @@ class Verifier:
         # fetched. The caller substitutes a real row id or drops it.
         self.screens = screens or []
         self.runner = runner
-        self.getter = getter
-        self.sleep = sleep
+        # Resolved here, not in the signature. A default argument is evaluated
+        # once at `def` time, so `getter=http_get` welded this seam shut: a
+        # verifier built through `targets.web.verifier()` -- which passes no
+        # getter -- could not be reached by monkeypatching `verify.http_get`,
+        # and every test driving the real factory therefore stopped at the
+        # build stage with the middle of this class never having run. Same
+        # behaviour, resolved late, so the seam is one.
+        self.getter = getter or http_get
+        self.sleep = sleep or time.sleep
         self.health_timeout = health_timeout
         self.build_timeout = build_timeout
 

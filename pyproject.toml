@@ -7,25 +7,37 @@ dependencies = [
     "anthropic>=0.40",
     "click>=8.1",
     "pydantic>=2.6",
+    # The terminal target verifies IN PROCESS. There is no container between
+    # proto-pilot and a generated terminal tree -- `verify_tui` runs that tree
+    # under `sys.executable` -- so the framework it is built on has to be
+    # importable wherever `proto` itself is installed. That is the durable
+    # reason and it holds for anyone who ever types `--target tui`.
+    #
+    # It stops being avoidable at the default flip in Phase 6 of
+    # `docs/TODO/terminal-target.md`: `proto new` with no `--target` will build
+    # a terminal app, so a machine without these two would go red at the
+    # `import` stage on its first run and read that as a generation failure.
+    #
+    # The web target still needs neither at runtime -- its tree is built and
+    # tested inside Docker -- which is why they were an extra until now.
+    "sqlalchemy>=2.0",
+    "textual>=0.80",
 ]
 
 [project.optional-dependencies]
-# The end-to-end test generates a tree and runs that tree's own smoke suite in
-# process, so proto-pilot's dev environment needs the generated app's stack too.
 dev = [
     "pytest>=8.0",
+    # The end-to-end tests generate a tree and run that tree's own suite, so
+    # this environment needs the WEB target's stack too. The terminal target's
+    # is in `dependencies` above, because it is the product's now and not only
+    # the test suite's.
     "fastapi>=0.115",
-    "sqlalchemy>=2.0",
     "jinja2>=3.1",
     "httpx>=0.27",
     "python-multipart>=0.0.9",
-    # The Phase 1 terminal-target spike (`scripts/spikes/terminal_target/`)
-    # boots its generated app with `App.run_test`, on the host, with no Docker
-    # and no browser -- so the framework has to be importable here. These two
-    # are the spike's, not the product's: `protopilot/` imports neither, and
-    # they come out in the same commit the spike does. See
-    # `docs/TODO/terminal-target.md`.
-    "textual>=0.80",
+    # A generated terminal tree's smoke suite is `async def` with
+    # `asyncio_mode = auto`, and proto-pilot runs it. The application itself
+    # does not need this; the suite it ships with does.
     "pytest-asyncio>=0.24",
 ]
 
