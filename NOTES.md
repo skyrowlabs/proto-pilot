@@ -350,44 +350,111 @@ is only a pointer at it).
 
 ## Traps — not bugs, but they will get you
 
-- **The upgrade to skeletor v0.2.5 refuses, and the refusal is correct.** Run
-  `../skeletor/bin/skeletor-upgrade . --dry-run` (writes nothing, never refused)
-  and it says:
+- **The upgrade was blocked by one hash, and both of our guesses about why were
+  wrong.** Repaired 2026-09-03 in `434790a`; `bin/skeletor-upgrade . --dry-run`
+  now produces a plan instead of a refusal. Kept because the *reasoning* failure
+  is the reusable part, not the fix.
 
-  ```
-  ⚠️  the tree was scaffolded from a dirty checkout — using the committed part (v0.2.0)
-  → base: skeletor @ v0.2.0
-  ❌ .skeletor.json disagrees with the base it names (1 file(s)):
-     · .github/workflows/ci.yml: recorded hash does not match the base render
-  ```
+  `.skeletor.json` recorded a hash for `.github/workflows/ci.yml` that no base
+  render could ever match. This note previously blamed two things and neither
+  survives reading skeletor's source:
 
-  Two separate facts, and only the second blocks.
+  - **"Written by our own `--repair-manifest`"** — false. It sets
+    `manifest["files"]` and nothing else. `skeletor_ref` is written in exactly
+    one place, `skeletor-new:425`, so `v0.2.0-dirty` came from the original
+    scaffold and the repair merely inherited it.
+  - **"We hand-ported `ci.yml`, taking their side on three hunks"** — false, and
+    it *cannot* be true: the repair hashes `base_files`, the rendered base, never
+    the target.
 
-  **`skeletor_ref` is `v0.2.0-dirty`**, which is not a resolvable revision —
-  `git rev-parse v0.2.0-dirty` fails. The upgrade handles it by using the
-  committed part and warning, which is better than the degraded `--no-base` path
-  I expected before running it. But it means the base we render against is not
-  the tree we were actually scaffolded from, and template edits uncommitted in
-  their checkout that day will read as template changes now. Written by our own
-  `--repair-manifest` on 2026-09-01, from a dirty skeletor checkout.
+  What actually happened: the 2026-09-01 repair rendered its base from a skeletor
+  checkout with uncommitted changes to that very file (`02897fa`, `e85e6fb`, both
+  that day), so the recorded hash described a render that exists in no commit.
+  skeletor closed the hole in `5230a7c` — a run that would write now refuses a
+  dirty base, while `--dry-run` never is.
 
-  **`ci.yml`'s recorded hash disagrees with the v0.2.0 render.** Same *shape* as
-  the `DOCS_INDEX.md` case that blocked the last upgrade — a manifest recording
-  what was found rather than what was rendered — and the repair was supposed to
-  have settled it. We hand-ported `ci.yml` during that upgrade, taking their side
-  on three hunks, which is the likely source.
+  **The lesson, which is the only reason this entry is still here: a remembered
+  action is not evidence; a recoverable state is.** The hand-port was the thing
+  I could *remember*, so I reached for it. `git log` on one path would have
+  answered it and was available the whole time. Prefer the state you can check
+  over the event you can recall.
 
-  **Do not fix this by reaching for `--from-dir`.** It overrides the base, so a
-  current checkout gets compared against a v0.2.0 manifest, and the refusal that
-  follows advises `--repair-manifest` — which would then rewrite the hashes from
-  the wrong base while leaving `skeletor_ref` alone, leaving the two halves of
-  the manifest describing different skeletors. skeletor fixed that advice in
-  `24dc282` so it names the likelier cause first, but the flag is exactly what
-  somebody reaches for with the producing checkout sitting next door.
+  A second-order note worth keeping: the `--from-dir` warning in the old version
+  of this entry described the correct mechanism — hashes rewritten from the wrong
+  base while `skeletor_ref` is left alone — as a *hypothetical about a flag
+  nobody had pulled*, while that exact mechanism had already fired through a
+  different door and was the thing blocking us. **Having the mechanism and
+  missing the instance is a cheap failure; the write-up still did the work.**
+  It is what let skeletor find the real cause in minutes.
 
-  Expect one further thing once the manifest is repaired: `docs/reports/README.md`
-  arrives as a **collision**, per the entry below. skeletor reproduced our upgrade
-  in a worktree and confirmed it.
+  **The `-dirty` ref never clears, and that is correct.** Nothing can recover a
+  render that was never committed, and the repair does not touch the ref, so the
+  ⚠️ line survives every future upgrade. `8dd1832` makes the message say so —
+  before that, two adjacent lines with opposite lifetimes invited you to go
+  hunting for what you had failed to fix.
+
+  **Still true and still worth avoiding: `--from-dir`.** It overrides the base,
+  so a current checkout gets compared against a v0.2.0 manifest. skeletor fixed
+  the advice in `24dc282`, but the flag remains what somebody reaches for with
+  the producing checkout sitting next door.
+
+- **The upgrade can see a collision but not a duplicate, and our own reporting
+  loop manufactures duplicates.** Found 2026-09-03 in the first working dry run.
+
+  `tests/test_pyright_scope.py` arrives under `✅ 2 new file(s) would be added`.
+  We already have that gate, as
+  `tests/test_lint_tool_parity.py::test_pyright_has_something_to_analyse` — not
+  merely similar but the same gate argued the same way, down to asserting the
+  precondition rather than parsing `--outputjson`. Accepting the upgrade as
+  reported would leave one gate running twice under two names.
+
+  **This is structural, not bad luck.** The sequence that improves the template
+  is: we hit a hole, we write the gate *here* to close it, we report the idea,
+  skeletor implements it at the path *they* choose. Both halves are correct and
+  the paths differ for no reason. Every gate that reaches the template through a
+  report is a candidate.
+
+  No tool can fix it — `cross_check` compares paths and hashes, and seeing this
+  would mean diffing *purposes*. The protocol can: skeletor knows which repo
+  reported each gate (their docstring names us), so shipping the path back with
+  the announcement turns a silent accretion into a decision. Reported to them.
+
+  **Two of five, confirmed — skeletor supplied the list.** They shipped five
+  things today from our reports; two land at paths we already occupy under a
+  different name:
+
+  | Our report | They shipped at | Ours |
+  |---|---|---|
+  | pyright scope | `tests/test_pyright_scope.py` | `test_lint_tool_parity.py::test_pyright_has_something_to_analyse` |
+  | archive strip | `test_docs_pipeline.py::test_no_filed_plan_still_claims_a_shelf` | `tests/test_archive_drops_tank_fields.py` |
+
+  The other three are clean: `check_doc_tables.py` was widened in the same file,
+  `docs/reports/README.md` is ours, and `test_docs_name_real_commands.py` is the
+  gate we argued against and were refuted on.
+
+  **The resolution goes opposite ways, on one rule.** Co-location with the
+  assertions a reader is already looking through wins. Keep *ours* for pyright:
+  theirs sits in the python overlay only because `pyrightconfig.json` does,
+  which is forced, while ours sits with the other lint-parity assertions by
+  choice. Keep *theirs* for the archive strip: neither placement is forced, so
+  only co-location decides, and `test_docs_pipeline.py` is where someone asking
+  "what do we assert about the docs pipeline" looks. A rule that answers two
+  cases differently is working, not failing.
+
+  `test_archive_drops_tank_fields.py` can be deleted outright. An earlier
+  version of this entry said to rescue its archaeology -- that the bug survived
+  two layers -- into NOTES.md first. **That was wrong and skeletor caught it.**
+  Both halves already ship in the template, beside the code they explain:
+  `scripts/docs/add_frontmatter.py` on why sharing the guard made the archive
+  branch unreachable in the only case it exists for, and `strip_tank_headers`'s
+  docstring on why stripping frontmatter alone does not file a plan. Copying
+  them here would have created a second copy of a reason -- the exact thing that
+  drifts, and the thing this file keeps warning about.
+
+  Both deletions belong in the same pass as the upgrade, not before it: doing
+  them first leaves a gate gone and its replacement not yet arrived.
+
+  Check for this by hand on every upgrade. Not everything under "new file" is new.
 
 - **A file we wrote will come back as a template *collision*, for the second
   time.** `docs/reports/README.md` was written here 2026-09-03, sent to skeletor
