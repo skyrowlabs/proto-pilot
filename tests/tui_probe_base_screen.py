@@ -23,7 +23,7 @@ from sqlalchemy import text
 from textual.app import App, ComposeResult, ScreenStackError
 from textual.widgets import Static
 
-from tests.screen import screen_text
+from tests.screen import screen_text, where
 
 pytestmark = pytest.mark.asyncio
 
@@ -59,6 +59,46 @@ class OneScreen(App):
 class TwoScreens(OneScreen):
     def on_mount(self) -> None:
         self.push_screen(Leaf())
+
+
+# ── action_back, against the app that actually ships ─────────────────────
+#
+# The two below take the `app` fixture -- the real `TerminalApp` out of the
+# rendered tree -- rather than a hand-written `App` defined in this file. That
+# is the whole reason they exist. Every other test here builds its own app, and
+# an app built by the same file as the assertion agrees with it by
+# construction: `OneScreen` uses `get_default_screen`, so it was one deep, so
+# the guard held, so the suite was green while the shipped app was broken.
+#
+# What was broken: `app/main.py` pushed `HomeScreen()` in `on_mount`, `App`
+# keeps a screen of its own at the bottom of the stack, and the guard therefore
+# saw depth two and popped. Observed as ['Screen', 'HomeScreen'] -> ['Screen'],
+# with `screen_text` returning ''. A fixture cannot find that; the shipped
+# object can.
+
+
+async def test_the_home_screen_is_the_bottom_of_the_stack(app) -> None:
+    """One deep, not two. This is the fix rather than a consequence of it --
+    if `main.py` goes back to pushing the home screen, this is what says so,
+    and it says so in the language of the cause instead of the symptom."""
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.pause()
+        assert len(app.screen_stack) == 1, f"the home screen is not the default screen; {where(app)}"
+
+
+async def test_escape_on_the_home_screen_does_not_blank_the_app(app) -> None:
+    """The symptom, asserted on the rendered screen rather than on the stack.
+
+    A person pressing Escape on the first screen of a generated app must not be
+    left looking at nothing. Phase 5's blank-screen check is the same assertion
+    one layer out, and it would have reported this as a failure of the
+    *generated* app for a reason that lives entirely in the skeleton.
+    """
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.pause()
+        await pilot.press("escape")
+        await pilot.pause()
+        assert screen_text(app.screen).strip(), f"Escape blanked the app; {where(app)}"
 
 
 # ── action_back ──────────────────────────────────────────────────────────

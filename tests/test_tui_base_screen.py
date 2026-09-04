@@ -99,6 +99,39 @@ def test_the_probe_is_running_against_the_shipped_file(tree_with_probe):
     assert result.returncode != 0, "the probe passed against a base screen that pops the last screen"
 
 
+PUSHED_HOME_SCREEN = """
+    def on_mount(self) -> None:
+        Base.metadata.create_all(bind=engine)
+        with session() as db:
+            seed(db)
+        self.push_screen(HomeScreen())
+"""
+
+
+def test_the_probe_catches_a_home_screen_pushed_onto_the_default(tree_with_probe):
+    """The regression that actually happened, reintroduced on purpose.
+
+    `app/main.py` pushed `HomeScreen()` from `on_mount` until 2026-09-04.
+    Textual keeps a `Screen` of its own at the bottom of the stack, so the home
+    screen sat at depth two, `action_back`'s guard never fired, and Escape on
+    the first screen popped to a blank default — the exact thing the guard's
+    docstring says it prevents.
+
+    The suite was green throughout, because every test built its own app with
+    `get_default_screen`. So this is the assertion that the probe is looking at
+    the shipped `main.py` and not only at the shipped `base.py`: put the old
+    shape back and it must go red.
+    """
+    main = tree_with_probe / "app" / "main.py"
+    source = main.read_text()
+    start = source.index("    def get_default_screen(self)")
+    end = source.index("def main() -> None:")
+    main.write_text(source[:start] + PUSHED_HOME_SCREEN.lstrip("\n") + "\n" + source[end:])
+
+    result = run_tree_suite(tree_with_probe, "tests/test_base_screen.py")
+    assert result.returncode != 0, "the probe passed against an app whose home screen is pushed onto a blank one"
+
+
 def test_the_probe_is_not_collected_by_this_suite():
     """It imports `app.base`, which exists only inside a rendered tree, so
     collecting it here would be an ImportError at collection time — which exits

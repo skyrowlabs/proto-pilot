@@ -41,6 +41,16 @@ class AppScreen(Screen):
         and a global Escape binding that crashes the app on the home screen is
         the most reliable way to fail the boot check for a reason that has
         nothing to do with the app.
+
+        The comparison is to one because `app/main.py` returns `HomeScreen`
+        from `get_default_screen()` rather than pushing it. That is the half of
+        this guard that is not in this file, and it was wrong for a while:
+        `App` always keeps a screen of its own at the bottom, so a home screen
+        that is *pushed* sits at depth two, this branch never fires, and Escape
+        pops to a blank default screen -- precisely the failure the paragraph
+        above says it prevents. Do not "fix" that by counting to two here. The
+        depth of Textual's stack is Textual's business; a screen that is the
+        default screen is one deep whatever the framework does next.
         """
         if len(self.app.screen_stack) > 1:
             self.app.pop_screen()
