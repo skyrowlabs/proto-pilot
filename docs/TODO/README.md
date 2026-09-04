@@ -12,7 +12,7 @@ checking whether a capability already exists (parked) before rebuilding it.
 
 **Machine-readable index**: [`../todo_index.json`](../todo_index.json).
 
-**2 open plans** · **0 agent-managed**
+**3 open plans** · **0 agent-managed**
 
 ---
 
@@ -23,6 +23,7 @@ _Not started — intended future work._
 | Plan | Priority | Updated | Summary |
 | ---- | -------- | ------- | ------- |
 | [The Improvement Loop](improvement-loop.md) | high | 2026-09-03 | Let a prototype be told to keep getting better, with a ratchet that reverts any iteration leaving it less green than it found it. |
+| [The proto Console](proto-console.md) | medium | 2026-09-04 | A terminal front end for the tool itself — type the idea in one pane, watch generation in another — built as a second view over the job seam `proto serve` already paid for. |
 
 ## ⛔ Blocked
 

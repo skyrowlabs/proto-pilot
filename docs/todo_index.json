@@ -1,13 +1,14 @@
 {
   "_generated_by": "scripts/docs/gen_todo_index.py",
   "_note": "Generated — never hand-edit. Edit the plan's frontmatter or header lines and rerun.",
-  "count": 2,
+  "count": 3,
   "by_status": {
     "blocked": [
       "drawing-freedom"
     ],
     "planned": [
-      "improvement-loop"
+      "improvement-loop",
+      "proto-console"
     ]
   },
   "ready_queue": [],
@@ -50,6 +51,26 @@
       ],
       "summary": "Let a prototype be told to keep getting better, with a ratchet that reverts any iteration leaving it less green than it found it.",
       "open_tasks": 28,
+      "auto_generated": false
+    },
+    {
+      "slug": "proto-console",
+      "title": "The proto Console",
+      "path": "docs/TODO/proto-console.md",
+      "shelf_status": "planned",
+      "priority": "medium",
+      "queue_order": null,
+      "blocked_on": null,
+      "updated": "2026-09-04",
+      "tags": [
+        "console",
+        "jobs",
+        "front-end",
+        "textual",
+        "ux"
+      ],
+      "summary": "A terminal front end for the tool itself — type the idea in one pane, watch generation in another — built as a second view over the job seam `proto serve` already paid for.",
+      "open_tasks": 26,
       "auto_generated": false
     }
   ]
