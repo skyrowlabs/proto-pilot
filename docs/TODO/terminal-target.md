@@ -188,24 +188,66 @@ four baselines to keep green in CI, growing as either axis does.
 
 ## Phase 3 — The terminal skeleton
 
-- [ ] `skeleton/` becomes `skeleton/web/` and `skeleton/tui/`. The move is
+- [x] `skeleton/` becomes `skeleton/web/` and `skeleton/tui/`. The move is
       mechanical and must be byte-identical for the web target — a
       characterisation test proves the existing tree is unchanged, exactly as
       Phase 2 of the archetypes plan did for CRUD
-- [ ] Textual + SQLite, one process. No compose file, no second service, no
+- [x] Textual + SQLite, one process. No compose file, no second service, no
       port allocation. `app.py`, `db.py`, the base screen, `tests/conftest.py`
-- [ ] **From Phase 1**: the smoke helper must probe several text attributes, not
+- [x] **From Phase 1**: the smoke helper must probe several text attributes, not
       just `.renderable` — current Textual keeps `Static` text on `_content` as
       a `Content`. All three terminal runs failed on this and diagnosed it
       independently; a fourth would be waste. A screen whose only content is a
       `Static` is invisible to a buffer-reading harness, so either the helper
       probes (`TEXT_ATTRS`, the shape one run settled on) or generated screens
       carry text through `Screen.sub_title`, a `DataTable` or a `Button`
-- [ ] **What `proto gc` / `proto prune` / the Docker resource labels do for a
+- [x] **What `proto gc` / `proto prune` / the Docker resource labels do for a
       tui-target tree is an open question, not a task.** They exist because a
       tree removed with `rm -rf` orphans a container, a volume and a network. A
       single process with a SQLite file orphans nothing. Do not delete them —
       the web target still needs them — but do not pretend they apply
+
+> **Phase 3 landed 2026-09-04.** The move is proved rather than inspected:
+> `tests/golden/web_skeleton_manifest.json` was captured from `skeleton/` at
+> `51f1b31`, before a single `git mv` ran, and
+> `tests/test_skeleton_move_characterisation.py` recomputes it from
+> `targets.web.SKELETON_DIR`. All 24 files, byte for byte, unmoved in content.
+> It hashes **source bytes**, unrendered and unnormalised, which the CRUD
+> characterisation cannot: that one hashes a rendered tree and would not have
+> noticed a file copied rather than moved.
+>
+> `skeleton/tui/` is 19 files against the web tree's 24, and most of the
+> difference is Docker. It runs its own three-test suite green with no daemon,
+> no browser and no port.
+>
+> **The helper became a skeleton file, and that is the real answer to Phase 1's
+> constraint.** The plan offered two options — probe several attributes, or make
+> generated screens carry text through `sub_title`/`DataTable`/`Button` — and
+> `skeleton/tui/tests/screen.py` does the first while `app/screens.py`
+> demonstrates the second, so the fix holds from both ends. Making it *skeleton*
+> rather than generated is the part the plan did not say: a helper the model
+> rewrites per prototype is a helper it gets wrong per prototype, which is
+> precisely what was measured happening three times out of three.
+>
+> **The attribute has moved a third time.** Phase 1 found `.renderable` gone and
+> the text on `_content` as a `Content`. On the Textual installed here (8.2.8)
+> `_content` is gone too: the text is `Static.content`, a plain `str`, with
+> `_Static__content` behind the mangling. All four names are in `TEXT_ATTRS`.
+> A constraint that changes between the measurement and the implementation is
+> the argument for the tuple rather than a branch, and for testing the shipped
+> file rather than a copy of it — `tests/test_tui_skeleton.py` imports
+> `screen.py` out of the skeleton and demonstrates it on a hand-written app.
+>
+> **Two things deliberately not done, both in the plan's own order.** There is
+> no `protopilot/targets/tui.py`: a registered target whose `CODE_PASSES` and
+> `verifier()` do not exist is a `proto new --target tui` that half-works, and
+> Phase 6's note says exactly why that is the wrong order. The module arrives
+> with the passes in Phase 4. And the gc question is recorded in `NOTES.md` and
+> at `cli.py`'s `gc` as an open question rather than answered — the useful half
+> found while writing it down is that `proto prune` is about the *registry* and
+> so probably applies to a terminal tree unchanged, while `gc` and the labels
+> are the half that does not apply and cannot be settled before Phase 5 says
+> what a terminal verify leaves behind.
 
 ## Phase 4 — The passes, and how many there are
 

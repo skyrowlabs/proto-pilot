@@ -41,6 +41,31 @@ is only a pointer at it).
   state they create rather than state the seed left. The second is better and
   is a change to the smoke prompt and to every archetype's `smoke_py`.
 
+- **`proto gc` / `proto prune` / the Docker resource labels have no meaning for
+  a terminal tree, and what to do about that is an open question.** Raised by
+  Phase 3 of [the terminal target](docs/TODO/terminal-target.md), which says
+  outright that this is a question and not a task, so it is recorded here rather
+  than half-answered in code.
+
+  They exist because a web tree removed with `rm -rf` orphans a container, a
+  named volume, a network and an image, and `containers.py` finds them again
+  from a label carrying the tree's absolute path. A `skeleton/tui/` tree is one
+  process and one SQLite file: deleting it orphans nothing, there is no daemon
+  to ask, and `find_orphans` would have nothing to find.
+
+  **Do not delete any of it** — the web target still needs every part, and it is
+  the only mechanism this repo has for resources that outlive their tree. **Do
+  not extend it to `tui` either**, which is the tempting half: a label
+  vocabulary applied to a target with no resources to label is machinery that
+  reads as coverage and is not.
+
+  What is actually undecided is narrower than it looks. `proto prune` is about
+  the *registry*, not about Docker, and a terminal tree is registered like any
+  other — so it probably applies unchanged and just needs saying. `proto gc` and
+  the labels are the half that does not apply, and the question is whether they
+  should say so for a `tui` project or stay silent. Neither is decidable before
+  Phase 5 settles what a terminal verify leaves behind.
+
 - **`auth: "password"` is accepted by the spec and implemented by no pass.** A
   spec can ask for it and nothing will build it. Either implement it or reject it
   at intake; silently accepting it is the worst of the three.

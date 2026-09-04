@@ -68,22 +68,26 @@ stack-picking code generator.
 
 ### Naming: two "skeletons" in one tree
 
-`skeleton/` is the fixed application tree copied into every *generated
-prototype*. **skeletor** (a sibling checkout at `../skeletor`, not part of this
-repository) is the generator that produced *this
-repository's* shell. They are unrelated, and the collision is unfortunate but
-load-bearing in both directions — do not rename either to resolve it, and do
-not confuse `skeleton/` (product data) with `.skeletor.json` (repo metadata).
+`skeleton/` holds one fixed application tree per target — `skeleton/web/`,
+`skeleton/tui/` — copied into every *generated prototype*. **skeletor** (a
+sibling checkout at `../skeletor`, not part of this repository) is the
+generator that produced *this repository's* shell. They are unrelated, and the
+collision is unfortunate but load-bearing in both directions — do not rename
+either to resolve it, and do not confuse `skeleton/` (product data) with
+`.skeletor.json` (repo metadata).
 
 ### Invariants — do not soften these
 
 These are the guarantees that make generated output trustworthy. Each was a
 deliberate decision, not an accident of implementation.
 
-- **The model can only write five paths**: `app/models.py`, `app/routes.py`,
-  `app/seed.py`, `app/templates/*.html` (except `base.html`), and
-  `tests/test_smoke.py`. Everything else is refused by `protopilot/files.py`
-  *before it reaches disk*. Model output is data, not authority — the parts of
+- **The model can only write five paths**: on the web target `app/models.py`,
+  `app/routes.py`, `app/seed.py`, `app/templates/*.html` (except `base.html`),
+  and `tests/test_smoke.py`. Everything else is refused by
+  `protopilot/files.py` *before it reaches disk*. The list belongs to the
+  target and lives in `protopilot/targets/<name>.py`; `files.py` is the
+  mechanism and holds no list of its own, so a second target cannot inherit
+  the wrong five paths by default. Model output is data, not authority — the parts of
   the tree known to work are exactly the parts the model must not be able to
   touch. Widening this list is a significant design change, not a convenience
   fix.
@@ -98,8 +102,10 @@ deliberate decision, not an accident of implementation.
 - **The stack is fixed, not chosen.** FastAPI, server-rendered Jinja,
   SQLAlchemy 2.0, Postgres. No JS build step, no CDN, no migrations. A
   generator that picks a stack per idea produces N unrunnable variants.
-  **`skeleton/` is copied byte for byte, never generated**, so it is debugged
-  once rather than once per prototype.
+  **`skeleton/<target>/` is copied byte for byte, never generated**, so it is
+  debugged once rather than once per prototype. It is fixed *per target*: a
+  target may pick a different stack, which is the one thing an archetype may
+  not do.
 - **Tests are generated before the code they test.** Pass order is
   `schema -> smoke -> seed -> routes -> ui`. Smoke tests come second, from the
   spec, when no route exists yet — so they describe what was *asked for*, not
@@ -139,12 +145,13 @@ because the baseline cannot read a change request.
 | Path | What |
 | ---- | ---- |
 | `protopilot/passes/` | One module per pass — `intake`, `clarify`, `models`, `smoke`, `seed`, `routes`, `ui`, `repair`; `_shared.py` holds the stack brief |
-| `protopilot/files.py` | The write guard — the five-path allowlist |
+| `protopilot/files.py` | The write guard — the mechanism; the allowlist itself is the target's |
 | `protopilot/verify.py` | Boot, health-wait, smoke run, log capture |
 | `protopilot/baseline.py` | The deterministic offline implementation of every pass |
 | `protopilot/llm.py` | `LLM` Protocol + three backends |
 | `protopilot/registry.py` | Tracked prototypes — see the `prune()` trap in `NOTES.md` |
-| `skeleton/` | Copied byte-for-byte into every generated app |
+| `protopilot/targets/` | What medium a spec is built in: skeleton, pass tuple, write allowlist, verifier |
+| `skeleton/<target>/` | Copied byte-for-byte into every generated app; one tree per target |
 | `cli/`, `scripts/` | This repo's own tooling — never shipped to a user |
 
 ### Known state

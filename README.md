@@ -105,7 +105,7 @@ Useful flags on `new`: `--offline` (no API calls, see below), `--no-verify`
 
     idea
       -> spec.json          typed, small, reviewed by a human
-      -> skeleton           copied, never generated
+      -> the target's skeleton   copied, never generated
       -> five passes        each fed the previous pass's real source
       -> docker compose up  observed, not assumed
       -> repair loop        bounded, with a floor
@@ -116,9 +116,11 @@ Five decisions carry most of the weight.
 2.0, Postgres, and Pillow so a prototype can draw its own images instead of
 hotlinking one. No JS build step, no CDN, no migrations. A generator that picks
 a stack per idea produces N unrunnable variants and you debug all of them.
-Everything in `skeleton/` — the Dockerfile, the compose file, `app/main.py`,
-`app/db.py`, the stylesheet, `tests/conftest.py` — is copied byte for byte
-into every app, so it is debugged once rather than once per prototype.
+Everything in `skeleton/web/` — the Dockerfile, the compose file,
+`app/main.py`, `app/db.py`, the stylesheet, `tests/conftest.py` — is copied
+byte for byte into every app, so it is debugged once rather than once per
+prototype. There is one such tree per *target*: `skeleton/tui/` is the same
+idea in a terminal, and which one a spec gets is `spec.target`.
 
 **The model can only write five paths.** `app/models.py`, `app/routes.py`,
 `app/seed.py`, `app/templates/*.html` (except `base.html`), and

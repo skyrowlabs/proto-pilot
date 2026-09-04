@@ -28,11 +28,11 @@ LABEL = "A web app you open in a browser"
 
 #: The fixed tree, copied byte-for-byte into every generated prototype.
 #:
-#: Still `skeleton/` itself rather than `skeleton/web/`: Phase 3 of
-#: `docs/TODO/terminal-target.md` makes that move and proves it byte-identical,
-#: and doing it here would have mixed an untested tree move into the commit
-#: that introduces the seam. This is the only line that changes when it lands.
-SKELETON_DIR = SKELETON_ROOT
+#: `skeleton/web/` since 2026-09-04, when `skeleton/` grew a directory per
+#: target. The move was mechanical and is held byte-identical by
+#: `tests/test_skeleton_move_characterisation.py`, whose manifest was captured
+#: from the tree before a file was touched.
+SKELETON_DIR = SKELETON_ROOT / "web"
 
 #: The pass order, which is the design rather than an accident:
 #: tests come second, before any of the code they test, so they describe what

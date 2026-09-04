@@ -608,6 +608,13 @@ def prune(yes: bool) -> None:
     _echo(f"forgot {len(gone)}")
 
 
+# What `gc` and the Docker resource labels mean for a target with no containers
+# is an OPEN QUESTION, not a task, and it is written down as one in `NOTES.md`.
+# Nothing here is dead: the web target orphans a container, a volume, a network
+# and an image, and this is the only thing that finds them once the tree is
+# gone. It is also not to be extended to the terminal target, whose whole tree
+# is one process and one SQLite file -- a label vocabulary applied to a target
+# with nothing to label reads as coverage and is not.
 @main.command()
 @click.option("--yes", "-y", is_flag=True)
 @click.option("--dry-run", is_flag=True, help="List what would be removed and stop.")
