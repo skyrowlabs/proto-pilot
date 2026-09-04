@@ -71,7 +71,7 @@ from typing import Any, Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-from protopilot import build  # noqa: E402
+from protopilot import build, targets  # noqa: E402
 from protopilot.cli import free_port  # noqa: E402
 from protopilot.files import GeneratedFile  # noqa: E402
 from protopilot.llm import ClaudeCodeLLM, build_llm  # noqa: E402
@@ -348,7 +348,7 @@ def run_web(spec: Spec, tree: Path, llm, record: Record, attempts: int, verify: 
     spec.save(tree)
     ctx = PassContext(project_dir=tree, change=spec.direction)
 
-    for module in build.CODE_PASSES:
+    for module in targets.get("web").CODE_PASSES:
         step(f"pass {module.NAME}...")
         try:
             result = run_pass(module, spec, ctx, llm)

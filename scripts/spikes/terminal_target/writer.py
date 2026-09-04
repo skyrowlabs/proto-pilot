@@ -6,6 +6,12 @@ there is no seam to pass a different list through. Widening `files.WRITABLE`
 to make the spike work would be building Phase 2's `target` axis inside Phase
 1, which is the one thing the gate must not do.
 
+**That reason expired on 2026-09-04.** Phase 2 landed the seam: `files.py` now
+takes `writable`/`protected` as arguments and the lists live on the target
+module. This file is kept unchanged anyway, because it is spike material that
+`docs/TODO/terminal-target.md` Phase 6 deletes -- not because the constraint it
+describes is still true.
+
 The guarantee is the same one and it is the reason this exists at all: model
 output is data, not authority. Everything the model returns is checked against
 the allowlist before it touches disk, and the check is done for every file

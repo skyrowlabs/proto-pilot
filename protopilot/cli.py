@@ -22,8 +22,7 @@ from protopilot.llm import ClaudeCodeLLM, ClaudeLLM, LLMError, build_llm
 from protopilot.passes import PassContext, clarify
 from protopilot.render import render_skeleton
 from protopilot.runner import SubprocessRunner, docker_available
-from protopilot.spec import SPEC_DIR, SPEC_FILENAME, Spec, Theme, checkable_paths
-from protopilot.verify import Verifier
+from protopilot.spec import SPEC_DIR, SPEC_FILENAME, Spec, Theme
 
 PORT_RANGE = range(8080, 8180)
 
@@ -118,8 +117,16 @@ def _project(directory: str | None) -> Path:
     return path
 
 
-def _verifier(project_dir: Path, spec: Spec) -> Verifier:
-    return Verifier(project_dir, spec.port, SubprocessRunner(), screens=checkable_paths(spec))
+def _verifier(project_dir: Path, spec: Spec):
+    """The verifier for this spec's target.
+
+    Asked for rather than constructed: `Verifier` needs Docker, a port and a
+    health wait, and a terminal target needs none of the three. `Verifies` is
+    already a Protocol, so `drive_to_green` never learns which one it got.
+    """
+    from protopilot import targets
+
+    return targets.for_spec(spec).verifier(project_dir, spec, SubprocessRunner())
 
 
 def _port_is_ours(project_dir: Path, port: int) -> bool:
@@ -198,6 +205,12 @@ def main() -> None:
     help="What shape this is. Skips the classifier call entirely; `proto archetypes` lists them.",
 )
 @click.option(
+    "--target",
+    "target_name",
+    default=None,
+    help="What medium to build it in; `proto targets` lists them.",
+)
+@click.option(
     "--answer",
     "answers",
     multiple=True,
@@ -224,6 +237,7 @@ def new(
     directory: str | None,
     direction: str,
     archetype_name: str | None,
+    target_name: str | None,
     answers: tuple[str, ...],
     port: int | None,
     attempts: int,
@@ -235,7 +249,17 @@ def new(
     demo: bool,
 ) -> None:
     """Generate a new prototype from IDEA."""
+    from protopilot import targets
+
     llm = build_llm(offline=offline, backend=backend)
+
+    # `targets.DEFAULT` rather than `Spec.target`'s field default: the two are
+    # equal today and they answer different questions. This one is "what is a
+    # NEW spec born with", and it is the one Phase 6 of
+    # `docs/TODO/terminal-target.md` moves.
+    chosen_target = target_name or targets.DEFAULT
+    if chosen_target not in targets.names():
+        raise click.ClickException(str(targets.MissingTarget(chosen_target, targets.names())))
 
     if not no_verify:
         ok, why = docker_available(SubprocessRunner())
@@ -252,11 +276,16 @@ def new(
             idea,
             llm,
             archetype=chosen,
+            target=chosen_target,
             port=free_port(port),
             direction=direction,
             theme=theme,
             answers=_parse_answers(chosen, answers),
         )
+    except targets.UnsupportedPair as exc:
+        # Named, both halves, before a token is spent. The user changes one of
+        # the two and neither is guessable from a message naming only one.
+        raise click.ClickException(str(exc)) from exc
     except LLMError as exc:
         raise click.ClickException(str(exc)) from exc
 
@@ -508,6 +537,20 @@ def list_archetypes() -> None:
         _echo(f"  fits: {module.MATCHES}")
         for question in module.QUESTIONS:
             _echo(f"    --answer {question['id']}=...  {question['question']}")
+        _echo("")
+
+
+@main.command(name="targets")
+def list_targets() -> None:
+    """What media this build can generate into, and what each one can build."""
+    from protopilot import targets
+
+    for name in targets.names():
+        module = targets.get(name)
+        default = "  (default)" if name == targets.DEFAULT else ""
+        _echo(f"{name}{default}")
+        _echo(f"  {module.LABEL}")
+        _echo(f"  builds: {', '.join(module.ARCHETYPES)}")
         _echo("")
 
 

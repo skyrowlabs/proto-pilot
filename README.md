@@ -83,6 +83,8 @@ never as green**; `web` is the front end behind `proto serve`.
 | `proto add CHANGE` | amend the spec, regenerate, re-verify |
 | `proto up` / `down` / `logs` / `test` | the obvious things |
 | `proto spec` | what this project actually promised |
+| `proto archetypes` | what shapes this build can generate, and what each asks |
+| `proto targets` | what media it can generate into, and what each can build |
 | `proto ls` | every prototype on this machine, and which are running |
 | `proto rm` | delete one: containers, data and the tree |
 | `proto prune` | forget registry entries whose directory is gone |

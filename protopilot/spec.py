@@ -138,6 +138,16 @@ class Spec(BaseModel):
     # Defaulted rather than required, so every spec written before archetypes
     # existed still loads and still generates the app it always did.
     archetype: str = "crud"
+    # What MEDIUM it is built in -- a web app in a browser, or a terminal app
+    # in a shell. Selects the skeleton, the pass tuple, the write guard's
+    # allowed paths and the verifier; see `protopilot/targets/`.
+    #
+    # Defaulted to "web", and this default is not a preference. It is the
+    # answer to "what did a spec.json written before the target axis existed
+    # mean?", and it stays "web" forever for that reason -- including after
+    # `targets.DEFAULT` (what a NEW spec is born with) moves. The two constants
+    # are equal today and they are not the same decision.
+    target: str = "web"
     # How it should LOOK. Read by the UI pass and by nothing else -- a theme
     # that can reach routes or models is an archetype wearing the wrong name.
     theme: Theme | None = None
@@ -189,6 +199,11 @@ class Spec(BaseModel):
     def summary(self) -> str:
         """What gets printed for the human review checkpoint."""
         lines = [f"{self.name} ({self.slug})  ->  port {self.port}", f"  {self.purpose}"]
+        # Both axes, always, and never conditionally. This is the only gate in
+        # the tool, and a person approving a generation has to be able to see
+        # which KIND of thing it is before the tokens are spent -- a field the
+        # summary omits is a field nobody reviews.
+        lines.append(f"  target: {self.target}")
         lines.append(f"  archetype: {self.archetype}")
         if self.theme and not self.theme.is_empty():
             lines.append(f"  theme: {self.theme.describe()}")
@@ -258,9 +273,15 @@ def _pluralise(word: str) -> str:
 #: `_strictify` marks every property in the schema as required, so a field left
 #: in here is a field the model MUST invent a value for. `archetype` and `theme`
 #: are classified by the clarify pass, and `answers` is assembled by the tool
-#: from what the human actually chose -- asking intake to guess any of the three
+#: from what the human actually chose -- asking intake to guess any of them
 #: would produce a confident second opinion that silently overwrites the first.
-MODEL_OWNED_EXCLUSIONS = ("archetype", "theme", "answers", "extra")
+#: `target` is here for the same reason and one step further: it decides which
+#: skeleton the model is writing against, so a model that could return it could
+#: contradict the prompt it was just given.
+#:
+#: `build.CARRIED_THROUGH_AMEND` is derived from this tuple, so a field added
+#: here also survives `proto add` -- which is why the derivation exists.
+MODEL_OWNED_EXCLUSIONS = ("archetype", "target", "theme", "answers", "extra")
 
 
 def intake_schema() -> dict:

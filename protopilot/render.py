@@ -21,8 +21,6 @@ TOKEN_RE = re.compile(r"@@([A-Z][A-Z0-9_]*)@@")
 BINARY_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".ico", ".woff", ".woff2", ".pyc"}
 SKIP_DIRS = {"__pycache__", ".pytest_cache", ".git"}
 
-SKELETON_DIR = Path(__file__).resolve().parent.parent / "skeleton"
-
 
 def project_name(spec: Spec, target: Path | None = None) -> str:
     """The Docker Compose project name: unique per directory, not per slug.
@@ -69,8 +67,17 @@ def render(text: str, values: dict[str, str]) -> str:
 
 
 def render_skeleton(spec: Spec, target: Path, skeleton: Path | None = None) -> list[Path]:
-    """Materialise the fixed tree. Returns the files written, relative paths."""
-    skeleton = skeleton or SKELETON_DIR
+    """Materialise the fixed tree. Returns the files written, relative paths.
+
+    Which tree that is belongs to `spec.target`, not to this module. There used
+    to be a `SKELETON_DIR` constant here and it could only ever name one of
+    them -- so it moved to `targets/<name>.py` rather than growing a branch,
+    and this function asks. The explicit `skeleton=` argument stays for callers
+    that are rendering a tree they already have in hand.
+    """
+    from protopilot import targets  # local: targets -> passes -> files -> ...
+
+    skeleton = skeleton or targets.for_spec(spec).SKELETON_DIR
     if not skeleton.is_dir():
         raise FileNotFoundError(f"skeleton not found at {skeleton}")
     values = substitutions(spec, target)

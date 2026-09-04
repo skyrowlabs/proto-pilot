@@ -71,7 +71,7 @@
         "tui"
       ],
       "summary": "Make the output medium an axis and build a terminal target beside the web one — gated on a measurement, because the model has seen far less Textual than FastAPI.",
-      "open_tasks": 26,
+      "open_tasks": 23,
       "auto_generated": false
     }
   ]

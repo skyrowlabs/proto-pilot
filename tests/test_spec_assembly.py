@@ -123,6 +123,7 @@ def test_an_amend_keeps_the_archetype_theme_answers_and_extra():
 
     assert updated.name == "Kitten Chess Deluxe", "the change the user asked for must still land"
     assert updated.archetype == "turn-based-game"
+    assert updated.target == previous.target, "the medium is not the model's to revise on an amend either"
     assert updated.theme is not None and updated.theme.subject == "cats and dogs"
     assert updated.answers == previous.answers
     assert updated.extra == previous.extra
@@ -164,12 +165,14 @@ def test_spec_from_idea_sets_the_axes_the_model_never_sees():
         "a kitten chess app",
         OfflineLLM(),
         archetype="turn-based-game",
+        target="web",
         port=8123,
         direction="keep it small",
         theme=Theme(subject="cats"),
         answers={"board_shape": "3x3"},
     )
     assert spec.archetype == "turn-based-game"
+    assert spec.target == "web"
     assert spec.theme is not None and spec.theme.subject == "cats"
     assert spec.answers == {"board_shape": "3x3"}
     assert spec.port == 8123
@@ -180,5 +183,7 @@ def test_an_empty_theme_is_stored_as_no_theme():
     """`Theme()` with every field blank and `None` mean the same thing, and the
     UI pass checks for one of them. Two ways to say "no theme" is one more than
     the consumer knows about."""
-    spec = builder.spec_from_idea("a gear tracker", OfflineLLM(), archetype="crud", port=8124, theme=Theme())
+    spec = builder.spec_from_idea(
+        "a gear tracker", OfflineLLM(), archetype="crud", target="web", port=8124, theme=Theme()
+    )
     assert spec.theme is None

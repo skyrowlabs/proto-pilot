@@ -16,15 +16,14 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from protopilot import build as builder
-from protopilot import registry
+from protopilot import registry, targets
 from protopilot.build import is_test_path
 from protopilot.jobs import STORE
 from protopilot.llm import build_llm
 from protopilot.passes import PassContext, clarify
 from protopilot.render import render_skeleton
 from protopilot.runner import SubprocessRunner, docker_available
-from protopilot.spec import Spec, Theme, checkable_paths
-from protopilot.verify import Verifier
+from protopilot.spec import Spec, Theme
 
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
@@ -63,6 +62,10 @@ def run_generation(
         job.idea,
         llm,
         archetype=chosen,
+        # The web front end has no target picker yet, so it takes the same
+        # default `proto new` does -- from `targets.DEFAULT` and never from a
+        # literal, because the day that constant moves this must move with it.
+        target=targets.DEFAULT,
         port=free_port(),
         direction=job.direction,
         theme=Theme(**job.theme) if job.theme else None,
@@ -83,9 +86,7 @@ def run_generation(
     builder.generate(spec, ctx, llm, log=log, hide_tests=demo)
 
     log("verify...")
-    make_verifier = verifier_factory or (
-        lambda: Verifier(target, spec.port, SubprocessRunner(), screens=checkable_paths(spec))
-    )
+    make_verifier = verifier_factory or (lambda: targets.for_spec(spec).verifier(target, spec, SubprocessRunner()))
     outcome = builder.drive_to_green(spec, ctx, llm, make_verifier(), attempts=attempts, log=log)
 
     registry.record(slug=spec.slug, name=spec.name, path=target, port=spec.port, idea=job.idea)
@@ -166,7 +167,7 @@ def run_amend(
 
     log("verify...")
     make_verifier = verifier_factory or (
-        lambda: Verifier(target, updated.port, SubprocessRunner(), screens=checkable_paths(updated))
+        lambda: targets.for_spec(updated).verifier(target, updated, SubprocessRunner())
     )
     outcome = builder.drive_to_green(updated, ctx, llm, make_verifier(), attempts=attempts, log=log)
     job.project_dir = str(target)

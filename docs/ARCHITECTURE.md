@@ -40,12 +40,14 @@ One generation, end to end. Every arrow is a place something can be refused.
   └───────────────┘        what it prints, so a field it omits is a field
     │                      nobody reviews.
     ▼
-  render_skeleton ────────  skeleton/ copied byte-for-byte, @@TOKEN@@ filled
+  render_skeleton ────────  the target's skeleton copied byte-for-byte,
+    │                       @@TOKEN@@ filled
     │
     ▼
-  five passes, in order ──  schema ▶ smoke ▶ seed ▶ routes ▶ ui
+  the target's passes ────  web: schema ▶ smoke ▶ seed ▶ routes ▶ ui
     │                       each fed the PREVIOUS pass's real source
-    │                       every write filtered through files.py
+    │                       every write filtered through files.py, against
+    │                       the running target's allowlist
     ▼
   verify ─────────────────  compose up ▶ wait on /healthz ▶ pytest in the
     │                       container ▶ capture logs ▶ (browser stage)
@@ -65,8 +67,8 @@ One generation, end to end. Every arrow is a place something can be refused.
 | `protopilot/web/` | `proto serve` — a web face on `proto new` | the same functions the CLI calls |
 | `protopilot/spec.py` | **The contract.** The only thing downstream reads about user intent | every pass |
 | `protopilot/passes/` | One module per pass; prompt, JSON Schema, and the previous pass's source | `llm.py`, `files.py` |
-| `protopilot/build.py` | Orchestration: pass order, the repair loop, the runbook floor | `passes/`, `verify.py` |
-| `protopilot/files.py` | **The write guard.** Five allowed paths; everything else refused | `passes/` |
+| `protopilot/build.py` | Orchestration: the repair loop, the runbook floor. The pass *tuple* is the target's | `passes/`, `targets/`, `verify.py` |
+| `protopilot/files.py` | **The write guard.** Five allowed paths; everything else refused. The mechanism only — the list is the target's | `passes/` |
 | `protopilot/llm.py` | `LLM` Protocol + three backends (api, claude-code, offline) | `anthropic`, the `claude` CLI |
 | `protopilot/baseline.py` | Deterministic offline implementation of every pass | `spec.py` |
 | `protopilot/verify.py` | Boot, health-wait, run the smoke suite, capture logs | `runner.py`, `browser.py` |
@@ -74,9 +76,11 @@ One generation, end to end. Every arrow is a place something can be refused.
 | `protopilot/runner.py` | Every subprocess, behind a Protocol so Docker can be faked | `subprocess` |
 | `protopilot/registry.py` | JSON index of generated trees — what exists, where, on which port | the filesystem |
 | `protopilot/containers.py` | **Docker as a second, independent source of truth**, via labels | `runner.py` |
-| `protopilot/render.py` | `skeleton/` ▶ a target directory, substituting `@@TOKEN@@` | `skeleton/` |
+| `protopilot/render.py` | a target's skeleton ▶ a project directory, substituting `@@TOKEN@@` | `targets/`, `skeleton/` |
+| `protopilot/archetypes/` | What SHAPE a spec is: questions, screen rule, prompt fragment, baseline | `spec.py`, `baseline.py` |
+| `protopilot/targets/` | What MEDIUM it is built in: skeleton, pass tuple, write allowlist, verifier | `passes/`, `verify.py` |
 | `protopilot/jobs.py` | In-process job store so the web front end can run work in the background | `web/` |
-| `skeleton/` | The fixed application tree copied into every generated app. **Not generated** | — |
+| `skeleton/` | The fixed application tree copied into every generated app, one directory per target. **Not generated** | — |
 | `cli/`, `scripts/` | This repo's own gates and jobs. Never shipped to a user | — |
 
 ## Critical Patterns

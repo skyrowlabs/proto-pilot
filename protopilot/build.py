@@ -1,6 +1,6 @@
 """Orchestration: run the passes, then drive the tree to green.
 
-The pass order is the design, not an accident:
+The pass order is the design, not an accident. On the web target:
 
     schema -> smoke -> seed -> routes -> ui
 
@@ -9,6 +9,11 @@ asked for rather than what got built; the routes pass is then handed them as
 its target. UI comes last because it is the pass most dependent on real
 source -- a template referencing a context key no route passes is the single
 most common way a generated app 500s.
+
+**The tuple itself lives on the target**, in `targets/<name>.py`, because a
+terminal app may not split the same five ways. The two invariants above are
+this module's and hold for every target; the list of modules that satisfies
+them is not.
 """
 
 from __future__ import annotations
@@ -18,14 +23,12 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from protopilot import targets
 from protopilot.llm import LLM
-from protopilot.passes import PassContext, PassResult, intake
-from protopilot.passes import models as schema_pass
-from protopilot.passes import repair, routes, run_pass, seed, smoke, ui
+from protopilot.passes import PassContext, PassResult, intake, repair, run_pass
 from protopilot.spec import MODEL_OWNED_EXCLUSIONS, Screen, Spec
 from protopilot.verify import Verifies, VerifyResult
 
-CODE_PASSES = (schema_pass, smoke, seed, routes, ui)
 SMOKE_PATH = "tests/test_smoke.py"
 
 Log = Callable[[str], None]
@@ -85,6 +88,7 @@ def spec_from_idea(
     llm: LLM,
     *,
     archetype: str,
+    target: str,
     port: int,
     direction: str = "",
     theme=None,
@@ -105,10 +109,18 @@ def spec_from_idea(
     """
     from protopilot import __version__, archetypes
 
+    # First, and before the intake call rather than after it: an unbuildable
+    # pair is refused by name, and refusing it here is what makes that free.
+    # `MissingTarget` comes out of the same call for a target this build does
+    # not have. A hole in the matrix discovered at verify time is the tool
+    # lying about its own coverage; discovered here it costs nothing.
+    targets.check_pair(target, archetype)
+
     ctx = PassContext(project_dir=Path("."), change=direction, archetype=archetype)
     spec = Spec.model_validate(_run_intake(idea, llm, ctx))
 
     spec.port = port
+    spec.target = target
     spec.direction = direction or spec.direction
     spec.protopilot_version = __version__
     spec.archetype = archetype
@@ -153,7 +165,11 @@ def generate(
     log: Log = print,
     hide_tests: bool = False,
 ) -> list[PassResult]:
-    """Run the five passes in order.
+    """Run the target's passes, in order.
+
+    Which passes those are belongs to `spec.target` -- there used to be a
+    `CODE_PASSES` tuple here, and a terminal app may not split the same five
+    ways, so it moved to the target module rather than growing a branch.
 
     `hide_tests` is presentation only. The smoke pass still runs, still runs
     second, and the routes pass is still handed its output as the target --
@@ -161,7 +177,7 @@ def generate(
     the thing being demoed is not the thing that ships.
     """
     results = []
-    for module in CODE_PASSES:
+    for module in targets.for_spec(spec).CODE_PASSES:
         log(f"  pass {module.NAME}...")
         try:
             result = run_pass(module, spec, ctx, llm)

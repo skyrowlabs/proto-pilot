@@ -115,10 +115,13 @@ than of the target, so it should be unaffected — confirm rather than assume.
 Mirrors `archetype` exactly, because that axis landed on this code and the shape
 is proven.
 
-- [ ] `Spec.target: str = "web"` — **defaulted**, so every `spec.json` written
+- [x] `Spec.target: str = "web"` — **defaulted**, so every `spec.json` written
       before this loads and generates the app it always did. This is the same
-      guarantee `archetype: str = "crud"` gives and it is tested the same way
-- [ ] `protopilot/targets/`, discovered by module presence like
+      guarantee `archetype: str = "crud"` gives and it is tested the same way.
+      **The field default and the CLI default are different decisions** and this
+      is only the first — see Phase 6. The field default stays `web` forever,
+      because its whole job is to say what a spec that predates the axis meant
+- [x] `protopilot/targets/`, discovered by module presence like
       `protopilot/archetypes/`. A target owns four things the archetype axis
       does not touch:
 
@@ -129,19 +132,59 @@ is proven.
       | allowed write paths | `files.ALLOWED` | different tree, different five paths |
       | verifier | `Verifier` | `Verifies` is already a Protocol — no refactor |
 
-- [ ] `Spec.summary()` prints the target at the review checkpoint. A person
+- [x] `Spec.summary()` prints the target at the review checkpoint. A person
       approving a generation must be able to see which kind of thing it is
-- [ ] Round-trip test: a spec saved and reloaded keeps its target; a spec
+- [x] Round-trip test: a spec saved and reloaded keeps its target; a spec
       written before this plan loads as `web` and generates byte-identically
 
 **The one that will hurt: `target` and `archetype` multiply.** Every archetype
 needs a baseline per target, and today's two archetypes against two targets is
 four baselines to keep green in CI, growing as either axis does.
 
-- [ ] A target declares which archetypes it supports. An unsupported pair is
+- [x] A target declares which archetypes it supports. An unsupported pair is
       refused **at intake, by name**, not generated into something broken. A
       matrix with holes stated is honest; a matrix with holes discovered at
       verify time is the tool lying about its own coverage
+
+> **Phase 2 landed 2026-09-04.** The characterisation held in the only way it
+> could: the offline CRUD generation of a two-entity spec changed **one file**,
+> `.protopilot/spec.json`, by gaining a `target` key. Every generated
+> application file — models, routes, seed, templates, smoke suite — and every
+> skeleton file hashed identically, which is the byte-for-byte half of what the
+> acceptance criterion asks for. `tests/golden/crud_offline_manifest.json` was
+> regenerated for that one line and nothing else.
+>
+> Four things the plan's table under-reads, found by doing it.
+>
+> **The table lists what a target owns and not where it lived.** All four were
+> *moved*, not copied: `render.SKELETON_DIR`, `build.CODE_PASSES` and
+> `files.WRITABLE`/`PROTECTED` are gone from those modules, and
+> `tests/test_targets.py` asserts their absence — a leftover constant is a
+> second definition that silently wins somewhere. `files.check_path` and
+> `files.write_all` grew `writable`/`protected` parameters as a consequence:
+> the guard is mechanism, the list is the target's, and a default value there
+> would have been a third place the default target is decided.
+>
+> **The write guard now follows the spec, not the import.** `run_pass` resolves
+> `targets.for_spec(spec)` at the moment of writing, so a pass that returns
+> `app/screens.py` into a web tree is refused with the web list named in the
+> error. That is the seam Phase 4 needs and it exists now rather than later.
+>
+> **An unknown target raises where an unknown archetype falls back.** A
+> deliberate divergence from "mirrors `archetype` exactly", and the reasoning
+> is in `protopilot/targets/__init__.py`: `archetypes.for_spec` can default
+> because a tree of the wrong *shape* still builds, while a target picks the
+> skeleton, the passes and the verifier — so the same fallback hands somebody a
+> FastAPI app because they asked for a terminal one. That is precisely the
+> "generated into something broken" this phase's last task refuses.
+>
+> **`--target` and `proto targets` shipped with it**, because an axis nothing
+> can select is not an axis. `targets.DEFAULT` is what `proto new` uses and it
+> is a **separate constant** from `Spec.target`'s field default; they are equal
+> today and Phase 6 moves only the first. `target` also joined
+> `MODEL_OWNED_EXCLUSIONS`, which put it in `CARRIED_THROUGH_AMEND` for free —
+> so `proto add` cannot silently rebuild a terminal app as a web one, which is
+> exactly the defect that list was derived to prevent for `archetype`.
 
 ## Phase 3 — The terminal skeleton
 
@@ -205,6 +248,21 @@ The reason to be optimistic about the whole plan.
 - [ ] `--offline` produces a running terminal app end to end
 - [ ] The characterisation discipline: the offline output for a fixed spec is
       byte-stable, so the golden manifests do not churn
+- [ ] **`proto new` defaults to `--target tui`, and writes it explicitly into
+      every new `spec.json`.** Decided 2026-09-04 on Phase 1's numbers: equal
+      competence, a cost paid in thinking time rather than in failure, and the
+      medium enforcing the disclaimer the tool exists to make. This is the last
+      task in the plan and not the first, because a default pointing at a target
+      that is not yet green breaks `proto new` for everyone including CI.
+
+      Two things it must not do. It must not touch `Spec.target`'s field default
+      — an old spec with no `target` key still means `web`, and always will; the
+      flip is about what a *new* spec is born with. And it must not demote the
+      web target beyond the default: it stays reachable by `--target web`, keeps
+      its passes, its skeleton, its verifier and its offline baseline green, and
+      keeps being generated in CI. It is the only control this repo has — when
+      the terminal target regresses, "is this the target or the change?" is
+      answerable only against a second target that still works
 
 ## Acceptance
 
@@ -220,6 +278,8 @@ The reason to be optimistic about the whole plan.
 - [ ] An unsupported archetype × target pair is refused at intake, naming both
 - [ ] The web target's five passes, skeleton and verifier are reachable and
       green, unchanged
+- [ ] `proto new "<idea>"` with no `--target` produces a terminal app, and a
+      `spec.json` written before this plan still produces a web one
 
 ## Dropped, and why
 
