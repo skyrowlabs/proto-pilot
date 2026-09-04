@@ -17,6 +17,21 @@ for configuration, and a doc there is a doc no index knows about.
 | Ideas, and what came of looking        | `docs/ideas/`              |
 | Business planning                      | `docs/business-planning/`  |
 
+`docs/ideas/` is deliberately one folder and not two. An idea nobody has decided to look
+into, and the write-up of somebody having looked, are the same kind of document here: a thing
+that is **not a plan**. Splitting them would ask you to classify at the moment you know least,
+and the answer would be wrong as soon as anyone did the work. What matters is the boundary
+that folder shares with the tank — `docs/TODO/` is where somebody has decided to *build* it —
+and a doc crosses that once, in one direction.
+
+The reason to have it at all: without it there is nowhere for an unexamined idea to go except
+root `docs/`, where it sits beside `ARCHITECTURE.md` and reads as though it describes the
+system. Tabled ideas keep their memo rather than being deleted — the expensive half of an
+investigation is what it ruled out. `docs/ideas/hosted.md` is the worked example.
+
+(The template calls this folder `docs/research/`. Here it is `docs/ideas/`, and the table
+above is the authority — one rename, recorded once.)
+
 ### A subfolder is registered by its README, not doc by doc
 
 `check_doc_tables.py` globs `docs/*.md` and **does not descend**, and so does
@@ -229,6 +244,16 @@ pp docs file <slug> --dry-run               # what it would do, changing nothing
 ```
 
 It refuses a plan that still has unchecked tasks, and it commits nothing — read the diff.
+
+**Filing removes the tank-only fields — `shelf_status`, `blocked_on`, `queue_order` — in both
+forms**, the frontmatter and the `> **Shelf-Status**:` header lines. They answer questions
+about a shelf the plan has left, and a finished plan that still says `in-progress` reads as a
+claim about work that is done. The header half is why the move does it rather than the
+backfill: a header beats frontmatter everywhere in this lifecycle, so cleaning the frontmatter
+alone leaves the plan reporting its old status forever. The free-form `> **Status**:` line is
+left alone — "Landed 2026-09-04" is a good thing for an archived plan to say.
+
+If you move a plan by hand instead, `pp test unit` will tell you which lines to delete.
 
 **Then repoint what cited it.** The move breaks links in two directions, and both are
 load-bearing prose that records *why* the docs say what they say:

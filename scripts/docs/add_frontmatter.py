@@ -76,13 +76,17 @@ def main() -> int:
 
     written = 0
     for plan, archive in targets:
-        # A doc that already has frontmatter is normally left alone — this is a
-        # backfill, not a rewriter. The archive is the exception: filing a plan
-        # must *remove* the tank-only keys, and a filed plan always arrives with
-        # frontmatter, so skipping it made `_derive`'s strip unreachable for
-        # every real doc. The archive branch is idempotent, so running it always
-        # costs nothing and a stale `shelf_status` in the archive is exactly the
-        # lie `gen_impl_index.py` pops the field to avoid publishing.
+        # The tank branch is a **backfill**: it fills in what is missing and
+        # then leaves the doc alone, so a maintainer's frontmatter survives.
+        #
+        # The archive branch is not a backfill. It is the normalisation a filing
+        # performs — strip the tank-only fields, add `category`/`completed` —
+        # and it has to run on a doc that *already has* frontmatter, because
+        # every doc being filed does. Sharing this guard made it unreachable in
+        # the only case it exists for: the archive branch had never once run
+        # during a real filing, and every plan filed by every tree scaffolded
+        # from this shell kept its old `shelf_status` forever. It is idempotent,
+        # so always running it costs a comparison.
         if plan.frontmatter and not args.force and not archive:
             continue
         derived = _derive(plan, archive)

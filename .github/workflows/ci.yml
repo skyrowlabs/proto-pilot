@@ -178,10 +178,20 @@ jobs:
       # dependency that tree needs is in this repo's `dev` extra. Neither
       # install is a superset of the other.
       #
-      # The step is the template's and is deliberately taken unchanged. On this
-      # tree it does exactly what `pip install -e ".[dev]"` did, `dev` being the
-      # only extra — so keeping a hand-written line here would buy nothing and
-      # conflict on every future upgrade.
+      # The step is the template's and is deliberately taken unchanged, so it
+      # does not conflict on every future upgrade. It reads the extra NAMES out
+      # of pyproject.toml and installs ALL of them — it does not assume the
+      # extra is called `dev`, which would be the same class of guess as
+      # assuming the tree has a package at all.
+      #
+      # This comment used to say `dev` was the only extra. It has not been true
+      # since `browser` and `web` were added, and nothing could notice: the step
+      # derives the list, so the code stayed right while the sentence rotted.
+      # All three are installed here on purpose. `browser` is the one that looks
+      # expensive and is not — the pip package is small, and Playwright only
+      # costs anything once `playwright install` fetches browsers, which this
+      # workflow never runs. The browser stage is skipped and reported as
+      # skipped, never as green.
       #
       # No API key and no Docker daemon: the offline baseline is what makes the
       # pipeline testable here, which is the point of having one.

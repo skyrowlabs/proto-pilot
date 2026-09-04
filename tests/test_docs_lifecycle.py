@@ -146,7 +146,29 @@ def test_filing_strips_the_tank_vocabulary_from_the_document(tree):
     -- `Plan.shelf_status` reads it before frontmatter.
 
     Reported to us by skeletor, whose template carries the same defect.
+
+    **All three tank fields are planted first, and that is not decoration.**
+    The shared fixture carries only `shelf_status`, so a loop over
+    `plans.TANK_ONLY` used to assert the absence of `queue_order` and
+    `blocked_on` that were never present -- two of three assertions passing
+    vacuously, which is this repository's own recurring class arriving inside
+    the test written to close an instance of it. skeletor plants them; taken
+    from their version.
     """
+    plan = tree / "docs" / "TODO" / "widget-cache.md"
+    plan.write_text(
+        plan.read_text(encoding="utf-8")
+        .replace(
+            "> **Shelf-Status**: ready",
+            "> **Shelf-Status**: ready\n> **Queue-Order**: 30\n> **Blocked-On**: owner-ops",
+        )
+        .replace(
+            "shelf_status: ready",
+            "shelf_status: ready\nqueue_order: 30\nblocked_on: owner-ops",
+        ),
+        encoding="utf-8",
+    )
+
     assert run(tree, "docs", "index").returncode == 0
     result = run(tree, "docs", "file", "widget-cache", "--category", "backend")
     assert result.returncode == 0, f"{result.stdout}\n{result.stderr}"

@@ -74,13 +74,22 @@ GATED = {"blocked", "shelved", "deferred"}
 
 PRIORITIES = ["critical", "high", "medium", "low"]
 
+#: Fields that answer a **tank** question and nothing else: which shelf a plan
+#: is on, what it is waiting for, and where it sits in the ready queue. A filed
+#: plan has left the tank, so all three are meaningless in the archive — and a
+#: stale `shelf_status: in-progress` on a finished plan is worse than
+#: meaningless, because it reads as a claim about work that is done.
+#:
+#: One owner, because this set was spelled out in three files: the backfill that
+#: strips it, the index that declines to publish it, and the test that holds the
+#: line. Two copies of a set drift; three had already started to.
+TANK_ONLY = ("shelf_status", "blocked_on", "queue_order")
+
+#: The same three as author-written header lines (`> **Shelf-Status**: ...`),
+#: derived rather than listed for the reason above.
+TANK_ONLY_HEADERS = tuple(key.replace("_", "-") for key in TANK_ONLY)
+
 _HEADER = re.compile(r"^>\s*\*\*(?P<key>[A-Za-z-]+)\*\*:\s*(?P<value>.+?)\s*$", re.MULTILINE)
-#: The tank-only keys as `> **Header**:` lines, derived from `TANK_ONLY`
-#: rather than respelled — the two must never disagree.
-_TANK_HEADER = re.compile(
-    r"^>\s*\*\*(?:" + "|".join(k.replace("_", "-") for k in TANK_ONLY) + r")\*\*:.*$\n?",
-    re.IGNORECASE | re.MULTILINE,
-)
 _TASK = re.compile(r"^\s*-\s*\[(?P<mark>[ xX])\]\s*(?P<text>.+?)\s*$", re.MULTILINE)
 _H1 = re.compile(r"^#\s+(?P<title>.+?)\s*$", re.MULTILINE)
 
@@ -88,27 +97,6 @@ _H1 = re.compile(r"^#\s+(?P<title>.+?)\s*$", re.MULTILINE)
 #: `(~operator)` is work only a human can do; `(~deferred)` is a deliberate
 #: non-goal. Both are the author saying "this will never be ticked here".
 EXEMPT_TASK_MARKERS = ("(~operator)", "(~deferred)")
-
-
-def strip_tank_headers(body: str) -> str:
-    """Remove the `> **Shelf-Status**:` / `> **Blocked-On**:` / `> **Queue-Order**:`
-    lines from a plan body.
-
-    Belongs to **filing**, not to the frontmatter backfill. The backfill runs on
-    every `pp docs index` and must never rewrite prose; a filing is the one
-    deliberate moment that knows the plan has left the tank, so it is the only
-    place allowed to. (Reported by skeletor, whose template carries the same
-    defect and whose fix this is.)
-
-    Stripping the frontmatter alone would not be enough: `Plan.shelf_status`
-    reads the header **first**, so a filed doc with the header intact still
-    reports itself unfinished however clean its frontmatter is.
-
-    `> **Status**:` is deliberately left alone. It is a sentence a human wrote
-    rather than one of the taxonomies, and "Shipped 2026-04-01" is a good thing
-    for an archived plan to say.
-    """
-    return _TANK_HEADER.sub("", body)
 
 
 _STATUS_HINTS = [
@@ -240,6 +228,34 @@ class Plan:
         if self.review_pr:
             entry["review_pr"] = self.review_pr
         return entry
+
+
+def strip_tank_headers(text: str) -> str:
+    """Remove the tank-only ``> **Header**:`` lines from a plan document.
+
+    Header lines beat frontmatter everywhere else in this package — that is the
+    whole point of them — which is why stripping the frontmatter alone does not
+    file a plan. ``Plan.shelf_status`` reads the header first, so a document
+    whose frontmatter has been cleaned goes on reporting the shelf it was on,
+    to every reader, human and machine alike.
+
+    So the two forms have to go together, and only one moment knows the plan has
+    left the tank: the move itself. This is called by ``pp docs file`` and
+    deliberately not by the backfill, which runs on every ``docs index`` and has
+    no business rewriting anybody's prose.
+
+    The free-form ``> **Status**:`` line is left alone. It is a sentence a human
+    wrote, not one of the three machine taxonomies, and "Shipped 2026-04-01" is
+    a perfectly good thing for an archived plan to say.
+    """
+    drop = {key.lower() for key in TANK_ONLY_HEADERS}
+    kept = [line for line in text.splitlines(keepends=True) if not _is_header_for(line, drop)]
+    return "".join(kept)
+
+
+def _is_header_for(line: str, keys: set) -> bool:
+    match = _HEADER.match(line)
+    return bool(match) and match.group("key").lower() in keys
 
 
 def load(path: Path) -> Plan:

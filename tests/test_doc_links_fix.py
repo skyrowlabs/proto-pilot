@@ -43,6 +43,48 @@ def tree(tmp_path, monkeypatch):
     return write
 
 
+def test_a_new_root_document_is_enrolled_by_existing(tmp_path, monkeypatch):
+    """A fourth root `.md` is checked without anybody adding it to anything.
+
+    This was a hand-written list of the three the template ships, so a fresh
+    tree was complete and every real tree diverged from there — most reliably
+    through `CHANGELOG.md`, which Release Please writes at the root and which is
+    the document most made of links. The checker printed `0 broken links` over
+    it: a clean report on a file it had never opened.
+
+    The assertion is on the **set**, not on four names. Naming the fourth would
+    reproduce the bug one entry later.
+    """
+    monkeypatch.setattr(links, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(links, "SCAN_ROOTS", [])
+    for name in ("README.md", "CHANGELOG.md", "NOTES.md"):
+        (tmp_path / name).write_text("# x\n", encoding="utf-8")
+    (tmp_path / "not-markdown.txt").write_text("x\n", encoding="utf-8")
+
+    found = {p.name for p in links.markdown_files()}
+
+    assert found == {"README.md", "CHANGELOG.md", "NOTES.md"}, found
+
+
+def test_a_broken_link_in_a_root_document_is_reported(tmp_path, monkeypatch):
+    """Planted, because a green run after a widening proves nothing.
+
+    The widening above makes the checker *look* at a root document. Only a
+    deliberately broken link proves it also *reports* on one — which is the half
+    that failed before, and the half a passing suite cannot distinguish from a
+    file nobody read.
+    """
+    monkeypatch.setattr(links, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(links, "DOCS_DIR", tmp_path / "docs")
+    monkeypatch.setattr(links, "IGNORE_FILE", tmp_path / ".validate-ignore")
+    monkeypatch.setattr(links, "SCAN_ROOTS", [])
+    (tmp_path / "NOTES.md").write_text("# N\n\nSee [gone](does-not-exist.md).\n", encoding="utf-8")
+
+    dead_paths, _ = links.scan()
+
+    assert any("NOTES.md" in entry for entry in dead_paths), dead_paths
+
+
 def test_repoints_a_heading_that_grew(tree):
     """The common case: somebody made a heading more specific."""
     source = tree("a.md", "# A\n\nSee [the reason](b.md#why-this-exists).\n")
@@ -127,26 +169,3 @@ def test_fix_is_idempotent(tree):
     assert len(links.repoint_fragments()) == 1
     assert links.repoint_fragments() == []
     assert links.scan() == ([], [])
-
-
-def test_the_scan_covers_every_markdown_file_at_the_repo_root() -> None:
-    """Recomputed from the tree, never compared against a list.
-
-    This gate scanned `docs/`, `.claude/`, `.github/` and a hand-written
-    `EXTRA_FILES = ["AGENTS.md", "CLAUDE.md", "README.md"]`. The fourth root
-    document is `NOTES.md` -- the live parking lot `README.md` tells a reader
-    to open first -- and it was not in that list, so its links were never
-    checked. Filing a plan on 2026-09-04 broke two of them and the gate printed
-    `0 broken links (at the ceiling)`.
-
-    That is this repository's own recurring class, arriving in the file that
-    enforces links: a negative result from a matcher means either the thing is
-    absent or the matcher is blind, and nothing in the output distinguishes
-    them. Asserting the *set* rather than four names is what makes a fifth root
-    document enrol by existing.
-    """
-    scanned = set(links.markdown_files())
-    root_docs = set(links.PROJECT_ROOT.glob("*.md"))
-    missing = sorted(p.name for p in root_docs - scanned)
-    assert not missing, f"root-level markdown the link gate cannot see: {missing}"
-    assert (links.PROJECT_ROOT / "NOTES.md") in scanned, "NOTES.md is the one that was missing"

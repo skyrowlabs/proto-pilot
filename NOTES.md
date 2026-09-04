@@ -437,11 +437,14 @@ is only a pointer at it).
   missing the instance is a cheap failure; the write-up still did the work.**
   It is what let skeletor find the real cause in minutes.
 
-  **The `-dirty` ref never clears, and that is correct.** Nothing can recover a
-  render that was never committed, and the repair does not touch the ref, so the
-  ⚠️ line survives every future upgrade. `8dd1832` makes the message say so —
-  before that, two adjacent lines with opposite lifetimes invited you to go
-  hunting for what you had failed to fix.
+  **The `-dirty` ref never clears *by repair*, and it cleared on the next
+  upgrade.** Both halves are true and this entry used to state only the first,
+  which read as "forever". Nothing can recover a render that was never
+  committed, and `--repair-manifest` does not touch the ref — but an **upgrade**
+  writes a new one, and the v0.2.11 upgrade on 2026-09-04 recorded a clean
+  `skeletor_ref: v0.2.11` from a clean checkout. The ⚠️ line is gone and the
+  next base render is reproducible. `8dd1832` makes the message say so while it
+  applies; what it does not say is which operation ends it.
 
   **It is permanent but bounded, and this entry used to overstate it.** skeletor
   ruled on 2026-09-04 (their `v0.2.6`): the banner is a provenance marker, not a
@@ -518,6 +521,21 @@ is only a pointer at it).
 
   Both deletions belong in the same pass as the upgrade, not before it: doing
   them first leaves a gate gone and its replacement not yet arrived.
+
+  **Done 2026-09-04, in the v0.2.11 upgrade.** Both gates deleted, both
+  survivors verified present. Two things learned in the doing.
+
+  `git rm` is **atomic across pathspecs**: one of the two files was untracked
+  (the upgrade had just written it), so `git rm a b` failed on `a` and removed
+  neither — while the surrounding script reported success for both. The verify
+  step caught it. Report after checking, not after acting.
+
+  And the deletion only sticks because of a release that landed while we waited.
+  Before skeletor's **v0.2.7**, a file they ship and we delete was classified on
+  being absent, restored on the next upgrade, and reported as a green
+  `✅ new file added` — the one phrasing under which nobody looks, because a new
+  file is what an upgrade is *for*. The next dry run now says
+  `⏭️ skeletor wrote and you deleted — NOT restored`, naming ours.
 
   Check for this by hand on every upgrade. Not everything under "new file" is new.
 

@@ -9,15 +9,16 @@ and makes the relevant part harder to find, not easier.
 
 ## Routing Table
 
-| When working on...        | Load                       | Path                        |
-| ------------------------- | -------------------------- | --------------------------- |
-| **Architecture / design** | ARCHITECTURE.md            | `docs/ARCHITECTURE.md`      |
-| **Setup / config**        | DEVELOPMENT.md             | `docs/DEVELOPMENT.md`       |
-| **CI/CD pipeline**        | DEVELOPMENT.md             | `docs/DEVELOPMENT.md`       |
-| **Testing**               | DEVELOPMENT.md             | `docs/DEVELOPMENT.md`       |
-| **CLI commands**          | CLI.md                     | `docs/CLI.md`               |
-| **Shelved / parked work** | TODO/README.md             | `docs/TODO/README.md`       |
-| **Was this built before?**| todo_index.json            | `docs/todo_index.json`      |
+| When working on...         | Load                         | Path                                |
+| -------------------------- | ---------------------------- | ----------------------------------- |
+| **Architecture / design**  | ARCHITECTURE.md              | `docs/ARCHITECTURE.md`              |
+| **Setup / config**         | DEVELOPMENT.md               | `docs/DEVELOPMENT.md`               |
+| **CI/CD pipeline**         | DEVELOPMENT.md               | `docs/DEVELOPMENT.md`               |
+| **Testing**                | DEVELOPMENT.md               | `docs/DEVELOPMENT.md`               |
+| **CLI commands**           | CLI.md                       | `docs/CLI.md`                       |
+| **Shelved / parked work**  | TODO/README.md               | `docs/TODO/README.md`               |
+| **Was this built before?** | todo_index.json              | `docs/todo_index.json`              |
+| **Reports of any kind**    | reports/README.md            | `docs/reports/README.md`            |
 | **Agentic Automation** | AGENTIC_AUTOMATION.md | `docs/AGENTIC_AUTOMATION.md` |
 | **Ideas, not scheduled** | ideas/README.md | `docs/ideas/README.md` |
 | **Reports / release windows** | reports/README.md | `docs/reports/README.md` |
