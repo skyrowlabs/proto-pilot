@@ -178,7 +178,7 @@ def test_the_seed_puts_the_playable_game_last(game_tree):
 
 # ── the same shape, in a terminal ────────────────────────────────────────
 #
-# Phase 6 of `docs/TODO/terminal-target.md`. Completing this pair was not
+# Phase 6 of `docs/implementations/spec/terminal-target.md`. Completing this pair was not
 # optional once `tui` became `targets.DEFAULT`: a hole in the default target is
 # `proto new` refusing its own classifier's answer, which is a worse failure
 # than any stated hole elsewhere in the matrix.

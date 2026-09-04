@@ -278,7 +278,7 @@ def new(
     # `targets.DEFAULT` rather than `Spec.target`'s field default: the two are
     # equal today and they answer different questions. This one is "what is a
     # NEW spec born with", and it is the one Phase 6 of
-    # `docs/TODO/terminal-target.md` moves.
+    # `docs/implementations/spec/terminal-target.md` moves.
     chosen_target = target_name or targets.DEFAULT
     if chosen_target not in targets.names():
         raise click.ClickException(str(targets.MissingTarget(chosen_target, targets.names())))

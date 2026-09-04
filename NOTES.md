@@ -443,6 +443,21 @@ is only a pointer at it).
   before that, two adjacent lines with opposite lifetimes invited you to go
   hunting for what you had failed to fix.
 
+  **It is permanent but bounded, and this entry used to overstate it.** skeletor
+  ruled on 2026-09-04 (their `v0.2.6`): the banner is a provenance marker, not a
+  live uncertainty about our tree. `cross_check` is a **bijection over the
+  manifest** — every recorded hash matches the base render *and* every rendered
+  file is recorded — and all three drift shapes are **refusals rather than
+  warnings**. Our dry run produced a plan, so the manifest and the base agree
+  file for file. The uncommitted edits in that 2026-09-01 checkout therefore
+  touched nothing this scaffold ships, and the 8 conflicts the pending upgrade
+  reports — the `ci.yml` hand-merge above being the eighth — are all **genuine
+  divergence**, not manifest noise.
+
+  The caveat stays live in exactly two shapes: under `--no-base`, and for a
+  manifest with no `files` map. Neither is us. Read the banner as "the ref
+  cannot be re-derived", not as "the plan may be wrong".
+
   **Still true and still worth avoiding: `--from-dir`.** It overrides the base,
   so a current checkout gets compared against a v0.2.0 manifest. skeletor fixed
   the advice in `24dc282`, but the flag remains what somebody reaches for with

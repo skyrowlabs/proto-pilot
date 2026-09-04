@@ -5,7 +5,7 @@ next door -- `NAME`, `WRITES`, `SCHEMA`, `build(spec, ctx)`, `offline(spec,
 ctx)` -- so `run_pass` drives either target with no branch in it.
 
 **The split is five, and that is a measured answer rather than a symmetry.**
-`docs/TODO/terminal-target.md` Phase 4 asks whether a Textual app splits the
+`docs/implementations/spec/terminal-target.md` Phase 4 asks whether a Textual app splits the
 same way a FastAPI one does, and the Phase 1 go/no-go ran all five live against
 three specs: every one of them did work, and the expensive two are `smoke`
 (~6.4x the web pass) and `screens` (~4.3x), with `schema`, `seed` and `ui` at

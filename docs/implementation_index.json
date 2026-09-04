@@ -1,10 +1,11 @@
 {
   "_generated_by": "scripts/docs/gen_impl_index.py",
   "_note": "Generated — never hand-edit. Edit the doc's frontmatter and rerun.",
-  "count": 1,
+  "count": 2,
   "by_category": {
     "spec": [
-      "archetypes-and-theme"
+      "archetypes-and-theme",
+      "terminal-target"
     ]
   },
   "implementations": [
@@ -26,6 +27,27 @@
       "category": "spec",
       "completed": "2026-09-01",
       "agent_value": 1
+    },
+    {
+      "slug": "terminal-target",
+      "title": "The Terminal Target",
+      "path": "docs/implementations/spec/terminal-target.md",
+      "priority": "high",
+      "updated": "2026-09-04",
+      "tags": [
+        "target",
+        "skeleton",
+        "passes",
+        "verify",
+        "archetypes",
+        "tui"
+      ],
+      "summary": "Make the output medium an axis and build a terminal target beside the web one — gated on a measurement, because the model has seen far less Textual than FastAPI.",
+      "open_tasks": 0,
+      "auto_generated": false,
+      "category": "spec",
+      "completed": "2026-09-04",
+      "agent_value": 3
     }
   ]
 }

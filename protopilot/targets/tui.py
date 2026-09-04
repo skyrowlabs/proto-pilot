@@ -1,6 +1,6 @@
 """The terminal target: Textual, SQLAlchemy, one SQLite file, one process.
 
-The second medium, and the one `docs/TODO/terminal-target.md` exists to build.
+The second medium, and the one `docs/implementations/spec/terminal-target.md` exists to build.
 Everything the web target needs a container for -- a port, a health wait, a
 compose project, a volume to orphan -- has no counterpart here: the whole
 application is `python -m app.main` and the database is a file beside it.
@@ -15,7 +15,7 @@ a shape *sayable* to the model, a baseline makes it *testable without a key*,
 and a target that claimed the first while missing the second would be green in
 CI and broken on the day somebody ran it offline.
 
-This is the concrete shape of the cost `docs/TODO/terminal-target.md` Phase 2
+This is the concrete shape of the cost `docs/implementations/spec/terminal-target.md` Phase 2
 calls "the one that will hurt": the two axes multiply, and the multiplication
 is paid here and in the archetype's terminal generators.
 
@@ -57,7 +57,7 @@ SKELETON_DIR = SKELETON_ROOT / "tui"
 
 #: The pass order. Five, and that is measured rather than assumed.
 #:
-#: `docs/TODO/terminal-target.md` Phase 4 asks whether a Textual app splits the
+#: `docs/implementations/spec/terminal-target.md` Phase 4 asks whether a Textual app splits the
 #: same way a FastAPI one does -- "a Textual app is often one file with a
 #: `compose()` method, so the split may not be five". The Phase 1 go/no-go ran
 #: all five live against three specs and every one of them did work. The

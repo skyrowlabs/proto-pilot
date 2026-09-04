@@ -1,7 +1,7 @@
 [project]
 name = "proto-pilot"
 version = "0.1.0"
-description = "Turn an idea and a little direction into a running Dockerised prototype."
+description = "Turn an idea and a little direction into a running prototype -- a terminal app by default, or a Dockerised web one."
 requires-python = ">=3.11"
 dependencies = [
     "anthropic>=0.40",
@@ -14,7 +14,7 @@ dependencies = [
     # reason and it holds for anyone who ever types `--target tui`.
     #
     # It stops being avoidable at the default flip in Phase 6 of
-    # `docs/TODO/terminal-target.md`: `proto new` with no `--target` will build
+    # `docs/implementations/spec/terminal-target.md`: `proto new` with no `--target` will build
     # a terminal app, so a machine without these two would go red at the
     # `import` stage on its first run and read that as a generation failure.
     #
@@ -111,6 +111,11 @@ skip = [".venv", ".venv-ci", "venv", ".git", "build", "dist", "node_modules", ".
 # when pytest is invoked without a tests/ path argument.
 [tool.pytest.ini_options]
 addopts = "--strict-markers"
+# `tmp/` holds generated prototype trees, each with its own tests/ that
+# import an app this interpreter cannot see. `./pp test unit` selects by
+# marker and never noticed; a bare `python -m pytest` collected them and
+# died with 17 errors in a tree nobody was testing.
+norecursedirs = ["tmp", "prototypes", ".venv", "skeleton"]
 filterwarnings = ["error::pytest.PytestReturnNotNoneWarning"]
 timeout = 120
 markers = [

@@ -1,6 +1,6 @@
 """The `target` axis: registry, round trip, matrix, and what it took over.
 
-Phase 2 of `docs/TODO/terminal-target.md`. The axis mirrors `archetype`, so
+Phase 2 of `docs/implementations/spec/terminal-target.md`. The axis mirrors `archetype`, so
 most of what is asserted here has a twin in `tests/test_archetypes.py` — the
 interesting tests are the four that do not:
 
@@ -51,7 +51,7 @@ def test_discovery_is_by_module_presence():
 
 
 def test_every_target_declares_the_whole_contract():
-    """The five constants and the one function `targets/__init__.py` documents.
+    """The thirteen constants and the two functions `targets/__init__.py` documents.
 
     Recomputed over whatever is installed rather than asserted about `web`, so
     a second target added later is enrolled by existing — the same reason the

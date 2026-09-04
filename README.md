@@ -79,11 +79,20 @@ Compose v2 is needed only for `--target web`**; the default target is one
 process and a SQLite file, so `proto doctor` reports a missing daemon as a
 limitation on one target rather than as a failure.
 
+**`textual` and `sqlalchemy` install with the tool, not as an extra.** The
+terminal target verifies **in process** — there is no container between
+proto.pilot and the tree it is checking, so a generated app's imports have to
+resolve in the interpreter running `proto`. That is a real cost of the default
+target and it is stated rather than hidden; the web target still needs neither
+at runtime, because its tree is built and tested inside Docker.
+
 Three optional extras: `dev` pulls the web target's stack too, because the
 end-to-end test runs a generated tree in process; `browser` adds Playwright, and
 without it the web target's browser verification stage is **skipped and reported
 as skipped, never as green** — the terminal target's equivalent needs no extra
-and is never skipped; `web` is the front end behind `proto serve`.
+and is never skipped; `web` is the front end behind `proto serve`, which is
+**pinned to `--target web`** and does not follow the default, because it hands
+back a link you click and a terminal app has no link.
 
 ## Commands
 
@@ -111,7 +120,10 @@ Docker — after the registry has been pruned, wiped, or never written.
 `up`, `down`, `logs`, `test`, `reset` and `gc` are Docker verbs and apply to a
 `--target web` prototype. A terminal prototype has no container to start,
 detach or orphan, so those commands refuse it by name and say what to type
-instead — `make run` in the tree.
+instead — `make run` in the tree. There is nothing for `gc` to find either: a
+terminal verify writes its throwaway SQLite files into `<tree>/.dbs/`, inside
+the tree, so deleting the tree takes everything with it. `prune` is about the
+registry rather than Docker and applies to any prototype.
 
 Useful flags on `new`: `--target` (which medium; default `tui`), `--offline`
 (no API calls, see below), `--no-verify` (generate without booting), `--port`,
@@ -140,8 +152,12 @@ Everything in `skeleton/<target>/` is copied byte for byte into every app, so
 it is debugged once rather than once per prototype — the Dockerfile, the
 compose file and the stylesheet on the web side; `app/main.py`, `app/db.py`,
 `app/base.py` and the test harness on both. Which tree a spec gets is
-`spec.target`, and a target owns rather more than the tree: its pass tuple, its
-write allowlist, its verifier, and the archetype briefs written in its medium.
+`spec.target`, and a target owns rather more than the tree — fifteen things,
+where the design predicted four. Six of the eleven it did not predict are
+sentences this tool prints about itself that turned out to be true only of
+Docker: a port, a URL, `make up`, "Container logs".
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#what-a-target-owns) has the
+contract.
 
 **The model can only write a handful of paths**, and the list belongs to the
 target. On the web target: `app/models.py`, `app/routes.py`, `app/seed.py`,
@@ -201,6 +217,13 @@ for real; without Playwright it is skipped and reported as skipped, never as
 green. The terminal target's equivalent is two strings — the app's screen
 buffer against an empty application's — so it needs no extra, is never skipped,
 and is the same check on every machine.
+
+On the terminal target that last stage is a **backstop rather than the first
+line**, and it is worth knowing which fires. `skeleton/tui/tests/test_boots.py`
+already asserts a non-empty buffer, and it is skeleton, so every generated tree
+carries it — a blank app goes red at `tests`, one stage earlier. `paint` catches
+the case the tree's own suite cannot: an app that mounts, answers every query
+and shows nothing, with a smoke suite that never thought to look.
 
 ## The offline baseline
 

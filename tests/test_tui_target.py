@@ -1,6 +1,6 @@
 """The terminal target: its passes, its prompts, and the tree they produce.
 
-Phase 4 of `docs/TODO/terminal-target.md`. The skeleton already had tests
+Phase 4 of `docs/implementations/spec/terminal-target.md`. The skeleton already had tests
 (`test_tui_skeleton.py`) and so did the base screen (`test_tui_base_screen.py`);
 what arrives here is everything between them — five passes, a brief, a write
 allowlist, an offline baseline, and a target module that ties them together.

@@ -38,7 +38,7 @@ def archetypes_default() -> str:
 #:
 #: It used to take `targets.DEFAULT`, with the reason "the web front end has no
 #: target picker yet" -- a **workaround**, and the flip in Phase 6 of
-#: `docs/TODO/terminal-target.md` falsified it. The durable reason is the one
+#: `docs/implementations/spec/terminal-target.md` falsified it. The durable reason is the one
 #: that survives: what this front end hands back is a link you click, and a
 #: terminal app has no link. `job.url` would be a URL to nothing.
 #:

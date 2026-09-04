@@ -13,7 +13,7 @@ makes the registry a registry and not a list.
 
 It used to hard-code `tui` in one place, pinning "the axis exists but the
 target does not yet" while that was true. Phase 4 of
-`docs/TODO/terminal-target.md` made it false, and the pin came out rather than
+`docs/implementations/spec/terminal-target.md` made it false, and the pin came out rather than
 being relaxed: the refusal test now uses a name no build will ever have, and
 every generation test runs over `targets.names()`.
 """

@@ -1,6 +1,6 @@
 """Verify, for the terminal target — which is where this target is better.
 
-Phase 5 of `docs/TODO/terminal-target.md`, and the phase that plan calls "the
+Phase 5 of `docs/implementations/spec/terminal-target.md`, and the phase that plan calls "the
 reason to be optimistic about the whole plan". Everything the web verifier is
 built around — a daemon, a port, a `/healthz` race, an optional browser that
 gets reported as skipped — has no counterpart here. What replaces the browser

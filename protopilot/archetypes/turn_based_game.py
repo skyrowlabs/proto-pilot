@@ -545,7 +545,7 @@ def templates_for(spec: Spec) -> dict[str, str]:
 # ── the terminal generators ──────────────────────────────────────────────
 #
 # The same shape one medium over, and the reason they exist is
-# `docs/TODO/terminal-target.md` Phase 6: the default target has to be able to
+# `docs/implementations/spec/terminal-target.md` Phase 6: the default target has to be able to
 # build every installed archetype, because a hole there is `proto new` refusing
 # its own classifier's answer.
 #

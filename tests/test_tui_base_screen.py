@@ -54,7 +54,7 @@ def tree_with_probe(spec, tmp_path) -> Path:
     """A rendered terminal tree with the probe dropped into its `tests/`.
 
     `skeleton=` is explicit because there is no `tui` target module to resolve
-    it from until Phase 4 of `docs/TODO/terminal-target.md`.
+    it from until Phase 4 of `docs/implementations/spec/terminal-target.md`.
     """
     render_skeleton(spec, tmp_path, skeleton=TUI_SKELETON)
     shutil.copyfile(PROBE, tmp_path / "tests" / "test_base_screen.py")

@@ -6,7 +6,7 @@ was already in the tree, in `render.py`, `build.py` and `files.py`, and this is
 a move rather than a copy. If the extraction is faithful, `tests/golden/`'s two
 manifests are unchanged; if it is not, that is where it shows.
 
-It is also the control. `docs/TODO/terminal-target.md` keeps this target
+It is also the control. `docs/implementations/spec/terminal-target.md` keeps this target
 reachable, green and generated in CI even after the default moves, because
 "is this the target or the change?" is a question only a second working target
 can answer.

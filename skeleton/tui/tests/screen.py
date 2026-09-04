@@ -2,7 +2,7 @@
 
 **This file exists because three separate generations wrote it wrong, in the
 same way, and each diagnosed it from scratch.** The Phase 1 measurement behind
-`docs/TODO/terminal-target.md` ran three terminal generations and all three
+`docs/implementations/spec/terminal-target.md` ran three terminal generations and all three
 failed their own smoke suite while the app underneath was correct: the smoke
 helper each one wrote read a `Static`'s text off `.renderable`, which current
 Textual does not have. Every `Static` on every screen therefore read as empty,

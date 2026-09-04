@@ -1,6 +1,6 @@
 """The terminal skeleton: it renders, it boots, and its harness can see it.
 
-Phase 3 of `docs/TODO/terminal-target.md`. `skeleton/tui/` is a fixed Textual +
+Phase 3 of `docs/implementations/spec/terminal-target.md`. `skeleton/tui/` is a fixed Textual +
 SQLite tree — one process, one file, no compose file, no port — and this is
 what holds it up until Phase 4 gives it passes and Phase 5 gives it a verifier.
 

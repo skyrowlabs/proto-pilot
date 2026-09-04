@@ -18,7 +18,7 @@ nothing else uses.
 ## The blank-screen check
 
 This is the terminal analogue of the browser stage, and the reason
-`docs/TODO/terminal-target.md` Phase 5 is the optimistic half of that plan:
+`docs/implementations/spec/terminal-target.md` Phase 5 is the optimistic half of that plan:
 render the app's screen buffer, render the buffer of an application with
 nothing in it at the same size, and compare two strings. No browser, no
 headless Chrome, no optional extra that gets reported as skipped -- and unlike

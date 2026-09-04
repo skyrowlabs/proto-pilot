@@ -16,7 +16,7 @@
   "requirements.txt": "c838db3781aca1eeefd82e6088ec1de9e8ca331cd349793a451821cbd8101380",
   "tests/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "tests/conftest.py": "9f5b57ac15baa08198babaabd2a38b7fb3978c7f772aa94881d62168220c74f0",
-  "tests/screen.py": "27a63c336e316cac2b41cff7191f08e76e70676b3706c8c00c80c098d38d8879",
+  "tests/screen.py": "bb79f494d7cbaa2b437e318c9b51ce280dc79a84a81833a98a326507d4cadfdd",
   "tests/test_boots.py": "d24913538a5636d23609bd8c19d9bd5f797e8e9ff7b9e36ab1cb5f3e36d3a0ef",
   "tests/test_smoke.py": "467347b000a0f0e01bf87db5d90d29c5cf1e02b66ae7149d92b658ade89e3bc3"
 }

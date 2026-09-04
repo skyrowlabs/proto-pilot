@@ -45,7 +45,7 @@ port are the optional front end and the *output* of the tool.
 
 | Piece | Stack | Port | Purpose |
 | ----- | ----- | ---- | ------- |
-| `proto serve` | FastAPI + Jinja | 7000 | A web face on `proto new`. A second *caller* of the pipeline, never a second implementation of it |
+| `proto serve` | FastAPI + Jinja | 7000 | A web face on `proto new`, pinned to `--target web` because it hands back a link you click. A second *caller* of the pipeline, never a second implementation of it |
 | a generated prototype, `--target web` | FastAPI + Postgres, in Docker | first free from 8080 | The output. One compose project per tree, named `<slug>_<path-hash>` |
 | a generated prototype, `--target tui` (**default**) | Textual + SQLite, one process | none | The output. Nothing listens, nothing to orphan |
 
@@ -108,13 +108,22 @@ deliberate decision, not an accident of implementation.
   and the caller's working directory unless told otherwise — so the guarantee
   above held for the `api` backend and was false for the other one. The second
   guard is `llm.ISOLATION`. A change to either half is a change to this rule.
-- **The stack is fixed, not chosen.** FastAPI, server-rendered Jinja,
-  SQLAlchemy 2.0, Postgres. No JS build step, no CDN, no migrations. A
-  generator that picks a stack per idea produces N unrunnable variants.
-  **`skeleton/<target>/` is copied byte for byte, never generated**, so it is
-  debugged once rather than once per prototype. It is fixed *per target*: a
-  target may pick a different stack, which is the one thing an archetype may
-  not do.
+- **The stack is fixed, not chosen.** Textual over SQLAlchemy 2.0 and one
+  SQLite file on the terminal target; FastAPI, server-rendered Jinja,
+  SQLAlchemy 2.0 and Postgres on the web one. Neither has a JS build step, a
+  CDN or migrations. A generator that picks a stack per idea produces N
+  unrunnable variants. **`skeleton/<target>/` is copied byte for byte, never
+  generated**, so it is debugged once rather than once per prototype. It is
+  fixed *per target*: a target may pick a different stack, which is the one
+  thing an archetype may not do.
+- **The two defaults are different constants and must stay that way.**
+  `targets.DEFAULT` is `"tui"` — what a *new* spec is born with.
+  `Spec.target`'s field default is `"web"` — what a `spec.json` written before
+  this axis existed **means**, permanently, so an old spec still generates the
+  app it always did. Never write "the default target" without saying which.
+  Collapsing them would make the next flip silently rewrite every spec on disk;
+  `tests/test_targets.py::test_the_cli_default_and_the_field_default_are_separate_constants`
+  pins both literals.
 - **Tests are generated before the code they test.** Pass order is
   `schema -> smoke -> seed -> routes -> ui` on the web target and
   `schema -> smoke -> seed -> screens -> ui` on the terminal one. Smoke tests
@@ -131,7 +140,11 @@ deliberate decision, not an accident of implementation.
   `verify_tui.py` imports the terminal tree, starts it under `App.run_test`,
   drives it, runs the smoke suite and compares the rendered screen buffer to an
   empty application's — `import -> boot -> tests -> paint`, no daemon and no
-  port. Three repair attempts either way, then a **floor**: the tree is handed
+  port. **`paint` is the backstop, not the first line**: the skeleton's own
+  `tests/test_boots.py` asserts a non-empty buffer and ships in every generated
+  tree, so a blank app is already red at `tests`. `paint` exists for the app
+  that mounts, answers every query, shows nothing, and has a smoke suite that
+  never looked. Three repair attempts either way, then a **floor**: the tree is handed
   back anyway with a `RUNBOOK.md` naming the red stage, the last error, and what
   was tried. A known-broken prototype beats a mystery, and both beat a loop that
   never terminates.
@@ -164,11 +177,12 @@ because the baseline cannot read a change request.
 | `protopilot/passes/tui/` | The terminal target's five, same shape; `_brief.py` holds its stack brief and the archetype fragments in that medium |
 | `protopilot/baseline_tui.py` | The deterministic offline generator for the terminal target — screens, smoke suite and stylesheet |
 | `protopilot/files.py` | The write guard — the mechanism; the allowlist itself is the target's |
-| `protopilot/verify.py` | Boot, health-wait, smoke run, log capture |
+| `protopilot/verify.py` | **Web:** boot, health-wait, smoke run, log capture |
+| `protopilot/verify_tui.py` | **Terminal:** import, boot under `App.run_test`, smoke run, blank-screen check; `tui_probe.py` is the half that runs inside the tree |
 | `protopilot/baseline.py` | The deterministic offline implementation of every pass |
 | `protopilot/llm.py` | `LLM` Protocol + three backends |
 | `protopilot/registry.py` | Tracked prototypes — see the `prune()` trap in `NOTES.md` |
-| `protopilot/targets/` | What medium a spec is built in: skeleton, pass tuple, write allowlist, verifier |
+| `protopilot/targets/` | What medium a spec is built in — fifteen things, of which the plan predicted four; the contract is in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#what-a-target-owns) and a test recomputes it |
 | `skeleton/<target>/` | Copied byte-for-byte into every generated app; one tree per target |
 | `cli/`, `scripts/` | This repo's own tooling — never shipped to a user |
 

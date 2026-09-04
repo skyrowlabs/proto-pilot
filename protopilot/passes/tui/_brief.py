@@ -10,7 +10,7 @@ pass's source -- goes in the user message.
 
 Every task block below is the one the Phase 1 go/no-go actually ran. Six live
 runs, three specs, two targets, and the numbers the whole of
-`docs/TODO/terminal-target.md` stands on came out of these exact strings --
+`docs/implementations/spec/terminal-target.md` stands on came out of these exact strings --
 `docs/reports/occasional/2026-09-04-terminal-target-go-no-go.md`. A rewritten
 brief would invalidate them, so this was moved out of the spike rather than
 composed fresh -- `git show 6e02c85:scripts/spikes/terminal_target/brief.py` is
@@ -43,7 +43,7 @@ the model the app it is building is a web page.
 So `ARCHETYPE_BRIEFS` is the same content in this medium, kept as close to the
 original sentence for sentence as the medium allows. That makes the archetype
 brief a **fifth** thing the target owns, beyond the four
-`docs/TODO/terminal-target.md` Phase 2 lists, and it is the concrete shape of
+`docs/implementations/spec/terminal-target.md` Phase 2 lists, and it is the concrete shape of
 the cost that plan calls "the one that will hurt": the two axes multiply, and
 this is where the multiplication is paid.
 """

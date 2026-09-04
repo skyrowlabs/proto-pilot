@@ -1,25 +1,25 @@
 ---
-title: "The Terminal Target"
+title: The Terminal Target
 slug: terminal-target
-shelf_status: planned
 priority: high
+category: spec
+agent_value: 3
+completed: 2026-09-04
 updated: 2026-09-04
 tags: [target, skeleton, passes, verify, archetypes, tui]
-summary: "Make the output medium an axis and build a terminal target beside the web one — gated on a measurement, because the model has seen far less Textual than FastAPI."
+summary: Make the output medium an axis and build a terminal target beside the web one — gated on a measurement, because the model has seen far less Textual than FastAPI.
 ---
 
 # The Terminal Target
 
 > **Status**: 🟢 Landed 2026-09-04 — all six phases
-> **Shelf-Status**: planned
 > **Priority**: High — it is the direction the tool is being pointed, and the
 > first phase is what decides whether the direction is affordable
-> **Queue-Order**: unset until it is `ready`
 
 ## Why, in one line
 
 The argument lives in
-[`docs/ideas/sketches-not-scaffolds.md`](../ideas/sketches-not-scaffolds.md)
+[`docs/ideas/sketches-not-scaffolds.md`](../../ideas/sketches-not-scaffolds.md)
 and is **not repeated here** — a doc lives where it changes. This plan is the
 buildable slice of that direction: the `target` axis and the terminal target
 that proves it. Read the idea doc first; the three decisions and the reasoning
@@ -86,7 +86,7 @@ told to write. Terminal: the spike's own smoke helper reads Static text via
 the test could not see it — meaning the real `tui` figure is *better* than 2.33.
 
 Full numbers, per-pass breakdown and every repair reason:
-[`docs/reports/occasional/2026-09-04-terminal-target-go-no-go.md`](../reports/occasional/2026-09-04-terminal-target-go-no-go.md).
+[`docs/reports/occasional/2026-09-04-terminal-target-go-no-go.md`](../../reports/occasional/2026-09-04-terminal-target-go-no-go.md).
 Three findings there change phases below; they are marked inline.
 
 **The harness is built and the six runs are made.**
@@ -96,7 +96,7 @@ check, and an incrementally written JSON record per run. Nothing under
 `protopilot/` was touched, so the gate below could still say no.
 
 **Deleted 2026-09-04, once Phase 6 was green**, which is what
-[`scripts/spikes/README.md`](../../scripts/spikes/README.md) says a spike is
+[`scripts/spikes/README.md`](../../../scripts/spikes/README.md) says a spike is
 for. The report keeps the finding. The prompts were **moved** into
 `protopilot/passes/tui/_brief.py` rather than deleted, because the numbers
 below describe those exact strings and a rewritten brief would have
@@ -439,7 +439,7 @@ The reason to be optimistic about the whole plan.
 
 - [x] `./pp check pre-push` green
 - [x] Phase 1's numbers exist and are recorded, whichever way they fell —
-      [the go/no-go report](../reports/occasional/2026-09-04-terminal-target-go-no-go.md)
+      [the go/no-go report](../../reports/occasional/2026-09-04-terminal-target-go-no-go.md)
 - [x] A `spec.json` written before this plan loads, and generates a web app
       byte-identical to what it generated before —
       `tests/test_crud_characterisation.py` against

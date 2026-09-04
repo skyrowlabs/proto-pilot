@@ -1,6 +1,6 @@
 """Every byte of the web skeleton, as it stood before `skeleton/` grew targets.
 
-Phase 3 of `docs/TODO/terminal-target.md` moves `skeleton/` to `skeleton/web/`
+Phase 3 of `docs/implementations/spec/terminal-target.md` moves `skeleton/` to `skeleton/web/`
 so `skeleton/tui/` can sit beside it. The move is mechanical and the plan says
 it must be **byte-identical for the web target** — proved by a characterisation
 test, the way Phase 2 of the archetypes plan proved the `crud` extraction, and

@@ -13,17 +13,33 @@ modules next door — module-level constants and plain functions, no classes:
     LABEL        one human phrase, shown when a person is choosing
     SKELETON_DIR the fixed tree copied byte-for-byte into every prototype
     CODE_PASSES  the pass modules, in the order they run
+    REPAIR       the repair pass, which is not in `CODE_PASSES`
     WRITABLE     the paths a pass may write, for `files.check_path`
     PROTECTED    paths under a writable glob that are skeleton anyway
     ARCHETYPES   the archetype names this target can actually build
+    USES_PORT    whether a generated tree binds one at all
+    HANDOFF      how the finished thing is handed back to a person
+    RUN_HINT     what to type to start it again later
+    LOGS_LABEL   what the captured output is called on this medium
+    MANUAL       the RUNBOOK block for driving it by hand
+    preflight()  whether this machine can build this medium, and why not
     verifier()   a `verify.Verifies` for a generated tree
 
-Those are the four things `docs/TODO/terminal-target.md` names as target-owned
-— skeleton directory, pass tuple, allowed write paths, verifier — plus the
-matrix declaration, and each of them is defined **here and nowhere else**.
+Thirteen constants and two functions, defined **here and nowhere else**.
 `render.SKELETON_DIR`, `build.CODE_PASSES` and `files.WRITABLE` used to hold
 three of them; they were moved rather than copied, because two definitions of a
 rule drift within the week and the copy that is wrong is the one being read.
+
+**The count is the finding.** `docs/implementations/spec/terminal-target.md` predicted four
+target-owned things — skeleton directory, pass tuple, allowed write paths,
+verifier — and building the second target needed eleven more. Four of those are
+registry bookkeeping and one is `REPAIR`, but **six were sentences hardcoded
+somewhere that turned out to be true only of Docker**: a port in the review
+checkpoint, a URL in the hand-back line, `make up`, "Container logs", a
+`docker compose` block in the RUNBOOK, and a daemon probe in `doctor`. None of
+them looked medium-specific until a second medium existed, which is the general
+lesson and the reason this list is written out rather than summarised: the real
+cost of a second target is the contract, not the skeleton.
 
 **Discovery is by module presence**, like `protopilot/archetypes/`: a file in
 this directory is a registered target and there is deliberately no list to
@@ -46,7 +62,7 @@ Two ways this axis deliberately does **not** copy the archetype axis:
   and they answer different questions. `Spec.target = "web"` says what a
   `spec.json` written before this axis existed **meant**, and it stays `web`
   forever. `DEFAULT` says what a *new* spec is born with, and
-  `docs/TODO/terminal-target.md` Phase 6 flips it. Collapsing them into one
+  `docs/implementations/spec/terminal-target.md` Phase 6 flips it. Collapsing them into one
   constant would make that flip silently rewrite the meaning of every old spec.
 """
 
@@ -67,7 +83,7 @@ SKELETON_ROOT = Path(__file__).resolve().parents[2] / "skeleton"
 #: The target `proto new` chooses when the user does not say.
 #:
 #: **`tui` since 2026-09-04**, and this is the whole of the change Phase 6 of
-#: `docs/TODO/terminal-target.md` describes. It is NOT `Spec.target`'s field
+#: `docs/implementations/spec/terminal-target.md` describes. It is NOT `Spec.target`'s field
 #: default and must never be collapsed into it -- see the module docstring, and
 #: `tests/test_targets.py`, which holds that line. A spec written before the
 #: axis existed still means `web`, permanently; this says what a *new* spec is

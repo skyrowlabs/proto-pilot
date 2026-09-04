@@ -12,7 +12,7 @@ checking whether a capability already exists (parked) before rebuilding it.
 
 **Machine-readable index**: [`../todo_index.json`](../todo_index.json).
 
-**3 open plans** · **0 agent-managed**
+**2 open plans** · **0 agent-managed**
 
 ---
 
@@ -23,7 +23,6 @@ _Not started — intended future work._
 | Plan | Priority | Updated | Summary |
 | ---- | -------- | ------- | ------- |
 | [The Improvement Loop](improvement-loop.md) | high | 2026-09-03 | Let a prototype be told to keep getting better, with a ratchet that reverts any iteration leaving it less green than it found it. |
-| [The Terminal Target](terminal-target.md) | high | 2026-09-04 | Make the output medium an axis and build a terminal target beside the web one — gated on a measurement, because the model has seen far less Textual than FastAPI. |
 
 ## ⛔ Blocked
 

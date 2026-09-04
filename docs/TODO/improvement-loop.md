@@ -27,15 +27,18 @@ What survives untouched: the ratchet argument, git as the revert mechanism, the
 pass machinery and write guard as the thing that changes files, every human
 control, and the whole `Dropped, and why` section.
 
-What needs one edit when a second target exists: **two of the four rails are
-named in web vocabulary.** `templates` counts `app/templates/*.html`, and
-`screens served` compares `checkable_paths(spec)` against routes that answer. A
-terminal app has screens and no routes. The *rails* are right — "did a screen
-stop existing" is the question on any medium — so this is a target-owned
-implementation behind the same names, not a redesign. The plan already says the
-rails are "a tuple in one place so a fifth is a line, not a refactor"; that
-property is what makes this cheap, and it should be honoured rather than
-special-cased.
+**The second target exists as of 2026-09-04, and it is the default**, so this
+edit is due rather than anticipated: **two of the four rails are named in web
+vocabulary.** `templates` counts `app/templates/*.html`, and `screens served`
+compares `checkable_paths(spec)` against routes that answer. A terminal app has
+`app/screens.py` and no routes at all, and its verifier's stages are
+`import → boot → tests → paint`. The *rails* are right — "did a screen stop
+existing" is the question on any medium — so this is a target-owned
+implementation behind the same names, not a redesign — one more thing
+`protopilot/targets/<name>.py` would declare, beside the fifteen it already
+does. The plan already says the rails are "a tuple in one place so a fifth is a
+line, not a refactor"; that property is what makes this cheap, and it should be
+honoured rather than special-cased.
 
 ### It is not the loop the pivot asked for, and conflating them would be a mess
 
@@ -136,8 +139,9 @@ opinion is a rail that will be argued with at 3am by a loop that cannot argue.
 ### What does the changing
 
 **The pass machinery, not a free agent.** `protopilot/files.py` already
-enforces that a model may write only five paths, and that guard is one of the
-five load-bearing invariants in the README. An agent with a shell can edit the
+enforces that a model may write only the paths the running target allows — five
+on the web target, six on the terminal one — and that guard is one of the five
+load-bearing invariants in the README. An agent with a shell can edit the
 Dockerfile, the compose file or `requirements.txt`, and an improvement loop
 with that power is a way to end up debugging a stack nobody chose — which is
 the exact thing the fixed skeleton exists to prevent.
@@ -207,7 +211,7 @@ before anything is allowed to act on it.
 
 ## Phase 3 — The `improve` pass, with its baseline
 
-- [ ] `passes/improve.py`, writing only the five allowed paths, given the real
+- [ ] `passes/improve.py`, writing only the target's allowed paths, given the real
       current source rather than a description of it
 - [ ] Its prompt asks for **one** bounded change and a one-line rationale. A
       pass that rewrites four files per iteration defeats the ratchet, because
@@ -251,7 +255,7 @@ before anything is allowed to act on it.
 - [ ] A dirty tree and a non-git tree are both refused, by name
 - [ ] Ctrl-C during a run leaves the tree at a commit, not mid-edit
 - [ ] `proto improve` on this repository's own root refuses
-- [ ] The improve pass writes nothing outside the five allowed paths, proven by
+- [ ] The improve pass writes nothing outside the target's allowed paths, proven by
       the existing write guard rather than a new one
 
 ## Dropped, and why

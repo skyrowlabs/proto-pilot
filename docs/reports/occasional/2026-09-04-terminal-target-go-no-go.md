@@ -1,7 +1,7 @@
 # Can the model build a terminal app as well as a web one?
 
 > **Analyzed at:** v0.1.0 +35 commits (`6e02c85`)
-> Phase 1 of [`docs/TODO/terminal-target.md`](../../TODO/terminal-target.md),
+> Phase 1 of [`docs/TODO/terminal-target.md`](../../implementations/spec/terminal-target.md),
 > the go/no-go the rest of that plan is gated on.
 
 **The gate passes, and the metric it was written around turns out to measure

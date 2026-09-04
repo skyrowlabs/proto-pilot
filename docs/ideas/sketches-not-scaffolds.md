@@ -4,9 +4,15 @@
 > [hosted.md](hosted.md), which is now tabled.
 >
 > **A plan has been cut from its first buildable slice** —
-> [`docs/TODO/terminal-target.md`](../TODO/terminal-target.md), the `target`
+> [`docs/TODO/terminal-target.md`](../implementations/spec/terminal-target.md), the `target`
 > axis and the terminal target, gated on a measurement. This doc stays here and
 > holds the *argument*; the plan holds the phases and does not repeat it.
+>
+> **That slice landed 2026-09-04.** `proto new` builds a Textual + SQLite
+> terminal app unless told otherwise — decision 1 below is now what the code
+> does, not what it intends. Decision 2 is unchanged in effect and decision 3 is
+> still a decision without a flip. The web target stays reachable by
+> `--target web`, green and generated in CI.
 >
 > That is a refinement of this folder's own rule, which said a doc moves to
 > `docs/TODO/` when someone decides to build it. It moves when the **whole**
@@ -151,9 +157,14 @@ spec both ways and compare repair counts, tokens and verify wall-clock. That is
 the estimate hosted.md said should happen before anything is built — it just
 turned out to be about the target rather than the audience.
 
-The expectation is that the terminal target becomes the default and the web one
-becomes legacy. Whether it is eventually cut is a later call and does not need
-making now.
+The expectation was that the terminal target becomes the default and the web one
+becomes legacy. **Half of that happened on 2026-09-04**: `targets.DEFAULT` is
+`tui`, and the web target is *not* legacy — it keeps its five passes, its
+skeleton, its verifier and its offline baseline green and generated in CI,
+because it is the only control this repo has for telling a target regression
+apart from a change regression. "Not the default" and "legacy" turned out to be
+different states, and the second is still a later call that does not need making
+now.
 
 ## What this settles from hosted.md
 
@@ -185,18 +196,23 @@ Tabling the hosted service does not throw away everything in that doc:
 
 ## Open questions
 
-- **Does Docker survive?** A single Textual process with a SQLite file may not
-  need it, and dropping it makes the tool far easier for another developer to
-  adopt. Against: model-authored code then runs unsandboxed on their machine.
-  Their machine and their idea, knowingly running a code generator — the same
-  argument that makes it fine locally today — but it should be a decision, not a
-  drift. Probably: optional isolation rather than the stack.
+- **Does Docker survive?** Still open, and now open with the fact in hand: the
+  terminal target ships with no container, so model-authored code from a default
+  `proto new` already runs unsandboxed on the machine that asked for it. That is
+  the trade this bullet describes, taken by default rather than decided. Their
+  machine and their idea, knowingly running a code generator — the same argument
+  that makes it fine locally today — but it should be a decision, not a drift.
+  Probably: optional isolation rather than the stack. The web target keeps its
+  container and is not the answer to this, because it is a medium rather than a
+  sandbox.
 - **Does a sketch need persistence at all?** A file-backed SQLite makes a
   prototype feel real; a JSON file might be enough. "Add a trip and it is still
   there" is most of what makes an idea testable, so probably yes, but small.
-- **What replaces the five passes?** `schema → smoke → seed → routes → ui` maps
-  roughly to `models → smoke → seed → screens → styling`, but a Textual app is
-  often one file with a `compose()` method, so the split may not be five.
+- ~~**What replaces the five passes?**~~ **Answered by measurement, and it is
+  five.** `schema → smoke → seed → screens → ui`. All five did real work across
+  six live runs; the expensive two are `smoke` (~6.4× its web twin) and `screens`
+  (~4.3×), with the other three at parity. If the split is ever revisited, that
+  is where the money is.
 - **Does `proto` become a TUI itself, or does it host one?** These are separable.
   The tool having a TUI is useful today, independent of everything above.
 - **Is "released tool" a v0.2.0 or a v1.0.0 promise?** Going public means other

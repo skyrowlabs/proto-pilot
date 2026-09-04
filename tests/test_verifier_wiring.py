@@ -66,7 +66,7 @@ def built(project_dir, spec, runner=None) -> Verifier:
 
     `verifier()` is annotated `-> Verifies` on purpose — `drive_to_green` must
     never learn which implementation it got, and Phase 5 of
-    `docs/TODO/terminal-target.md` depends on that staying true. These tests
+    `docs/implementations/spec/terminal-target.md` depends on that staying true. These tests
     are the exception: they are about the construction rather than the
     protocol, so the narrowing is deliberate, and it doubles as the assertion
     that today's web target still hands back the Docker verifier.

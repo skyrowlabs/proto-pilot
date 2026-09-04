@@ -46,6 +46,18 @@ worth investing in?** Three answers, and the plan's fate differs:
 `docs/TODO/terminal-target.md` Phase 1 is what settles it, and until that
 measurement exists nobody can rule here honestly.
 
+**The measurement exists as of 2026-09-04 and the flip happened**, so the gate
+is now answerable — by somebody, and not by this paragraph. What landed is
+between the first two answers rather than on either: `targets.DEFAULT` is `tui`,
+and the web target is **not** legacy. It keeps its five passes, its skeleton,
+its verifier and its offline baseline green and generated in CI, deliberately,
+because it is the only control the repo has for telling a target regression
+apart from a change regression. So "web stays a supported target" is true and
+"web is the default" is not, and which of the three answers above that makes
+this plan is a product call that is still open. **Blocked-On stays
+`product-decision`**; what changed is that the input it was waiting on is in.
+[The numbers](../reports/occasional/2026-09-04-terminal-target-go-no-go.md).
+
 ## What transfers to any target, and is the reason to keep this doc
 
 Two things in this plan are about neither Docker nor a browser, and both survive
