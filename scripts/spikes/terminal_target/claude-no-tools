@@ -36,4 +36,27 @@
 # "only Monitor (which I won't repurpose as a shell for this) can execute
 # commands" -- which is a deny list working by the model's goodwill rather
 # than by the flag. An allow list of nothing has no such hole.
-exec claude "$@" --tools ""
+#
+# ...except one layer out, which is where the first version of this file
+# stopped and was wrong. `--tools` governs the **built-in** tools. MCP servers
+# are a separate registry and survive it: with `--tools ""` alone the model
+# reported it still had Google Drive, Slack and Cloudflare, and said so
+# unprompted while explaining why it could not write the file. Whatever is in
+# the operator's MCP config is reachable from inside a generation pass.
+#
+# So the isolation needs all three flags, and the check that it worked is to
+# ask the model what it has rather than to trust the flags:
+#
+#     --tools ""                      no built-in tools
+#     --strict-mcp-config             ignore every ambient MCP configuration
+#     --mcp-config '{"mcpServers":{}}'  ...and supply an empty one
+#
+# Verified 2026-09-03: that combination reports exactly one tool,
+# `StructuredOutput`, which is the one the schema needs. `--tools ""` alone
+# reports the three MCP servers above.
+#
+# This is the same lesson as the deny-list paragraph, one level up, and it is
+# worth stating plainly because the first version of this file *argued* the
+# lesson and then missed the instance: an allow list is only exhaustive over
+# the registry it governs, and a second registry is invisible to it.
+exec claude "$@" --tools "" --strict-mcp-config --mcp-config '{"mcpServers":{}}'
