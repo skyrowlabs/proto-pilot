@@ -54,7 +54,7 @@
     ".github/release-please-config.json": "0ae7d81af30ed2e967440e236fc34ab2ba1456eb3d5990b4c1ec988f2866154a",
     ".github/scripts/.validate-ignore": "db54915892385aea06326aebefa78678e70b6a74bde1571cf00196f1b955e471",
     ".github/scripts/docs-only.cjs": "6f8f426d67e988fdfe7ce197dbb614a21e08fd8b00bdaed326295fb76d741674",
-    ".github/workflows/ci.yml": "5928fee6ef6b783f531293f5896a04797468dbbcead1a85924b62fee55bce6e1",
+    ".github/workflows/ci.yml": "e8da42648f507d5a3489271e2daf10e43e38c9201a70b1fcda6aa95187a04b04",
     ".github/workflows/coverage-nightly.yml": "b0d11438ee1a9a5c1b4d56155dfbb7dd65ea8df8fd176ce35046a1e6c57ec18f",
     ".github/workflows/docs-validation.yml": "661c2b15855bd7cb9d30ed5ee3cf9cf0ac55bed6b563ad3019963c0e267703fd",
     ".github/workflows/pr-draft-discipline.yml": "55749991174b4d6cc896c44fcdfdd8e90c0cc5bc11d6d878e41e2483658e8624",
