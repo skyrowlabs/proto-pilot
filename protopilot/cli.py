@@ -526,6 +526,34 @@ def reset(directory: str | None, yes: bool) -> None:
     sys.exit(code)
 
 
+def _preflight_backend(backend: str | None) -> None:
+    """Fail now rather than partway into a generation.
+
+    Resolved through `build_llm` rather than by re-reading the rule here: the
+    choice is `--backend`, then `PROTOPILOT_LLM`, then the API, and a second
+    copy of that would answer differently the day the rule changes. It also
+    fixes what the hand-rolled version missed — `serve` only checked when
+    `--backend claude-code` was passed explicitly, so an operator who set
+    `PROTOPILOT_LLM=claude-code` in their shell (the ordinary way to do it) got
+    no check at all.
+
+    **Only the free check runs.** `ClaudeCodeLLM.check()` is a `--version`
+    call on a subprocess and costs nothing. `ClaudeLLM.check()` deliberately
+    spends one token, because a zero balance is invisible until a real request
+    is made -- worth it in `proto doctor`, which is asked to find out, and not
+    worth it on every launch of a front end.
+    """
+    from protopilot.llm import ClaudeCodeLLM
+
+    llm = build_llm(backend=backend)
+    if not isinstance(llm, ClaudeCodeLLM):
+        return
+    try:
+        llm.check()
+    except LLMError as exc:
+        raise click.ClickException(f"{exc}\n     set PROTOPILOT_CLAUDE_BIN to a working `claude` binary") from exc
+
+
 @main.command()
 @click.option("--workspace", default=None, help="Where prototypes are generated (default: ./prototypes).")
 @click.option("--backend", type=click.Choice(["api", "claude-code", "offline"]), default=None)
@@ -545,6 +573,11 @@ def console(workspace: str | None, backend: str | None, demo: bool) -> None:
     `proto new` is untouched and stays the scriptable path -- a front end that
     is the only way in is a tool you cannot automate.
     """
+    # Before the app takes over the terminal: a `ClickException` raised from
+    # inside a running Textual app is painted over by the next frame and then
+    # lost when the screen is torn down.
+    _preflight_backend(backend)
+
     from protopilot.console import run as run_console
 
     root = Path(workspace).resolve() if workspace else Path.cwd() / "prototypes"
@@ -568,14 +601,7 @@ def serve(port: int, workspace: str | None, backend: str | None, demo: bool) -> 
     except ImportError as exc:  # pragma: no cover - dependency guard
         raise click.ClickException('the front end needs extras: pip install -e ".[web]"') from exc
 
-    if backend in ("claude-code", "subscription"):
-        # Fail here rather than three passes into a generation.
-        from protopilot.llm import ClaudeCodeLLM
-
-        try:
-            ClaudeCodeLLM().check()
-        except LLMError as exc:
-            raise click.ClickException(f"{exc}\n     set PROTOPILOT_CLAUDE_BIN to a working `claude` binary") from exc
+    _preflight_backend(backend)
 
     from protopilot.web.app import create_app
 
