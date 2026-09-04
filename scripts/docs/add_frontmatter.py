@@ -41,7 +41,7 @@ def _derive(plan: plans.Plan, archive: bool) -> dict:
         data["category"] = data.get("category") or (rel.parts[0] if len(rel.parts) > 1 else "uncategorized")
         data.setdefault("agent_value", 1)
         data.setdefault("completed", plan.updated or "")
-        for key in ("shelf_status", "blocked_on", "queue_order"):
+        for key in plans.TANK_ONLY:
             data.pop(key, None)
         return data
 
@@ -76,7 +76,14 @@ def main() -> int:
 
     written = 0
     for plan, archive in targets:
-        if plan.frontmatter and not args.force:
+        # A doc that already has frontmatter is normally left alone — this is a
+        # backfill, not a rewriter. The archive is the exception: filing a plan
+        # must *remove* the tank-only keys, and a filed plan always arrives with
+        # frontmatter, so skipping it made `_derive`'s strip unreachable for
+        # every real doc. The archive branch is idempotent, so running it always
+        # costs nothing and a stale `shelf_status` in the archive is exactly the
+        # lie `gen_impl_index.py` pops the field to avoid publishing.
+        if plan.frontmatter and not args.force and not archive:
             continue
         derived = _derive(plan, archive)
         if derived == plan.frontmatter:

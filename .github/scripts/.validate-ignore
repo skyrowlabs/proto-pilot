@@ -23,3 +23,17 @@ docs/b.md
 # An output destination the Saturday report job creates, named at `agentic`
 # and above. Harmless at `core`, where nothing references it.
 docs/reports/regular/repository-report.md
+
+# Fixture paths in tests/test_doc_routing_predicate.py. The predicate under test
+# is about `docs/` folder layout, so its fixtures have to be `docs/...` strings —
+# but they are built in a tmp_path tree and name nothing in this repo. Two of
+# them (`v1.2/`, a deep archive) exist precisely to show the walk has no depth
+# cutoff, so they must stay readable rather than be assembled from variables.
+docs/reports/releases/v1.2/audit.md
+docs/parked/idea.md
+docs/archive/README.md
+docs/archive/spec/one.md
+docs/archive/spec/deep/two.md
+docs/reports/regular/README.md
+docs/reports/stray.md
+

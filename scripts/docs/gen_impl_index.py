@@ -45,7 +45,7 @@ def build() -> dict:
             entry["agent_value"] = 1
         # Tank-only fields: meaningless once a plan is filed, and a stale
         # `shelf_status: ready` in the archive is actively misleading.
-        for key in ("shelf_status", "blocked_on", "queue_order"):
+        for key in plans.TANK_ONLY:
             entry.pop(key, None)
         entries.append(entry)
 

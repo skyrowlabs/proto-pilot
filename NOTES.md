@@ -93,6 +93,159 @@ is only a pointer at it).
 
 ## Open — found in a neighbour, to report not fix
 
+- **proto.pilot's footprint in skyrow-workspace, so the next session does not
+  guess at it.** Reporting the pivot, I flagged `strategy/seams/gpu-platform.md`
+  and `strategy/seams/model-hosting-handoff.md` as possibly leaning on the
+  hosted-tier framing. **Neither mentions proto.pilot at all** — `grep -ci proto`
+  returns 0 for both. The framing was in `strategy/research.md` R1 and in the
+  brief, both since amended by them.
+
+  I reasoned from which docs *ought* to own that framing instead of grepping a
+  sibling checkout that was right there, having already grepped a different
+  sibling twice the same day. The tell is in the wording I used — "worth knowing
+  *if* the seam doc leans on it anywhere" is the sentence you write instead of
+  checking.
+
+  **That list was wrong too, and both of us got it wrong differently.** I
+  scoped my grep to `strategy/`; two files sit above it, and one is
+  `workspace.md` — which *is* the workspace CLAUDE.md, reached through the
+  symlink at `~/skyrow.labs/CLAUDE.md`, carrying seven mentions including the
+  branch rule about this repo. **A `strategy/`-scoped grep is structurally blind
+  to the guide that governs the workspace.** Theirs used `grep -i proto`, which
+  matches `prototype`, so it carried three files that never mention us.
+
+  So I recorded the matcher-blindness lesson in this file and committed the same
+  error inside the hour — not by failing to grep this time, but by *choosing a
+  scope* and then reading the result as the whole answer. The blindness moved
+  from the pattern to the path, and nothing in the output said so.
+
+  The settled list, verified here with `grep -rn -E 'proto\.pilot|proto-pilot|`proto`'`
+  over the whole repo — nine documents, plus two neither of us had:
+
+  | hits | file |
+  | ---- | ---- |
+  | 20 | `strategy/research.md` — **more than the brief**; R1 is the real blast radius |
+  | 16 | `strategy/projects/proto-pilot.md` |
+  | 7 | `workspace.md` (the workspace CLAUDE.md) |
+  | 3 | `strategy/naming.md` |
+  | 2 | `strategy/portfolio.md`, `status.md` |
+  | 1 | `strategy/{sequencing,README,map}.md`, `scripts/refresh-status.py`, `project-diagram.drawio` |
+
+  **Not the seams** — `grep -ci proto` returns 0 for both. Relative paths into a
+  sibling are prose only, never a markdown link, per the trap above.
+
+  Their R1 observation is the one worth carrying, and it is recorded in
+  [sketches-not-scaffolds](docs/ideas/sketches-not-scaffolds.md): tabling the
+  hosted page **detaches** the service ambition rather than killing it, so R1
+  can no longer assume proto.pilot is skyrow.ai's front door.
+
+- **`check_doc_tables.py` was green having looked at 4 documents out of 24, and
+  I had seen the reason and called it harmless.** `_DOC_PATH` was
+  `docs/[A-Za-z0-9_-]+\.md` — no slash in the character class — so every nested
+  row was invisible in **both** directions. It could not satisfy a registration,
+  and a row left pointing at a deleted nested doc could never be reported
+  dangling: the reverse half of that check had never once worked below the top
+  level.
+
+  **I looked straight at that pattern earlier the same day.** I worked out that
+  a row for `docs/ideas/hosted.md` would be neither registered nor dangling, and
+  wrote *fine* — because the only question I was asking was whether moving a doc
+  into a subfolder would strand a row. It would not. I never turned it around
+  and asked what else the pattern could not see. skeletor did, and the eight
+  invisible rows here included `docs/ideas/README.md` — the row I had just
+  added, and described as the thing that keeps that folder from being a hole.
+
+  My first framing was "a fact used to answer one question does not stay used".
+  skeletor's is sharper and is the one to keep:
+
+  > **A negative result from a matcher means either the thing is absent or the
+  > matcher is blind, and nothing in the output distinguishes them.**
+
+  I asked "does this row become dangling?" and got *no*. The other reading of
+  the same *no* is "this row cannot be seen at all", and one query cannot tell
+  them apart. The habit that catches it is asking a matcher what it **did**
+  match, not only whether it matched the thing you feared.
+
+  Same shape, three instances now: `check docs` printing "4 doc(s), all
+  registered" over a tree of 24; `pyright` printing `0 errors` over however many
+  files, including zero (see below); and this. The remedy in all three is for a
+  check to report its **scope** beside its verdict, which `check_doc_tables.py`
+  now does.
+
+- **`pyright` reports its verdict and its scope in the same breath, and we were
+  reading only the verdict.** `pp check lint` takes the exit code, and "0
+  errors, 0 warnings, 0 informations" is what a clean run and an *empty* run
+  both print. Rename a directory named in `pyrightconfig.json`'s `include` and
+  the gate stays green having checked nothing, with no line of output that
+  differs. Found by following skeletor's aside about their template asserting
+  `filesAnalyzed`; ours never had it.
+
+  Not currently broken — 72 files analysed, genuinely clean. Held now by
+  `test_pyright_has_something_to_analyse`, which asserts the *precondition*
+  (every `include` path resolves and holds at least one `.py`) rather than the
+  result, so it stays fast and needs no pyright installed. The realistic way
+  this empties is a directory that moved, which is what that catches.
+
+  Fixed here to skeletor's predicate: a subfolder is routed by its own README
+  **or its own path**, and a routed folder is not descended into, so
+  `docs/implementations/spec/` is out of scope by construction rather than by
+  exception. Two regexes rather than one, because a folder is routed by a row
+  for *itself* — `docs/reports/regular/README.md` must not vouch for
+  `docs/reports/`. Held by `tests/test_doc_routing_predicate.py`.
+
+  The finding it produced: `docs/reports/` had three README-bearing subfolders
+  nothing pointed at. Closed with one `docs/reports/README.md` owning all three
+  rather than three rows, so a fourth report kind needs no table edit.
+
+- **The archive strip in `add_frontmatter.py` is unreachable, in their template
+  and therefore in every tree they have scaffolded.** `_derive(plan,
+  archive=True)` pops `shelf_status` / `blocked_on` / `queue_order` from a filed
+  plan, but line 79 skips any doc that already has frontmatter unless `--force`,
+  and a plan being filed always has some. `regen.py` never passes `--force`, so
+  `pp docs file` cannot strip them. Our first filed plan sat in the archive for
+  two days saying `shelf_status: in-progress` with all six phases ticked.
+
+  **The second layer is the one that matters.** Even reached, the strip would
+  not fix it: `plans.py:104` reads the body header `> **Shelf-Status**:` *before*
+  frontmatter, and no generator anywhere rewrites body headers. So the header
+  outranks the field the strip repairs, and there is no command to fix — which
+  is why the gate here is a test rather than one more careful step in `regen.py`.
+
+  **Why no suite could see it.** `gen_impl_index.py` pops the same three keys
+  when it builds the index, commenting that a stale `shelf_status` in the
+  archive is "actively misleading" — so the problem was already known and the
+  fix went into the **derived** artifact. The index renders clean while the
+  document keeps the lie, and `regen.py --check` can never go red on a field it
+  never renders. `pp check docs` was green on all five gates the whole time.
+  A check made to look away from the thing it was written about.
+
+  Reported 2026-09-03. **skeletor reproduced both layers, fixed both in
+  `d15fd2b`, and corrected my placement** — the useful half of the exchange.
+
+  I said the header needed a test because no generator could fix it. False:
+  `docs file` is a generator, just not the one I was looking at. The backfill
+  runs on every `docs index` and must not rewrite prose; a filing is a one-time
+  deliberate move and may. So the strip belongs at the move, and the test is a
+  ratchet for the hand-`git mv` route rather than the mechanism. Taken as
+  theirs, `plans.strip_tank_headers()` owning it.
+
+  They also found the half I missed while quoting the code around it: the same
+  unreachable branch is the only thing that *adds* `category`, `completed` and
+  `agent_value`, so those were absent from every archived doc this template has
+  ever produced. On screen the whole time.
+
+  And my `test_archive_is_not_empty` guard was wrong — it asserts a property of
+  the corpus inside a test about documents, so it is red in a fresh tree that
+  has done nothing wrong. Dropped; `test_docs_lifecycle.py` now constructs the
+  corpus and reads the filed document back instead.
+
+  **The line worth keeping is theirs: the nearest test to a defect is not a test
+  for it.** `test_docs_lifecycle.py` had been filing a plan since the day it was
+  written, with a fixture carrying the status in both forms, and asserted on
+  index slugs without ever opening the result. Same mistake as the one in
+  `gen_impl_index.py`, at a different distance — checking the artifact you
+  generate instead of the artifact you produced.
+
 - **`skeletor-new --force` records files it did not generate.** Scaffolding
   into this existing tree wrote a `.skeletor.json` whose `files` map hashes
   `prototypes/kitten_chess/**`, `proto_pilot.egg-info/**`, `.pytest_cache/**`
@@ -196,6 +349,25 @@ is only a pointer at it).
   `tmp/upgrade/`.
 
 ## Traps — not bugs, but they will get you
+
+- **A file we wrote will come back as a template *collision*, for the second
+  time.** `docs/reports/README.md` was written here 2026-09-03, sent to skeletor
+  on request, and shipped in their `905d421`. It is **not** in our
+  `.skeletor.json` — 115 entries, and this path is not one — because we created
+  it after the last upgrade. So `bin/skeletor-upgrade` will see a new template
+  file at a path we already occupy, which is a collision rather than an edit.
+
+  Exactly what happened to `tests/test_docs_name_live_code.py` (below): we wrote
+  it, our report caused them to ship one at that path, and the first thing it
+  collided with was the repo the idea came from. Theirs won that one on merit.
+  **Expect the same shape and judge it the same way** — on which text is better,
+  not on which came first.
+
+  What this is *not*, and the correction is skeletor's: it is not that "two
+  copies exist and neither generates the other." That is true of all 115
+  scaffolded files here and is what a template *is* — noting it for this one
+  would imply the other 114 are safe. The only unusual thing is the direction of
+  travel, and that is provenance, not a trap.
 
 - **A relative link to a sibling repo resolves on your machine and nowhere
   else.** Every skyrow.labs repo is a sibling checkout under one root, so

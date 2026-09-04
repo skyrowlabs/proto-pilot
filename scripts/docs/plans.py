@@ -39,6 +39,14 @@ from scripts.paths import PROJECT_ROOT  # noqa: E402
 #: Files in the plan trees that are not plans.
 NOT_A_PLAN = {"README.md", "_TEMPLATE.md"}
 
+#: Holding-tank vocabulary. Meaningless once a plan is filed: the archive holds
+#: only completed plans, so a filed doc still carrying one of these states two
+#: contradictory things at once. Owned here because three files strip the same
+#: set — `add_frontmatter.py`, `gen_impl_index.py` and the gate in
+#: `tests/test_archive_drops_tank_fields.py` — and a set spelled out in three
+#: places is a set that grows to four in only two of them.
+TANK_ONLY = ("shelf_status", "blocked_on", "queue_order")
+
 SHELF_STATUSES = [
     "ready",
     "in-progress",
@@ -67,6 +75,12 @@ GATED = {"blocked", "shelved", "deferred"}
 PRIORITIES = ["critical", "high", "medium", "low"]
 
 _HEADER = re.compile(r"^>\s*\*\*(?P<key>[A-Za-z-]+)\*\*:\s*(?P<value>.+?)\s*$", re.MULTILINE)
+#: The tank-only keys as `> **Header**:` lines, derived from `TANK_ONLY`
+#: rather than respelled — the two must never disagree.
+_TANK_HEADER = re.compile(
+    r"^>\s*\*\*(?:" + "|".join(k.replace("_", "-") for k in TANK_ONLY) + r")\*\*:.*$\n?",
+    re.IGNORECASE | re.MULTILINE,
+)
 _TASK = re.compile(r"^\s*-\s*\[(?P<mark>[ xX])\]\s*(?P<text>.+?)\s*$", re.MULTILINE)
 _H1 = re.compile(r"^#\s+(?P<title>.+?)\s*$", re.MULTILINE)
 
@@ -74,6 +88,28 @@ _H1 = re.compile(r"^#\s+(?P<title>.+?)\s*$", re.MULTILINE)
 #: `(~operator)` is work only a human can do; `(~deferred)` is a deliberate
 #: non-goal. Both are the author saying "this will never be ticked here".
 EXEMPT_TASK_MARKERS = ("(~operator)", "(~deferred)")
+
+
+def strip_tank_headers(body: str) -> str:
+    """Remove the `> **Shelf-Status**:` / `> **Blocked-On**:` / `> **Queue-Order**:`
+    lines from a plan body.
+
+    Belongs to **filing**, not to the frontmatter backfill. The backfill runs on
+    every `pp docs index` and must never rewrite prose; a filing is the one
+    deliberate moment that knows the plan has left the tank, so it is the only
+    place allowed to. (Reported by skeletor, whose template carries the same
+    defect and whose fix this is.)
+
+    Stripping the frontmatter alone would not be enough: `Plan.shelf_status`
+    reads the header **first**, so a filed doc with the header intact still
+    reports itself unfinished however clean its frontmatter is.
+
+    `> **Status**:` is deliberately left alone. It is a sentence a human wrote
+    rather than one of the taxonomies, and "Shipped 2026-04-01" is a good thing
+    for an archived plan to say.
+    """
+    return _TANK_HEADER.sub("", body)
+
 
 _STATUS_HINTS = [
     ("ready", ("ready for agent", "🚀")),

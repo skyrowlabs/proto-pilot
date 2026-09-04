@@ -17,6 +17,43 @@ for configuration, and a doc there is a doc no index knows about.
 | Ideas, and what came of looking        | `docs/ideas/`              |
 | Business planning                      | `docs/business-planning/`  |
 
+### A subfolder is registered by its README, not doc by doc
+
+`check_doc_tables.py` globs `docs/*.md` and **does not descend**, and so does
+skeletor's `register_shipped_docs` at scaffold time. So a doc one level down is
+outside every registration check — neither enrolled nor reported missing.
+
+The rule that covers it is the one `TODO/` and `implementations/` already
+follow, generalised rather than repeated per folder:
+
+> **A `docs/<subfolder>/` carries a `README.md` that indexes it, and that README
+> is the folder's single row in both routing tables.** Adding a doc means adding
+> a line to that README — not a row in two tables.
+
+Registering each doc individually would be the alternative, and it is worse: the
+routing tables are how an agent decides what to *read*, and a table listing every
+parked idea advertises work nobody is doing.
+
+A row in the table above can name a folder this repo does not yet ship
+(`business-planning/`, and until recently `ideas/`). The first doc dropped into
+one of those used to land outside every check, silently — the "doc
+no index knows about" failure arriving through the door this rule recommends.
+
+**`pp check docs` now enforces it** (`scripts/check_doc_tables.py`), and the
+audit that prompted it found the gate green having looked at 4 documents out of
+24: `docs/reports/` had three README-bearing subfolders nothing pointed at, and
+`docs/rules/` sat seven files deep, reachable only because DOCS_INDEX names the
+directory in prose. Two properties of the predicate are worth knowing:
+
+- **A routed folder is not descended into**, so `docs/implementations/spec/` is
+  out of scope by construction rather than by exception. No depth cutoff — that
+  would get this right by accident and be wrong for `docs/reports/releases/v1.2/`.
+- **A folder is routed by a row for itself, never by a row for something inside
+  it.** `docs/reports/regular/README.md` must not vouch for `docs/reports/`.
+
+Both are held by `tests/test_doc_routing_predicate.py`, because neither is
+visible in the pass/fail of a tree that happens to be correct today.
+
 ## TODO vs Implementations — Two Halves of One Lifecycle
 
 - **`docs/TODO/`** is the **holding tank**: every plan that is _not finished_ — shelved, in

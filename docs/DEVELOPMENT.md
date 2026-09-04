@@ -3,12 +3,21 @@
 ## First-Time Setup
 
 ```bash
-./pp setup          # .env from .env.example, git hooks, merge drivers
-./pp check health   # is everything answering?
+cp .env.example .env                            # then fill it in
+.venv/bin/pre-commit install --install-hooks    # commit-msg format + lint gates
+python scripts/git/install_merge_drivers.py     # the regen-docs driver
+./pp check health                               # is everything answering?
 ```
 
-`pp setup` installs two things that are easy to miss because they live outside
-version control:
+**There is no `pp setup`, deliberately** — see `AGENTS.md`, which explains that
+it could not exist: the CLI cannot run until the install it would be performing
+has already put `click` in the venv, so a quick start that opens with it fails
+on line one and reads as user error. This file named it anyway until 2026-09-03,
+in its own first code block, which is the worst place in the repo to name a
+command that is not there.
+
+The last three lines install two things that are easy to miss because they live
+outside version control:
 
 - **Git hooks** (`pre-commit install --install-hooks`) — the commit-msg format
   check and the lint gates.

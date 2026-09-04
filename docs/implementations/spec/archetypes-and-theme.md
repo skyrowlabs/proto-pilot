@@ -1,19 +1,19 @@
 ---
-title: "Archetypes and Theme"
+title: Archetypes and Theme
 slug: archetypes-and-theme
-shelf_status: in-progress
 priority: high
+category: spec
+agent_value: 1
+completed: 2026-09-01
 updated: 2026-09-01
 tags: [spec, passes, intake, ux]
-summary: "Give the spec a shape axis and a look axis, so a chess app and a gear tracker stop being the same CRUD app with a different adjective."
+summary: Give the spec a shape axis and a look axis, so a chess app and a gear tracker stop being the same CRUD app with a different adjective.
 ---
 
 # Archetypes and Theme
 
-> **Status**: 🟢 In progress — Phase 1 landed 2026-09-01
-> **Shelf-Status**: in-progress
+> **Status**: ✅ Complete — all six phases landed 2026-09-01
 > **Priority**: High — it is the difference between output that is correct and output that is recognisable, and every later idea about guided intake depends on it existing
-> **Queue-Order**: 10
 
 ## Problem
 

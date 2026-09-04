@@ -118,6 +118,16 @@ def file(slug: str, category: str, dry_run: bool, force: bool) -> None:
         shutil.move(str(source), str(target))
         run(["git", "add", str(target)])
 
+    # The move is the one deliberate moment that knows the plan has left the
+    # tank, so it is where the tank-only headers go. The frontmatter backfill
+    # cannot do it: it runs on every `pp docs index` and must not rewrite prose.
+    # And it is not optional — `Plan.shelf_status` reads the header *before*
+    # frontmatter, so a filed doc keeping it reports itself unfinished no matter
+    # how clean its frontmatter is.
+    stripped = plans.strip_tank_headers(target.read_text(encoding="utf-8"))
+    if stripped != target.read_text(encoding="utf-8"):
+        target.write_text(stripped, encoding="utf-8")
+
     script("scripts/docs/regen.py")
     ok(f"filed {slug} → docs/implementations/{category}/")
     detail()
