@@ -31,38 +31,26 @@ from protopilot.runner import SubprocessRunner
 from protopilot.spec import Theme
 
 
-def run_generation(
-    job,
-    workspace: Path,
-    target: str | None = None,
-    backend: str | None = None,
-    demo: bool = True,
-    attempts: int = 3,
-    verifier_factory=None,
-) -> None:
-    """One generation, start to finish.
+def assemble(job, backend: str | None = None, target: str | None = None):
+    """Intake, and nothing else. Returns the spec; **writes no files.**
 
-    `target` is a parameter and not a constant, which is the one real
-    difference from the version this replaced. The web front end pins `web`
-    because what it hands back is a link you click and a terminal app has no
-    link; the console has no such constraint and passes the user's choice. A
-    caller that says nothing gets `targets.DEFAULT`, the same answer
-    `proto new` gives.
+    The first half of a generation, split out so a front end can put a review
+    checkpoint between the two. `proto new` has always had one — a `[Y/n]` after
+    the spec summary — and the console needs the same decision at the same
+    point, which is only possible if the point exists in the runner.
 
-    Both channels are wired: `log` for the sentence a person reads, `emit` for
-    the fields a view folds into a progress region. A front end is free to use
-    either or both.
+    Nothing here touches the disk, so declining after this costs nothing
+    further. Not *nothing*: intake is one model call and it has already been
+    made by the time there is a spec to show. What the checkpoint saves is the
+    five generation passes and the verify loop, which is the expensive part and
+    the whole reason the checkpoint is before them rather than after.
     """
     from protopilot.cli import free_port
 
     llm = build_llm(backend=backend)
-    log = job.log
-
-    # Resolved once, and before intake: intake is the one pass with no spec to
-    # read the shape off, so it is told through the context.
     chosen = job.archetype or archetypes.DEFAULT
 
-    log("intake...")
+    job.log("intake...")
     spec = builder.spec_from_idea(
         job.idea,
         llm,
@@ -73,12 +61,31 @@ def run_generation(
         theme=Theme(**job.theme) if job.theme else None,
         answers=dict(job.answers),
     )
+    job.log(spec.summary())
+    job.event("spec", name=spec.name, slug=spec.slug, target=spec.target, archetype=chosen)
+    return spec
+
+
+def build(
+    job,
+    workspace: Path,
+    spec,
+    backend: str | None = None,
+    demo: bool = True,
+    attempts: int = 3,
+    verifier_factory=None,
+) -> None:
+    """Everything after the spec is settled: skeleton, passes, verify, record.
+
+    Takes the spec rather than an idea, so this half is identical whether a
+    human approved it at a checkpoint or nobody was asked.
+    """
+    llm = build_llm(backend=backend)
+    log = job.log
 
     tree = Path(workspace) / spec.slug
     if tree.exists():
         shutil.rmtree(tree)
-    log(spec.summary())
-    job.event("spec", name=spec.name, slug=spec.slug, target=spec.target, archetype=chosen)
 
     render_skeleton(spec, tree)
     spec.save(tree)
@@ -108,4 +115,41 @@ def run_generation(
         attempts=outcome.attempts,
         project_dir=str(tree),
         run_hint=targets.for_spec(spec).RUN_HINT,
+    )
+
+
+def run_generation(
+    job,
+    workspace: Path,
+    target: str | None = None,
+    backend: str | None = None,
+    demo: bool = True,
+    attempts: int = 3,
+    verifier_factory=None,
+) -> None:
+    """Both halves, with nobody asked in between.
+
+    What a front end calls when it has no review checkpoint of its own. The web
+    front end does exactly this; the console calls `assemble` and `build`
+    separately so it can put a screen between them.
+
+    `target` is a parameter and not a constant, which is the one real
+    difference from the version this replaced. The web front end pins `web`
+    because what it hands back is a link you click and a terminal app has no
+    link; the console has no such constraint and passes the user's choice. A
+    caller that says nothing gets `targets.DEFAULT`, the same answer
+    `proto new` gives.
+
+    Both channels are wired throughout: `log` for the sentence a person reads,
+    `emit` for the fields a view folds into a progress region.
+    """
+    spec = assemble(job, backend=backend, target=target)
+    build(
+        job,
+        workspace,
+        spec,
+        backend=backend,
+        demo=demo,
+        attempts=attempts,
+        verifier_factory=verifier_factory,
     )

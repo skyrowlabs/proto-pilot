@@ -16,13 +16,13 @@ checking whether a capability already exists (parked) before rebuilding it.
 
 ---
 
-## 🟡 In Progress
+## 🔎 Awaiting Your Review
 
-_Actively being worked; partially shipped._
+_Implemented and out for review — read the PR, then file the plan (or send it back)._
 
-| Plan | Priority | Updated | Summary |
-| ---- | -------- | ------- | ------- |
-| [The proto Console](proto-console.md) | medium | 2026-09-04 | A terminal front end for the tool itself — type the idea in one pane, watch generation in another — built as a second view over the job seam `proto serve` already paid for. |
+| Plan | Review PR | Updated | Summary |
+| ---- | --------- | ------- | ------- |
+| [The proto Console](proto-console.md) | — | 2026-09-04 | A terminal front end for the tool itself — type the idea in one pane, watch generation in another — built as a second view over the job seam `proto serve` already paid for. |
 
 ## 🔴 Planned
 

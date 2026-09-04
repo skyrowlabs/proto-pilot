@@ -1,7 +1,7 @@
 ---
 title: "The proto Console"
 slug: proto-console
-shelf_status: in-progress
+shelf_status: in-review
 priority: medium
 updated: 2026-09-04
 tags: [console, jobs, front-end, textual, ux]
@@ -10,8 +10,8 @@ summary: "A terminal front end for the tool itself — type the idea in one pane
 
 # The proto Console
 
-> **Status**: 🟡 In progress — Phases 1-3 and 6 done; Phase 4 open, Phase 5 half
-> **Shelf-Status**: in-progress
+> **Status**: 🟢 All six phases done — ready for review
+> **Shelf-Status**: in-review
 > **Priority**: Medium — the default target has no front end but raw stdout,
 > which is a gap the pivot opened rather than a pre-existing one
 > **Queue-Order**: unset until it is `ready`
@@ -239,37 +239,94 @@ refusal exists to prevent, wearing its own clothes. It writes on transitions now
 
 Found by the test for the refusal, not by the test for the status line.
 
-## Phase 4 — The review checkpoint becomes a screen
+## Phase 4 — The review checkpoint becomes a screen ✅
 
-Not started. The `[Y/n]` spec review is still stdin-only, so the console
-currently generates without one — which is the CLI's `--yes` behaviour, not a
-regression, but it is the interaction the plan most wanted moved.
+- [x] The spec review is a screen you can read properly — the spec's **own**
+      `summary()`, the same string `proto new` prints, so the two front ends
+      cannot drift into describing one spec differently
+- [x] Declining costs nothing further: asserted on the **workspace**, which is
+      the only place a generation can leave a trace, rather than on a flag the
+      console sets about itself
+- [x] The CLI prompt is untouched. Two front ends, one seam, no shared view code
 
-- [ ] The spec review — entities, screens, target, archetype, then approve — is a
-      `[Y/n]` on stdin today. In the console it is a screen you can read properly
-- [ ] Declining costs nothing and must keep costing nothing: the checkpoint sits
-      before generation for exactly that reason
-- [ ] The CLI prompt stays as it is. Two front ends, one seam, no shared view code
+### The split this needed
 
-## Phase 5 — The concurrency defect, before concurrency is offered
+`run_generation` did intake → skeleton → passes → verify in one call, with no
+seam to put a question in. It is now `assemble` (intake, **writes nothing**) and
+`build` (everything after the spec is settled), with `run_generation` calling
+both for a front end that has no checkpoint — which the web front end does not.
 
-**The honest half is done; the fix is not.**
+That split is what makes "declining costs nothing" true rather than asserted.
+And it makes the cost honest in the other direction too: intake has already run
+by the time there is a spec to show, so declining is not free. **One model call
+is spent.** What the checkpoint saves is the five passes and the verify loop,
+which is the whole of the wall clock and nearly all of the tokens — which is why
+it sits here and not one step earlier, where there would be nothing to review.
 
-- [x] `JobStore.run` wraps work in `redirect_stdout`, and `sys.stdout` is
-      process-global. Two jobs on two threads clobber each other's capture
-- [x] **The console runs one job at a time and says so**, naming what it is
-      busy with. Held by a test, and by the keybinding rather than a second
-      click — see the note below
-- [ ] The fix is per-job capture rather than a global redirect. It is a
-      `jobs.py` change and it improves `proto serve` for free
+`busy` is asked of a **phase**, not of `job.status`. The job is `done` while the
+review is open — intake finished, nothing after it has started — so a status
+reading would call the console idle and start a second generation underneath the
+modal. Held by its own test.
 
-Phase 1 measured the buffer at **0 bytes** on a real run, so today the clobbering
-has nothing to clobber — which lowers the severity and does not remove the
-defect: the first pass that prints instead of logging reinstates it silently.
+### Two real bugs, one of them only visible on a small terminal
 
-A hazard checked and cleared while here: `redirect_stdout` cannot steal the
-console's own painting, because Textual's `LinuxDriver` writes to
-`sys.__stderr__` — the wrong stream *and* the pristine handle.
+**The buttons were inside the scroll region.** A spec summary is as long as the
+spec: five entities with eight fields is a screen and a half, and the answer to
+a blocking question was then below the fold. They are outside it now, so the
+summary scrolls and the answer does not move.
+
+That one surfaced as a test failing about one run in three, always on an
+assertion about something else — "the console is still busy", ten seconds after
+a click that had quietly missed. The cause was one layer further down again:
+**a widget is mounted before the screen's first layout pass**, so between those
+two moments it exists with a zero-width region and `pilot.click` resolves to
+coordinates that hit nothing. The wait is on the button *having a size* now, and
+`approve()` asserts the screen actually closed — so a missed click fails at the
+click rather than somewhere unrelated later.
+
+Also measured while there: `app.query("#approve")` returns 0 while
+`app.screen.query("#approve")` returns 1 on the same frame. The app-level query
+searches the default screen, not the pushed modal, while `pilot.click` resolves
+against the top of the stack — so the obvious predicate waits forever for a
+button that is on screen and clickable.
+
+## Phase 5 — The concurrency defect ✅
+
+- [x] `JobStore.run` wrapped work in `redirect_stdout`, and `sys.stdout` is
+      process-global. Two jobs on two threads clobbered each other's capture
+- [x] The console refuses a second run by name
+- [x] **Fixed: capture is per-thread.** `sys.stdout` is replaced once by a
+      router that dispatches on the calling thread's id; a job registers a
+      writer for its own thread and every other thread reaches the real stdout
+      untouched. `proto serve` gets this for free
+
+Installed once and **left in place** rather than swapped around each job.
+Restoring on the last unregister looks tidier and races — a second job
+registering while the first restores loses its routing, which is the class of
+bug being replaced. With no writer registered every call delegates to the
+original object, and everything that is not `write`/`flush` is proxied through,
+so a library asking `isatty()` or `fileno()` still gets the truth about the
+process.
+
+**The buffer is gone entirely**, which fixes a second defect rather than the
+same one twice. Output used to accumulate in a `StringIO` and land in the
+`finally`, so anything reaching the log via `print` rather than `job.log`
+arrived *when the job ended* — one block, twenty-one minutes late. Phase 1
+measured that buffer at 0 bytes, so it was latent: the first pass that printed
+instead of logging would have reinstated it silently. A `_JobWriter` now turns
+writes into `job.log` calls a line at a time, live.
+
+Both defects are held by tests that were confirmed to see them: planting a
+single process-wide writer fails the concurrency test, and planting a
+hold-until-flush writer fails the liveness test. The concurrent test uses a
+`Barrier` and 50 interleaved lines each, because with one print apiece a run
+where the two happened not to overlap would pass and prove nothing.
+
+**The console still runs one job at a time, and the reason changed.** It began
+as a guard around this defect; what remains is a view constraint — these panes
+answer "what is happening" once, and a second run would have nowhere to go.
+Worth stating because a guard whose reason has expired is how a stale comment
+starts.
 
 ## Phase 6 — Tested with no key and no daemon ✅
 
@@ -299,7 +356,7 @@ disagreeing index, where the two strategies give different answers.
 
 ## Acceptance
 
-- [x] `./pp check pre-push` green — 585 tests
+- [x] `./pp check pre-push` green — 594 tests
 - [x] Phase 1's numbers exist and are recorded, whichever way they fell
 - [x] `proto console`, offline, generates a prototype end to end with no key, no
       daemon and no browser
@@ -310,9 +367,9 @@ disagreeing index, where the two strategies give different answers.
 - [x] `proto new` and `proto serve` are unchanged and green
 - [x] A second concurrent generation is refused by name, not interleaved
 
-Phases 4 and the second half of 5 are open and are named as open above. What
-ships is a console that generates, streams, lists and refuses — without the spec
-review screen, and with the concurrency defect guarded rather than fixed.
+All six phases are done. What ships is a console that generates, streams,
+lists, reviews and refuses — and a `jobs.py` whose capture is per-job, which
+`proto serve` gets for free.
 
 ## Dropped, and why
 

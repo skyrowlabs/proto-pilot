@@ -12,10 +12,9 @@ the thing it schedules.
 
 from __future__ import annotations
 
-import io
+import sys
 import threading
 import uuid
-from contextlib import redirect_stdout
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Callable
@@ -87,6 +86,106 @@ class Job:
         }
 
 
+class _JobWriter:
+    """A file-like that turns writes into `job.log` calls, a line at a time.
+
+    Not a buffer. The version this replaced collected everything a job printed
+    into a `StringIO` and appended it in `JobStore.run`'s `finally`, which means
+    anything reaching the log via `print` rather than `job.log` arrived **when
+    the job ended** -- twenty-one minutes late on a real generation, and in one
+    block. Measured at 0 bytes today because the pipeline logs rather than
+    prints, so the defect was latent: the first pass that printed would have
+    reinstated it silently, and a pane that is dark for twenty minutes and then
+    fills is worse than the CLI it replaces.
+
+    Partial writes are held until a newline, because `print` issues the text and
+    the terminator as two separate calls and a line-per-write writer would
+    double every line.
+    """
+
+    def __init__(self, job: "Job") -> None:
+        self._job = job
+        self._partial = ""
+
+    def write(self, text: str) -> int:
+        self._partial += text
+        while "\n" in self._partial:
+            line, self._partial = self._partial.split("\n", 1)
+            self._job.log(line)
+        return len(text)
+
+    def flush(self) -> None:
+        """Whatever a job printed without a trailing newline still belongs in
+        the transcript; a silent loss is the worst outcome."""
+        if self._partial:
+            self._job.log(self._partial)
+            self._partial = ""
+
+
+class _RoutedStdout:
+    """`sys.stdout`, dispatched by calling thread.
+
+    `contextlib.redirect_stdout` rebinds `sys.stdout` for the whole **process**,
+    so two generations on two threads captured each other's output and braided
+    two transcripts together with nothing marking the seam. `proto serve` got
+    away with it only because nobody had run two at once.
+
+    This is the same idea done per thread: a job registers a writer for its own
+    thread, and every other thread -- the main one, another job's -- goes on
+    reaching the real stdout untouched.
+
+    Installed once and left in place rather than swapped in and out around each
+    job. Restoring on the last unregister looks tidier and races: a second job
+    registering while the first restores loses its routing, which is the exact
+    class of bug this replaces. With no writer registered every call delegates
+    to the original object, so leaving it installed is not observable.
+    """
+
+    def __init__(self, base) -> None:
+        self._base = base
+        self._writers: dict[int, _JobWriter] = {}
+        self._lock = threading.Lock()
+
+    def register(self, writer: _JobWriter) -> None:
+        with self._lock:
+            self._writers[threading.get_ident()] = writer
+
+    def unregister(self) -> None:
+        with self._lock:
+            writer = self._writers.pop(threading.get_ident(), None)
+        if writer is not None:
+            writer.flush()
+
+    def _target(self):
+        return self._writers.get(threading.get_ident(), self._base)
+
+    def write(self, text: str) -> int:
+        return self._target().write(text)
+
+    def flush(self) -> None:
+        self._target().flush()
+
+    def __getattr__(self, name: str):
+        """Everything else is the real stdout's business.
+
+        `isatty`, `encoding`, `fileno` and the rest have to keep answering
+        truthfully: a library asking whether stdout is a terminal, or asking for
+        its file descriptor, is asking about the process and not about this
+        job's transcript.
+        """
+        return getattr(self._base, name)
+
+
+def _routed_stdout() -> _RoutedStdout:
+    """Install the router once, and hand back the installed one."""
+    current = sys.stdout
+    if isinstance(current, _RoutedStdout):
+        return current
+    router = _RoutedStdout(current)
+    sys.stdout = router
+    return router
+
+
 class JobStore:
     def __init__(self) -> None:
         self._jobs: dict[str, Job] = {}
@@ -109,23 +208,23 @@ class JobStore:
     def run(self, job: Job, work: Callable[[Job], None]) -> None:
         """Run `work` on a thread, capturing its stdout into the job's log."""
 
+        router = _routed_stdout()
+
         def target() -> None:
             job.status = "running"
             job.started_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
-            buffer = io.StringIO()
+            # Registered from inside the thread, because the routing key is the
+            # thread's own id. Doing it in `run` would tag the caller's thread
+            # and send this job's output wherever the caller happened to be.
+            router.register(_JobWriter(job))
             try:
-                with redirect_stdout(buffer):
-                    work(job)
+                work(job)
                 job.status = "done"
             except BaseException as exc:  # noqa: BLE001 - surfaced, not swallowed
                 job.status = "failed"
                 job.error = f"{type(exc).__name__}: {exc}"
             finally:
-                # Anything the work printed rather than logged still belongs
-                # in the transcript; a silent failure is the worst outcome.
-                captured = buffer.getvalue().strip()
-                if captured:
-                    job.log(captured)
+                router.unregister()
                 job.finished_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
         threading.Thread(target=target, daemon=True).start()

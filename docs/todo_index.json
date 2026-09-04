@@ -6,7 +6,7 @@
     "blocked": [
       "drawing-freedom"
     ],
-    "in-progress": [
+    "in-review": [
       "proto-console"
     ],
     "planned": [
@@ -59,7 +59,7 @@
       "slug": "proto-console",
       "title": "The proto Console",
       "path": "docs/TODO/proto-console.md",
-      "shelf_status": "in-progress",
+      "shelf_status": "in-review",
       "priority": "medium",
       "queue_order": null,
       "blocked_on": null,
@@ -72,7 +72,7 @@
         "ux"
       ],
       "summary": "A terminal front end for the tool itself — type the idea in one pane, watch generation in another — built as a second view over the job seam `proto serve` already paid for.",
-      "open_tasks": 4,
+      "open_tasks": 0,
       "auto_generated": false
     }
   ]

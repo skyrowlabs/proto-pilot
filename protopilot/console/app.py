@@ -28,6 +28,7 @@ from textual.widgets import Button, Footer, Header, Input, Label, RichLog, Selec
 
 from protopilot import archetypes, generation, targets
 from protopilot.console.progress import fold, lines
+from protopilot.console.review import ReviewScreen
 from protopilot.jobs import STORE, JobStore
 
 #: How often the panes re-read the job. A generation is a minutes-long
@@ -51,6 +52,7 @@ class ConsoleApp(App):
         demo: bool = True,
         store: JobStore | None = None,
         runner=None,
+        review: bool = True,
     ) -> None:
         super().__init__()
         self.workspace = Path(workspace)
@@ -60,8 +62,18 @@ class ConsoleApp(App):
         # so a second console in one process does not share a store by
         # accident. Defaults to the process-wide one the web front end uses.
         self.store = store if store is not None else STORE
-        self._run = runner or generation.run_generation
+        # The two halves separately, so the review screen can sit between them.
+        # `runner` overrides the whole-run path and is what the suite injects;
+        # when it is given the checkpoint is skipped, because a fake runner has
+        # no spec to review.
+        self._run = runner
+        self._assemble = generation.assemble
+        self._build = generation.build
+        self.review = review and runner is None
         self.job = None
+        self.spec = None
+        #: idle | assembling | reviewing | building
+        self.phase = "idle"
         self._shown = 0
         self._last_status = ""
 
@@ -108,12 +120,18 @@ class ConsoleApp(App):
     def action_start(self) -> None:
         """Start a generation, or say why not.
 
-        **One at a time, and refused by name.** `JobStore.run` wraps its work in
-        `redirect_stdout`, and `sys.stdout` is process-global -- two jobs on two
-        threads clobber each other's capture. Until that is per-job (Phase 5 of
-        the plan) a second generation would interleave two transcripts into one
-        pane with nothing marking the seam. A queue is honest; a silent
-        interleave is not, and this is the cheap half of that fix.
+        **One at a time, and refused by name.** The reason changed and the
+        behaviour did not, which is worth saying plainly: this began as a guard
+        around `JobStore.run`'s process-global `redirect_stdout`, where two
+        jobs genuinely braided each other's output. That is fixed -- capture is
+        per-thread now -- so what remains is a *view* constraint rather than a
+        correctness one. These panes show one run: one log, one progress
+        region, one answer to "what is happening". A second concurrent
+        generation would need somewhere to put it, and that is a different
+        feature from being allowed to have one.
+
+        Refused **by name**, either way. A button that silently does nothing is
+        indistinguishable from one that is broken.
         """
         if self.busy:
             self.set_status(f"still generating {self.job.idea!r} — one at a time for now")
@@ -135,14 +153,78 @@ class ConsoleApp(App):
         job = self.store.create(idea, self.query_one("#direction", Input).value.strip())
         job.archetype = archetype
         self.job = job
+        self.spec = None
+        self.target = target
         self._shown = 0
         self._last_status = job.status
         self.query_one("#log", RichLog).clear()
+
+        if self._run is not None:
+            # An injected whole-run path: no spec to review, so no checkpoint.
+            self.phase = "building"
+            self.set_status(f"generating in {self.workspace}")
+            self.store.run(
+                job,
+                lambda j: self._run(j, self.workspace, target=target, backend=self.backend, demo=self.demo),
+            )
+            return
+
+        if not self.review:
+            self.phase = "building"
+            self.set_status(f"generating in {self.workspace}")
+            self.store.run(job, lambda j: self._whole_run(j, target))
+            return
+
+        self.phase = "assembling"
+        self.set_status("reading the idea...")
+        self.store.run(job, lambda j: self._assemble_into(j, target))
+
+    def _assemble_into(self, job, target: str) -> None:
+        """Intake, on the job's thread. The spec is kept for the review screen."""
+        self.spec = self._assemble(job, backend=self.backend, target=target)
+
+    def _whole_run(self, job, target: str) -> None:
+        """Both halves with nobody asked, for `--no-review`."""
+        spec = self._assemble(job, backend=self.backend, target=target)
+        self._build(job, self.workspace, spec, backend=self.backend, demo=self.demo)
+
+    # -- the checkpoint ---------------------------------------------------
+
+    def open_review(self) -> None:
+        """Show the spec and wait for an answer.
+
+        Pushed from the timer rather than from the worker thread: a Textual
+        screen must be mounted on the app's own event loop, and a thread that
+        pushed one directly would be mutating the widget tree from outside it.
+        The timer already runs there and already watches for the phase change.
+        """
+        spec = self.spec
+        if spec is None:  # intake produced nothing to review
+            self.phase = "idle"
+            self.set_status("nothing to review")
+            return
+        self.phase = "reviewing"
+        destination = str(Path(self.workspace) / spec.slug)
+        self.push_screen(ReviewScreen(spec.summary(), destination), self.answer_review)
+
+    def answer_review(self, approved: bool | None) -> None:
+        """What the checkpoint is for, in both directions."""
+        job = self.job
+        if job is None or self.spec is None:
+            self.phase = "idle"
+            return
+        if not approved:
+            # Nothing has been written, so there is nothing to undo. The
+            # transcript stays: what intake produced is worth reading even when
+            # the answer is no, and it is what a person changes their idea from.
+            self.phase = "idle"
+            self.set_status("declined — nothing was generated")
+            return
+        self.phase = "building"
+        self._last_status = "pending"
         self.set_status(f"generating in {self.workspace}")
-        self.store.run(
-            job,
-            lambda j: self._run(j, self.workspace, target=target, backend=self.backend, demo=self.demo),
-        )
+        spec = self.spec
+        self.store.run(job, lambda j: self._build(j, self.workspace, spec, backend=self.backend, demo=self.demo))
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "start":
@@ -154,7 +236,14 @@ class ConsoleApp(App):
 
     @property
     def busy(self) -> bool:
-        return self.job is not None and self.job.status in ("pending", "running")
+        """Anything in flight, **including a review waiting to be answered.**
+
+        Asked of the phase rather than of `job.status`, because the job is
+        `done` while the review screen is open — intake finished, and nothing
+        after it has started. A `job.status` reading would call that idle and
+        let a second generation start underneath the modal.
+        """
+        return self.phase != "idle"
 
     # -- drawing ----------------------------------------------------------
 
@@ -215,11 +304,23 @@ class ConsoleApp(App):
         if job.status == self._last_status:
             return
         self._last_status = job.status
+        if job.status not in ("done", "failed"):
+            return
+
         if job.status == "failed":
-            # The floor, in the pane and not only on disk.
+            # The floor, in the pane and not only on disk. Whichever half
+            # raised -- a failed intake is as final as a failed pass, and the
+            # phase has to leave "assembling" either way or the console is
+            # busy forever.
+            self.phase = "idle"
             self.set_status(f"failed: {job.error}")
-        elif job.status == "done":
+        elif self.phase == "assembling":
+            # Intake finished. This is the checkpoint, and it is opened from
+            # here because a screen must be mounted on the app's event loop.
+            self.open_review()
+        else:
             self.set_status(f"finished — {job.project_dir}" if job.project_dir else "finished")
+            self.phase = "idle"
 
 
 def run(workspace: Path, backend: str | None = None, demo: bool = True) -> None:

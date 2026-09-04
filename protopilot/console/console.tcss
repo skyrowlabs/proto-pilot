@@ -44,3 +44,51 @@
 #log {
     height: 1fr;
 }
+
+
+/* The review checkpoint. Bounded rather than natural-height: the modal holds a
+   spec summary, which is as long as the spec, and an unbounded one pushes the
+   buttons past the bottom of a short terminal. The question is blocking, so a
+   button you have to scroll to find is a question you cannot answer. */
+
+ReviewScreen {
+    align: center middle;
+    background: $background 60%;
+}
+
+#review {
+    width: 72;
+    max-width: 90%;
+    height: auto;
+    max-height: 80%;
+    padding: 1 2;
+    border: thick $primary;
+    background: $surface;
+}
+
+#review-title {
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+#review-body {
+    height: auto;
+    max-height: 20;
+}
+
+#review-dest {
+    margin-top: 1;
+    color: $text-muted;
+}
+
+/* Fixed height and docked to the bottom of the dialog, so the answer sits in
+   the same place whatever the spec's length. */
+#review-buttons {
+    height: 3;
+    margin-top: 1;
+    align: right middle;
+}
+
+#review-buttons Button {
+    margin-left: 2;
+}

@@ -63,6 +63,58 @@ async def until(pilot, predicate, *, ticks: int = 600) -> bool:
     return False
 
 
+async def approve(pilot, *, yes: bool = True) -> None:
+    """Answer the spec review, which every real generation now goes through.
+
+    Waits for the screen rather than assuming it is up: intake is a model call,
+    so how long it takes before there is anything to approve is not the caller's
+    business.
+    """
+    app = pilot.app
+    await wait_for_review(pilot)
+    await pilot.click("#approve" if yes else "#decline")
+    # Assert the screen actually closed. A click that misses -- and one did,
+    # intermittently, before `wait_for_review` waited for layout -- otherwise
+    # surfaces ten seconds later as "the console is still busy", which points
+    # at the phase machine rather than at the click.
+    assert await until(
+        pilot, lambda: not app.screen.query("#approve"), ticks=100
+    ), "the review is still open: the click did not land on a button"
+
+
+async def wait_for_review(pilot) -> None:
+    """Wait for the review screen to be **mounted**, not merely requested.
+
+    `phase` flips to `reviewing` immediately before `push_screen`, so a wait on
+    the phase returns while the screen is still being mounted and the click
+    lands on a screen with no buttons in it yet. The observable thing is the
+    button, so that is what is waited for.
+
+    `app.screen.query`, **not** `app.query`: the review is a `ModalScreen`
+    pushed onto the stack, and the app-level query searches the default screen
+    and finds nothing there. Measured — `app.query("#approve")` returns 0 while
+    `app.screen.query("#approve")` returns 1 on the same frame. `pilot.click`
+    resolves against the top screen, so a predicate written the other way waits
+    forever for a button that is on screen and clickable.
+    """
+    app = pilot.app
+
+    def laid_out() -> bool:
+        """Mounted **and** given a size.
+
+        Existing is not the same as being clickable. A widget is mounted before
+        the screen's first layout pass, so between those two moments it has a
+        zero-width region and `pilot.click` resolves to coordinates that hit
+        nothing. That window is short and load-bearing: waiting only for the
+        widget produced a test that failed roughly one run in three, always on
+        an assertion about something else.
+        """
+        found = app.screen.query("#approve")
+        return bool(found) and found.first().region.width > 0
+
+    assert await until(pilot, laid_out, ticks=600), f"the review checkpoint never opened (phase={app.phase})"
+
+
 async def type_idea(pilot, idea: str = "a tiny notes app") -> None:
     app = pilot.app
     app.query_one("#idea", Input).value = idea
@@ -88,6 +140,7 @@ async def test_the_console_generates_end_to_end_with_no_key_and_no_daemon(tmp_pa
     async with app.run_test(size=SIZE) as pilot:
         await type_idea(pilot)
         await pilot.click("#start")
+        await approve(pilot)
         assert await until(
             pilot, lambda: "green" in widget_text(helper, app, "#progress")
         ), f"{app.job.error if app.job else 'no job'}\n{log_text(app)}"
@@ -135,16 +188,124 @@ async def test_the_panes_fill_while_the_run_is_still_going(tmp_path, helper):
         released.set()
 
 
+# -- the checkpoint -------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_the_review_shows_the_spec_before_anything_is_generated(tmp_path, helper):
+    """The same summary `proto new` prints, so the two front ends cannot drift
+    into describing one spec differently."""
+    app = console(tmp_path, backend="offline")
+    async with app.run_test(size=SIZE) as pilot:
+        await type_idea(pilot, "a tiny notes app for one person")
+        await pilot.click("#start")
+        await wait_for_review(pilot)
+
+        shown = helper.visible(app)
+        assert app.spec is not None
+        assert app.spec.name in shown, shown
+        assert "target: tui" in shown, "the medium is part of what is being approved"
+        assert str(tmp_path / app.spec.slug) in shown, "the destination is not shown"
+
+        await pilot.click("#approve")
+        assert await until(pilot, lambda: not app.busy, ticks=600)
+
+
+@pytest.mark.asyncio
+async def test_declining_writes_nothing_and_costs_nothing_further(tmp_path, helper):
+    """The whole reason the checkpoint is where it is.
+
+    Intake has already run — that is how there is a spec to show — so declining
+    is not free. What it must save is everything after: no tree, no passes, no
+    verify. Asserted on the **workspace**, which is the only place a generation
+    can leave a trace, rather than on a flag the console sets about itself.
+    """
+    app = console(tmp_path, backend="offline")
+    async with app.run_test(size=SIZE) as pilot:
+        await type_idea(pilot)
+        await pilot.click("#start")
+        await approve(pilot, yes=False)
+
+        assert await until(pilot, lambda: not app.busy, ticks=200)
+        assert list(tmp_path.iterdir()) == [], f"declining still wrote {list(tmp_path.iterdir())}"
+        assert app.job is not None and app.job.project_dir == "", "a project directory was recorded"
+        assert "declined" in widget_text(helper, app, "#status"), widget_text(helper, app, "#status")
+
+        # The transcript survives: what intake produced is what a person
+        # changes their idea from, and throwing it away on "no" is the one
+        # thing that would make declining expensive.
+        assert "intake" in log_text(app)
+
+
+@pytest.mark.asyncio
+async def test_declining_leaves_the_console_ready_for_another_idea(tmp_path, helper):
+    """A checkpoint that answers "no" and then refuses to start again is worse
+    than no checkpoint. `busy` is asked of the phase for exactly this."""
+    app = console(tmp_path, backend="offline")
+    async with app.run_test(size=SIZE) as pilot:
+        await type_idea(pilot)
+        await pilot.click("#start")
+        await approve(pilot, yes=False)
+        assert await until(pilot, lambda: not app.busy, ticks=200)
+
+        await type_idea(pilot, "a different idea entirely")
+        await pilot.press("ctrl+r")
+        await wait_for_review(pilot)
+        assert app.job is not None and app.job.idea == "a different idea entirely"
+        await pilot.click("#decline")
+
+
+@pytest.mark.asyncio
+async def test_a_second_run_is_refused_while_the_review_is_open(tmp_path, helper):
+    """The job is `done` while the modal is up — intake finished and nothing
+    after it has started — so a `job.status` reading of "busy" would call this
+    idle and start a second generation underneath the screen."""
+    app = console(tmp_path, backend="offline")
+    async with app.run_test(size=SIZE) as pilot:
+        await type_idea(pilot, "the first idea")
+        await pilot.click("#start")
+        await wait_for_review(pilot)
+        first = app.job
+
+        assert first is not None and first.status == "done", "the premise of this test is gone"
+        assert app.busy, "a finished intake with an open review is not idle"
+
+        await type_idea(pilot, "the second idea")
+        await pilot.press("ctrl+r")
+        await pilot.pause()
+        assert app.job is first, "a second job started while the review was open"
+
+        await pilot.click("#decline")
+
+
+@pytest.mark.asyncio
+async def test_no_review_generates_straight_through(tmp_path, helper):
+    """The scriptable shape, kept: `proto new --yes` has always had one and a
+    front end that cannot be told to stop asking is a front end you cannot
+    demo."""
+    app = console(tmp_path, backend="offline", review=False)
+    async with app.run_test(size=SIZE) as pilot:
+        await type_idea(pilot)
+        await pilot.click("#start")
+        assert await until(pilot, lambda: "green" in widget_text(helper, app, "#progress"), ticks=600), log_text(app)
+        assert app.phase == "idle"
+        assert app.job is not None and (Path(app.job.project_dir) / "app" / "models.py").exists()
+
+
 # -- one at a time --------------------------------------------------------
 
 
 @pytest.mark.asyncio
 async def test_a_second_generation_is_refused_by_name_not_interleaved(tmp_path, helper):
-    """`JobStore.run` redirects `sys.stdout`, which is process-global, so two
-    jobs would clobber each other's capture and braid two transcripts into one
-    pane. Until that is per-job the console runs one at a time -- and says so,
-    naming what it is busy with, because a button that silently does nothing is
-    indistinguishable from one that is broken."""
+    """One run, one set of panes.
+
+    This started as a guard around a real defect — `JobStore.run` used a
+    process-global `redirect_stdout` and two jobs captured each other. That is
+    fixed and the behaviour still holds, now for a view reason: these panes
+    answer "what is happening" once, and a second generation would have nowhere
+    to go. Refused by name either way, because a button that silently does
+    nothing is indistinguishable from one that is broken.
+    """
     released = threading.Event()
     started = []
 
