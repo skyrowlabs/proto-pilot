@@ -219,11 +219,16 @@ def test_the_front_end_verifies_through_the_target_when_nothing_is_injected(tmp_
     So the default factory, the target lookup and the real `Verifier` all run,
     and the generation ends at the same honest floor the CLI has.
     """
+    from protopilot import generation
     from protopilot.jobs import JobStore
     from protopilot.web import app as web_app
 
     runner = CwdRunner([BUILD_FAILED])
-    monkeypatch.setattr(web_app, "SubprocessRunner", lambda: runner)
+    # Patched on `generation`, which is where the default factory now builds
+    # its runner; `web_app.run_generation` is a wrapper that pins the target
+    # and delegates. Patching the wrapper's module would leave the real
+    # `SubprocessRunner` in play and this test would boot Docker for real.
+    monkeypatch.setattr(generation, "SubprocessRunner", lambda: runner)
 
     job = JobStore().create("track camping gear across trips")
     web_app.run_generation(job, tmp_path, backend="offline")
@@ -298,12 +303,17 @@ def test_an_injected_factory_still_wins(tmp_path, monkeypatch):
     depends on this being true."""
     from fakes import FakeVerifier
 
+    from protopilot import generation
     from protopilot.jobs import JobStore
     from protopilot.verify import VerifyResult
     from protopilot.web import app as web_app
 
     runner = CwdRunner()
-    monkeypatch.setattr(web_app, "SubprocessRunner", lambda: runner)
+    # Same module as above, and it matters more here: this test asserts a
+    # NEGATIVE — that the default verifier did not also run — so a patch aimed
+    # at a module the call no longer reaches passes for the wrong reason. It
+    # did exactly that when `run_generation` moved, and stayed green.
+    monkeypatch.setattr(generation, "SubprocessRunner", lambda: runner)
 
     job = JobStore().create("track camping gear across trips")
     web_app.run_generation(

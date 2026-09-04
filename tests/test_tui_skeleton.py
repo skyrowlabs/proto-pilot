@@ -20,7 +20,6 @@ wrong order. The tree is data; the module arrives with the passes.
 
 from __future__ import annotations
 
-import importlib.util
 import subprocess
 import sys
 from pathlib import Path
@@ -159,37 +158,12 @@ def test_the_bare_skeleton_passes_its_own_tests(tree):
 
 
 # ── the helper can see what the app is showing ───────────────────────────
-
-
-@pytest.fixture(scope="module")
-def helper():
-    """`tests/screen.py`, loaded from the skeleton rather than copied here.
-
-    Copied, this file would be testing its own copy and would stay green while
-    the shipped one rotted — which is the exact shape of the defect this whole
-    group exists to prevent, one level up.
-
-    `sys.dont_write_bytecode` rather than `PYTHONDONTWRITEBYTECODE`, and the
-    distinction is the whole of why this works: the environment variable is
-    read once, at interpreter start, into that attribute — so setting it from
-    inside a running test does nothing at all. Without it, `exec_module` writes
-    a `__pycache__` into `skeleton/tui/tests/`, which is source data copied
-    byte-for-byte into every generated prototype. It is gitignored, so the cost
-    today is cosmetic; `_source_files()` above already excludes `__pycache__`
-    by name, because a `.pyc` read as text is a `UnicodeDecodeError` in a test
-    whose failure message is then about nothing.
-    """
-    path = TUI_SKELETON / "tests" / "screen.py"
-    spec_ = importlib.util.spec_from_file_location("skeleton_tui_screen", path)
-    assert spec_ and spec_.loader
-    module = importlib.util.module_from_spec(spec_)
-    previous = sys.dont_write_bytecode
-    sys.dont_write_bytecode = True
-    try:
-        spec_.loader.exec_module(module)
-    finally:
-        sys.dont_write_bytecode = previous
-    return module
+#
+# The `helper` fixture moved to `tests/conftest.py` when the console tests
+# needed the same reader: `Static.renderable` does not exist on the Textual
+# installed here, and two answers to "how do you read a widget's text" is how
+# one of them goes stale unnoticed. It still loads `skeleton/tui/tests/screen.py`
+# from the skeleton rather than copying it, for the reason its docstring gives.
 
 
 def test_text_attrs_is_a_module_level_tuple(helper):

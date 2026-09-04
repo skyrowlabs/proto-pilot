@@ -8,6 +8,7 @@ green, which is the single most expensive failure mode a test suite has.
 
 from __future__ import annotations
 
+import importlib.util
 import os
 import sys
 from pathlib import Path
@@ -99,3 +100,45 @@ def spec():
             ),
         ],
     )
+
+
+# ── reading what a Textual app is actually showing ───────────────────────
+
+
+@pytest.fixture(scope="module")
+def helper():
+    """`tests/screen.py`, loaded from the skeleton rather than copied here.
+
+    Lives here because two suites need it: the skeleton's own tests, and the
+    console's. `Static.renderable` does not exist on the Textual installed
+    here — a harness reading only that sees an empty screen and reports a
+    working app as broken — so this is the repository's one answer to how a
+    widget's text is read, and a second copy is how one of them goes stale.
+
+    Loaded, not copied: a copy would be tested against itself and would stay
+    green while the shipped one rotted, which is the shape of defect
+    `tests/test_tui_skeleton.py` exists to prevent one level up.
+
+    `sys.dont_write_bytecode` rather than `PYTHONDONTWRITEBYTECODE`, and the
+    distinction is the whole of why this works: the environment variable is
+    read once, at interpreter start, into that attribute — so setting it from
+    inside a running test does nothing at all. Without it, `exec_module` writes
+    a `__pycache__` into `skeleton/tui/tests/`, which is source data copied
+    byte-for-byte into every generated prototype. It is gitignored, so the cost
+    today is cosmetic; `test_tui_skeleton.py` already excludes `__pycache__`
+    by name when it walks the skeleton, because a `.pyc` read as text is a
+    `UnicodeDecodeError` in a test whose failure message is then about nothing.
+    """
+    from protopilot import targets
+
+    path = targets.SKELETON_ROOT / "tui" / "tests" / "screen.py"
+    spec_ = importlib.util.spec_from_file_location("skeleton_tui_screen", path)
+    assert spec_ and spec_.loader
+    module = importlib.util.module_from_spec(spec_)
+    previous = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        spec_.loader.exec_module(module)
+    finally:
+        sys.dont_write_bytecode = previous
+    return module

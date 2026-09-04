@@ -194,6 +194,10 @@ def generate(
     # Bound once: `of` is what turns "pass 3" into "pass 3 of 5", and a view
     # cannot count the passes itself -- which ones run belongs to the target.
     modules = list(targets.for_spec(spec).CODE_PASSES)
+    # The running order, up front. Without it a progress view can show what has
+    # happened but not what is coming -- it learns each pass's name only as that
+    # pass starts, so the list grows under the reader instead of filling in.
+    emit("plan", passes=[m.NAME for m in modules])
     for index, module in enumerate(modules, start=1):
         log(f"  pass {module.NAME}...")
         emit("pass_started", name=module.NAME, index=index, of=len(modules))

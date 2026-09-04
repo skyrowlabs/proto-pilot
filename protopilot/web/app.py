@@ -7,7 +7,6 @@ be a terminal.
 
 from __future__ import annotations
 
-import shutil
 import subprocess
 from pathlib import Path
 
@@ -16,14 +15,13 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from protopilot import build as builder
-from protopilot import registry, targets
+from protopilot import generation, registry, targets
 from protopilot.build import is_test_path
 from protopilot.jobs import STORE
 from protopilot.llm import build_llm
 from protopilot.passes import PassContext, clarify
-from protopilot.render import render_skeleton
 from protopilot.runner import SubprocessRunner, docker_available
-from protopilot.spec import Spec, Theme
+from protopilot.spec import Spec
 
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
@@ -57,57 +55,27 @@ def run_generation(
     attempts: int = 3,
     verifier_factory=None,
 ) -> None:
-    """One generation, start to finish. Module level so it can be tested.
+    """One generation, in this front end's medium.
 
-    This is the same sequence the CLI runs, in the same order, through the
-    same functions -- the front end is a second caller of the pipeline, not a
-    second implementation of it.
+    The sequence itself lives in `protopilot/generation.py`, so that a front
+    end which is not a web server can drive it without importing FastAPI. What
+    stays here is the one thing that is genuinely this front end's: the target
+    pin, and the reason for it directly above.
+
+    Kept as a function rather than an alias so `TARGET` is applied at call time.
+    A module-level `run_generation = partial(..., target=TARGET)` would bind the
+    pin at import and silently ignore a test that sets `app.TARGET` — which the
+    suite does, to assert the pin is real.
     """
-    from protopilot.cli import free_port
-
-    llm = build_llm(backend=backend)
-    log = job.log
-
-    # Resolved once, and before intake: intake is the one pass with no spec to
-    # read the shape off, so it is told through the context.
-    chosen = job.archetype or archetypes_default()
-
-    log("intake...")
-    spec = builder.spec_from_idea(
-        job.idea,
-        llm,
-        archetype=chosen,
-        # Pinned, and not `targets.DEFAULT`. See TARGET above.
+    generation.run_generation(
+        job,
+        workspace,
         target=TARGET,
-        port=free_port(),
-        direction=job.direction,
-        theme=Theme(**job.theme) if job.theme else None,
-        answers=dict(job.answers),
+        backend=backend,
+        demo=demo,
+        attempts=attempts,
+        verifier_factory=verifier_factory,
     )
-
-    target = Path(workspace) / spec.slug
-    if target.exists():
-        shutil.rmtree(target)
-    log(spec.summary())
-
-    render_skeleton(spec, target)
-    spec.save(target)
-    job.project_dir = str(target)
-    job.port = spec.port
-
-    ctx = PassContext(project_dir=target, change=job.direction)
-    builder.generate(spec, ctx, llm, log=log, hide_tests=demo, emit=job.event)
-
-    log("verify...")
-    make_verifier = verifier_factory or (lambda: targets.for_spec(spec).verifier(target, spec, SubprocessRunner()))
-    outcome = builder.drive_to_green(spec, ctx, llm, make_verifier(), attempts=attempts, log=log, emit=job.event)
-
-    registry.record(slug=spec.slug, name=spec.name, path=target, port=spec.port, idea=job.idea)
-    job.url = f"http://localhost:{spec.port}"
-    if not outcome.ok:
-        # Handed back anyway, with the stage named -- the same floor the CLI has.
-        stage = outcome.result.stage if outcome.result else "unknown"
-        log(f"red at {stage}; the tree is at {target}")
 
 
 def run_clarify(job, backend: str | None = None) -> None:

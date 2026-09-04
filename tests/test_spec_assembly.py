@@ -80,13 +80,52 @@ def test_only_one_module_decides_a_spec_field():
     assert offenders == {"protopilot/cli.py": {"port"}}, f"a spec field is being decided outside build.py: {offenders}"
 
 
-def test_both_front_ends_call_the_same_function():
-    """The positive half. Grep is a blunt instrument, but the thing it is
-    checking is blunt too: two callers, one callee."""
-    for path in ("protopilot/cli.py", "protopilot/web/app.py"):
+#: The two modules allowed to start a spec, and why there are exactly two.
+#:
+#: `cli.py` is the scriptable path; `generation.py` is the job path, which BOTH
+#: the web front end and the console drive. A third entry here means a front end
+#: has started assembling a spec for itself, which is the drift the test above
+#: catches on the field level and this one catches on the call level.
+SPEC_CALLERS = {"protopilot/cli.py", "protopilot/generation.py"}
+
+
+def test_only_the_two_entry_points_assemble_a_spec():
+    """Recomputed, not listed — the list is the *expectation*, not the search.
+
+    This used to name `protopilot/web/app.py` directly and assert the call was
+    in it. That was true until `run_generation` moved out of the web module so a
+    second front end could drive it without importing FastAPI, at which point
+    the test failed for the right reason and by the wrong mechanism: it was
+    checking an address rather than a property. A hardcoded pair also cannot
+    notice a *third* caller appearing, which is the direction that matters now
+    that there are three front ends and two of them share one runner.
+    """
+    found = {
+        str(path)
+        for path in sorted(Path("protopilot").rglob("*.py"))
+        if path.name != "build.py" and "spec_from_idea(" in path.read_text(encoding="utf-8")
+    }
+    assert found == SPEC_CALLERS, f"a spec is being assembled somewhere new: {found ^ SPEC_CALLERS}"
+
+    for path in sorted(SPEC_CALLERS):
         source = Path(path).read_text(encoding="utf-8")
         assert "spec_from_idea(" in source, f"{path} does not go through build.spec_from_idea"
-        assert "amend_spec(" in source, f"{path} does not go through build.amend_spec"
+
+
+def test_every_front_end_reaches_the_pipeline_rather_than_reimplementing_it():
+    """The positive half, for each of the three.
+
+    The CLI calls `build` directly; the web front end and the console both go
+    through `generation.run_generation`. What none of them may do is run passes
+    of their own — a front end that called `run_pass` would be a second
+    implementation of the pipeline wearing a first one's name.
+    """
+    assert "amend_spec(" in Path("protopilot/cli.py").read_text(encoding="utf-8")
+
+    for path in ("protopilot/web/app.py", "protopilot/console/app.py"):
+        source = Path(path).read_text(encoding="utf-8")
+        assert "run_generation" in source, f"{path} does not drive the shared runner"
+        assert "run_pass(" not in source, f"{path} runs passes itself instead of going through build"
 
 
 # -- what an amend must not lose ------------------------------------------

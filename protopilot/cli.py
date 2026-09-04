@@ -527,6 +527,31 @@ def reset(directory: str | None, yes: bool) -> None:
 
 
 @main.command()
+@click.option("--workspace", default=None, help="Where prototypes are generated (default: ./prototypes).")
+@click.option("--backend", type=click.Choice(["api", "claude-code", "offline"]), default=None)
+@click.option(
+    "--demo/--no-demo",
+    default=True,
+    show_default=True,
+    help="Hide test files in the UI (they are still generated and run).",
+)
+def console(workspace: str | None, backend: str | None, demo: bool) -> None:
+    """Run the terminal front end: type an idea, watch it generate.
+
+    The counterpart to `proto serve` for the default target. `serve` hands back
+    a link you click, which a terminal app has no use for; this one hands back a
+    tree and the command that runs it.
+
+    `proto new` is untouched and stays the scriptable path -- a front end that
+    is the only way in is a tool you cannot automate.
+    """
+    from protopilot.console import run as run_console
+
+    root = Path(workspace).resolve() if workspace else Path.cwd() / "prototypes"
+    run_console(root, backend=backend, demo=demo)
+
+
+@main.command()
 @click.option("--port", type=int, default=7000, show_default=True)
 @click.option("--workspace", default=None, help="Where prototypes are generated (default: ./prototypes).")
 @click.option("--backend", type=click.Choice(["api", "claude-code", "offline"]), default=None)

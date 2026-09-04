@@ -1,0 +1,46 @@
+/* The console's own styling. Nothing here is shared with a generated tree's
+   `app.tcss` -- that one belongs to the terminal target and is written by the
+   `ui` pass. Two files named for the same technology, owned by different
+   things, which is the collision the `console` name exists to avoid. */
+
+#panes {
+    height: 1fr;
+}
+
+#input-pane {
+    width: 34;
+    padding: 1 2;
+    border-right: solid $panel;
+}
+
+#input-pane Label {
+    margin-top: 1;
+    color: $text-muted;
+}
+
+#input-pane Button {
+    margin-top: 1;
+    width: 100%;
+}
+
+#status {
+    margin-top: 1;
+    color: $text-muted;
+}
+
+#output-pane {
+    width: 1fr;
+    padding: 1 2;
+}
+
+/* Sized rather than 1fr: the progress region is a fixed, scannable summary and
+   the log is the part that grows. A progress pane that expands with the run
+   pushes the log off screen exactly when there is most of it. */
+#progress-scroll {
+    height: 40%;
+    border-bottom: solid $panel;
+}
+
+#log {
+    height: 1fr;
+}

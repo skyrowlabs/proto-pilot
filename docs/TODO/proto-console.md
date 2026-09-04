@@ -10,7 +10,7 @@ summary: "A terminal front end for the tool itself — type the idea in one pane
 
 # The proto Console
 
-> **Status**: 🟡 In progress — Phases 1-2 done, Phases 3-6 open
+> **Status**: 🟡 In progress — Phases 1-3 and 6 done; Phase 4 open, Phase 5 half
 > **Shelf-Status**: in-progress
 > **Priority**: Medium — the default target has no front end but raw stdout,
 > which is a gap the pivot opened rather than a pre-existing one
@@ -187,21 +187,63 @@ named rather than linked, because a relative link into a sibling repo resolves o
 this machine and nowhere else). The text log is for a person. The event list is
 for a view.
 
-## Phase 3 — The two panes
+## Phase 3 — The two panes ✅
 
-- [ ] `protopilot/console/`, a Textual app. **Not `tui`** — see above
-- [ ] An input pane: the idea, `--direction`, and the flags that change the
-      result (`--target`, `--archetype`, `--offline`, `--backend`)
-- [ ] An output pane: `job.lines` streaming, and a progress region driven by
-      `events` — the five passes, the verify attempts, the file each pass wrote
-- [ ] A job list, from `STORE.all()`. Being able to see the last four runs is
-      most of the value: it is what makes two ideas comparable
-- [ ] `proto console` launches it. `proto new` is untouched and stays the
+- [x] `protopilot/console/`, a Textual app. **Not `tui`** — held by a test that
+      recomputes the package's filenames rather than trusting the reviewer
+- [x] An input pane: the idea, `--direction`, and the flags that change the
+      result. `--target` and `--archetype` are `Select`s built from the
+      registries, so a new target appears without an edit here
+- [x] An output pane: `job.lines` streaming, and a progress region driven by
+      `events` — the passes with their state and files, the verify attempts,
+      the repairs, and the floor
+- [x] A job list, from `STORE.all()`. Read from the store rather than from a
+      list the app keeps, so a job started by the web front end in the same
+      process appears here too
+- [x] `proto console` launches it. `proto new` is untouched and stays the
       scriptable path
+
+### The move Phase 3 forced, and why it was not optional
+
+`run_generation` lived in `protopilot/web/app.py`, which imports FastAPI at
+module scope. A console importing it from there would have needed the `web`
+extra to generate anything — **and the suite would not have noticed**, because
+the test environment installs that extra. A plain `pip install -e .` console
+would have failed for a user and stayed green here.
+
+So it moved to `protopilot/generation.py`: standard library plus proto.pilot's
+own modules, nothing else. `web/app.py` keeps a thin `run_generation` that pins
+`TARGET` and delegates — a function rather than a `partial`, so the pin is
+applied at call time and the suite's `app.TARGET` override still bites.
+
+Two tests caught the move, both correctly, and the second is the one worth
+keeping in mind: `test_an_injected_factory_still_wins` asserts a **negative** —
+that the default verifier did not also run — through a `monkeypatch` aimed at
+the module the call had just left. It passed. A patch that no longer reaches the
+code under test turns a negative assertion into a tautology, and nothing in the
+output says so. Confirmed non-vacuous afterwards by planting: with the injected
+factory ignored, it now runs the real verifier to a timeout.
+
+`test_both_front_ends_call_the_same_function` named two paths by hand and is now
+`test_only_the_two_entry_points_assemble_a_spec`, which recomputes the set of
+modules calling `spec_from_idea` and compares it to an expectation. The old
+shape could not have noticed a *third* caller appearing, which is the direction
+that matters now that there are three front ends sharing two entry points.
+
+### One console bug, found by a test for something else
+
+The status line was rewritten on **every tick**, so the "one at a time" refusal
+was set by the button and overwritten 200ms later by `generating ...`. Declining
+a second run looked exactly like a button that does nothing — the failure the
+refusal exists to prevent, wearing its own clothes. It writes on transitions now.
+
+Found by the test for the refusal, not by the test for the status line.
 
 ## Phase 4 — The review checkpoint becomes a screen
 
-The one interaction that has to move, and the one worth moving.
+Not started. The `[Y/n]` spec review is still stdin-only, so the console
+currently generates without one — which is the CLI's `--yes` behaviour, not a
+regression, but it is the interaction the plan most wanted moved.
 
 - [ ] The spec review — entities, screens, target, archetype, then approve — is a
       `[Y/n]` on stdin today. In the console it is a screen you can read properly
@@ -211,33 +253,66 @@ The one interaction that has to move, and the one worth moving.
 
 ## Phase 5 — The concurrency defect, before concurrency is offered
 
-- [ ] `JobStore.run` wraps work in `redirect_stdout`, and `sys.stdout` is
-      **process-global**. Two jobs on two threads clobber each other's capture.
-      `proto serve` gets away with it because nobody has run two at once
-- [ ] **Until this is fixed the console runs one job at a time**, and says so when
-      you ask for a second. A queue is honest; interleaved transcripts are not
-- [ ] The fix is per-job capture rather than a global redirect. It is a `jobs.py`
-      change and it improves `proto serve` for free
+**The honest half is done; the fix is not.**
 
-## Phase 6 — Tested with no key and no daemon
+- [x] `JobStore.run` wraps work in `redirect_stdout`, and `sys.stdout` is
+      process-global. Two jobs on two threads clobber each other's capture
+- [x] **The console runs one job at a time and says so**, naming what it is
+      busy with. Held by a test, and by the keybinding rather than a second
+      click — see the note below
+- [ ] The fix is per-job capture rather than a global redirect. It is a
+      `jobs.py` change and it improves `proto serve` for free
 
-- [ ] The console drives `--offline` end to end in the suite, using Textual's
-      `App.run_test` pilot — the same mechanism `verify_tui` already uses, so
-      there is no new test dependency
-- [ ] A run that fails still renders: the error, the last stage, and the
-      `RUNBOOK.md` path. The floor the pipeline already has must be visible in
-      the pane, not only on disk
+Phase 1 measured the buffer at **0 bytes** on a real run, so today the clobbering
+has nothing to clobber — which lowers the severity and does not remove the
+defect: the first pass that prints instead of logging reinstates it silently.
+
+A hazard checked and cleared while here: `redirect_stdout` cannot steal the
+console's own painting, because Textual's `LinuxDriver` writes to
+`sys.__stderr__` — the wrong stream *and* the pristine handle.
+
+## Phase 6 — Tested with no key and no daemon ✅
+
+- [x] The console drives `--offline` end to end in the suite through Textual's
+      `App.run_test` pilot — the same mechanism `verify_tui` uses, so no new
+      test dependency. An idea in, a real tree out, no key and no daemon
+- [x] A run that fails still renders: the error and the last stage in the pane,
+      and a red run names its stage and points at `RUNBOOK.md`
+
+The event fold is a **pure function over dicts** in `console/progress.py`, with
+no Textual import, and is tested as one. Asking a rendered pane whether attempt
+2 was counted is a hard way to learn it.
+
+### Two things the tests only caught by planting
+
+**`pilot.click` coalesces repeat clicks at the same position.** Measured on a
+minimal app: three clicks delivered two presses. A click-based test of the
+"second run refused" case would have passed whether the refusal worked or not,
+so that test uses the `ctrl+r` binding — a real user path, not coalesced — while
+every other test still exercises the button.
+
+**A test can describe a property without testing it.** The by-name matching test
+asserted that a pass is matched by `name` and not `index`, using an event with no
+`plan` — where both strategies fall through to "append a new pass" and both look
+right. Planting index-matching left the file green. It now folds a plan *and* a
+disagreeing index, where the two strategies give different answers.
 
 ## Acceptance
 
-- [ ] `./pp check pre-push` green
-- [ ] Phase 1's numbers exist and are recorded, whichever way they fell
-- [ ] `proto console`, offline, generates a prototype end to end with no key, no
+- [x] `./pp check pre-push` green — 585 tests
+- [x] Phase 1's numbers exist and are recorded, whichever way they fell
+- [x] `proto console`, offline, generates a prototype end to end with no key, no
       daemon and no browser
-- [ ] Output appears **while** generation runs, demonstrated by asserting on a
-      partial log mid-run rather than on the final one
-- [ ] `proto new` and `proto serve` are unchanged and green
-- [ ] A second concurrent generation is refused by name, not interleaved
+- [x] Output appears **while** generation runs, demonstrated by asserting on a
+      partial log mid-run rather than on the final one. The runner is held open
+      on an event and the panes are read while it is blocked, so the assertion
+      cannot accidentally be made against a finished job
+- [x] `proto new` and `proto serve` are unchanged and green
+- [x] A second concurrent generation is refused by name, not interleaved
+
+Phases 4 and the second half of 5 are open and are named as open above. What
+ships is a console that generates, streams, lists and refuses — without the spec
+review screen, and with the concurrency defect guarded rather than fixed.
 
 ## Dropped, and why
 
