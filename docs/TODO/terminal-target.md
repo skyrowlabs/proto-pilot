@@ -53,7 +53,7 @@ recorded.
 
 No `target` axis, no new package. A spike, thrown away after.
 
-- [ ] Take three existing `spec.json` files spanning both archetypes — a `crud`
+- [x] Take three existing `spec.json` files spanning both archetypes — a `crud`
       tracker, a `turn_based_game`, and one deliberately awkward shape
 - [ ] Hand-run the five pass prompts against a Textual + SQLite brief, by
       script, outside the pipeline. The point is the model's output, not the
@@ -67,6 +67,20 @@ No `target` axis, no new package. A spike, thrown away after.
 - [ ] **Gate:** if the terminal target needs materially more repair attempts,
       stop. Amend the idea doc with the finding and leave the web target as the
       default. Do not proceed on the strength of preferring the idea
+
+**The harness is built and the runs are not yet made.**
+[`scripts/spikes/terminal_target/`](../../scripts/spikes/terminal_target/) is
+the re-runnable measurement — three specs, a Textual brief, the five prompts, a
+write guard, a boot-and-paint check, and an incrementally written JSON record
+per run. Its README carries how to run the six, what comes out, and three
+things found while building it that this plan under-reads. Nothing under
+`protopilot/` was touched, so the gate below can still say no.
+
+**Structured output holds.** Confirmed live on 2026-09-03: a `structured()`
+call with a Textual prompt and the `FILES_SCHEMA` shape returned a well-formed
+`{files: [{path, content}], notes}`. Confirmed rather than assumed, as this
+phase asks — and it held for the reason it was expected to, schema-constrained
+decoding being a property of the serving runtime rather than of the target.
 
 Two things to watch for that the headline number will hide. Whether the
 failures **cluster** — a recurring mistake is a prompt fix or a `skeleton/`

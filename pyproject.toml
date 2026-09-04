@@ -19,6 +19,14 @@ dev = [
     "jinja2>=3.1",
     "httpx>=0.27",
     "python-multipart>=0.0.9",
+    # The Phase 1 terminal-target spike (`scripts/spikes/terminal_target/`)
+    # boots its generated app with `App.run_test`, on the host, with no Docker
+    # and no browser -- so the framework has to be importable here. These two
+    # are the spike's, not the product's: `protopilot/` imports neither, and
+    # they come out in the same commit the spike does. See
+    # `docs/TODO/terminal-target.md`.
+    "textual>=0.80",
+    "pytest-asyncio>=0.24",
 ]
 
 browser = [

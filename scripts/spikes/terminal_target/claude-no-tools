@@ -1,0 +1,39 @@
+#!/bin/sh
+# `claude`, with every tool taken away.
+#
+# `ClaudeCodeLLM` shells out to `claude --print ... --output-format json`, and
+# `claude --print` has its full tool set by default: Read, Write, Bash, and the
+# caller's working directory. Verified on 2026-09-03 -- a one-line prompt asking
+# it to `echo` into a file wrote the file, with `permission_denials: []`.
+#
+# That matters twice.
+#
+# For the **measurement**, it means a pass is not one generation: the terminal
+# smoke pass in the first live run took 602s across 18 turns and 47k output
+# tokens, and said in its notes that it had stood a scratch tree up and run the
+# tests it was writing. That is a real cost and arguably the honest one, since
+# it is what `proto --backend claude-code` does today -- but it moves the work
+# out of the repair loop and into the pass, which is exactly where the plan's
+# headline metric cannot see it.
+#
+# For the **product**, it means `files.py`'s guarantee -- "the model can only
+# write five paths", "model output is data, not authority" -- holds for the
+# `api` backend and does not hold for this one. The guard checks what the
+# returned JSON may write. It does not constrain the subprocess that returned
+# it. That is a bug in proto.pilot, not in this spike, and it is not this
+# spike's to fix.
+#
+# Use this to run the measurement as a pure generation instead:
+#
+#     PROTOPILOT_CLAUDE_BIN=scripts/spikes/terminal_target/claude-no-tools \
+#       .venv/bin/python scripts/spikes/terminal_target/run.py --target tui --spec field_notes
+#
+# Run the six one way or the other, never a mix: the two produce different
+# numbers and averaging them measures nothing.
+#
+# `--tools ""` rather than `--disallowed-tools`: a deny list has to name
+# every tool, and the first attempt here missed two. The model said so --
+# "only Monitor (which I won't repurpose as a shell for this) can execute
+# commands" -- which is a deny list working by the model's goodwill rather
+# than by the flag. An allow list of nothing has no such hole.
+exec claude "$@" --tools ""
