@@ -25,15 +25,26 @@ import json
 import pytest
 from click.testing import CliRunner
 
+from protopilot import cli as product_cli
 from protopilot import targets
 from protopilot.cli import main
 from protopilot.spec import SPEC_DIR, SPEC_FILENAME
+from tests.fakes import FakeLLM
 
 # Host-side: no key, no Docker daemon, no network. `--offline --no-verify`
 # is what makes a real `proto new` runnable under this marker.
 pytestmark = [pytest.mark.unit]
 
 IDEA = "track camping gear across trips"
+
+#: Every target except the one `proto new` picks on its own.
+#:
+#: A test that asks for `targets.DEFAULT` and then checks it got
+#: `targets.DEFAULT` cannot fail against a CLI that ignores `--target`
+#: entirely. Parametrising over this instead is what turns those assertions
+#: into assertions — and it leaves a single-target build collecting nothing
+#: rather than collecting something vacuous.
+NOT_THE_DEFAULT = [name for name in targets.names() if name != targets.DEFAULT]
 
 
 @pytest.fixture(autouse=True)
@@ -151,6 +162,16 @@ def test_the_target_is_checked_before_anything_is_spent(run, tmp_path, monkeypat
 
     monkeypatch.setattr(web_target, "preflight", lambda runner: (False, "the docker daemon is not running"))
 
+    # The other half of "before anything is spent", and it was missing: the
+    # assertions below say the daemon was not consulted and said nothing about
+    # the model. A `FakeLLM` with no responses is the whole check — it records
+    # every call and raises on the first one, so `classifying...` reaching the
+    # backend is a failure here instead of a live request. Without it this test
+    # is one regression away from spending real tokens on every run, which is
+    # exactly what it exists to prevent happening to a user.
+    llm = FakeLLM([])
+    monkeypatch.setattr(product_cli, "build_llm", lambda **kwargs: llm)
+
     # No `--no-verify`, so the docker probe is live and would answer first if
     # it were reached first.
     result = run("new", IDEA, "--dir", str(tmp_path / "tree"), "--target", "hologram", "-y")
@@ -158,6 +179,7 @@ def test_the_target_is_checked_before_anything_is_spent(run, tmp_path, monkeypat
     assert result.exit_code != 0
     assert "unknown target 'hologram'" in result.output
     assert "docker daemon" not in result.output.lower()
+    assert llm.calls == [], "a target typo reached the model; the tokens are spent before the typo is found"
 
 
 def test_a_target_that_needs_nothing_is_not_asked_for_docker(run, tmp_path, monkeypatch):
@@ -182,11 +204,20 @@ def test_a_target_that_needs_nothing_is_not_asked_for_docker(run, tmp_path, monk
     assert "make run" in result.output, "a terminal tree was told to start itself with a compose command"
 
 
-def test_new_writes_the_chosen_target_into_the_spec(run, tmp_path):
+@pytest.mark.parametrize("name", NOT_THE_DEFAULT)
+def test_new_writes_the_chosen_target_into_the_spec(run, tmp_path, name):
     """`--target` has to reach `spec.json`, because that file is what every
     later command — `proto add`, `proto spec`, the verifier lookup — reads the
-    target off."""
-    assert generated(run, tmp_path, "--target", targets.DEFAULT)["target"] == targets.DEFAULT
+    target off.
+
+    Asked for a target that is **not** the default, which is the whole of what
+    makes this a test. It used to pass `targets.DEFAULT` and compare against
+    `targets.DEFAULT`, and a CLI that dropped the flag on the floor would have
+    satisfied it exactly as well; while one target was installed there was no
+    other option. Two exist now, and the flag is only observable against the
+    one `proto new` would not have picked on its own.
+    """
+    assert generated(run, tmp_path, "--target", name)["target"] == name
 
 
 def test_new_with_no_target_uses_the_registrys_default(run, tmp_path):
