@@ -350,6 +350,45 @@ is only a pointer at it).
 
 ## Traps — not bugs, but they will get you
 
+- **The upgrade to skeletor v0.2.5 refuses, and the refusal is correct.** Run
+  `../skeletor/bin/skeletor-upgrade . --dry-run` (writes nothing, never refused)
+  and it says:
+
+  ```
+  ⚠️  the tree was scaffolded from a dirty checkout — using the committed part (v0.2.0)
+  → base: skeletor @ v0.2.0
+  ❌ .skeletor.json disagrees with the base it names (1 file(s)):
+     · .github/workflows/ci.yml: recorded hash does not match the base render
+  ```
+
+  Two separate facts, and only the second blocks.
+
+  **`skeletor_ref` is `v0.2.0-dirty`**, which is not a resolvable revision —
+  `git rev-parse v0.2.0-dirty` fails. The upgrade handles it by using the
+  committed part and warning, which is better than the degraded `--no-base` path
+  I expected before running it. But it means the base we render against is not
+  the tree we were actually scaffolded from, and template edits uncommitted in
+  their checkout that day will read as template changes now. Written by our own
+  `--repair-manifest` on 2026-09-01, from a dirty skeletor checkout.
+
+  **`ci.yml`'s recorded hash disagrees with the v0.2.0 render.** Same *shape* as
+  the `DOCS_INDEX.md` case that blocked the last upgrade — a manifest recording
+  what was found rather than what was rendered — and the repair was supposed to
+  have settled it. We hand-ported `ci.yml` during that upgrade, taking their side
+  on three hunks, which is the likely source.
+
+  **Do not fix this by reaching for `--from-dir`.** It overrides the base, so a
+  current checkout gets compared against a v0.2.0 manifest, and the refusal that
+  follows advises `--repair-manifest` — which would then rewrite the hashes from
+  the wrong base while leaving `skeletor_ref` alone, leaving the two halves of
+  the manifest describing different skeletors. skeletor fixed that advice in
+  `24dc282` so it names the likelier cause first, but the flag is exactly what
+  somebody reaches for with the producing checkout sitting next door.
+
+  Expect one further thing once the manifest is repaired: `docs/reports/README.md`
+  arrives as a **collision**, per the entry below. skeletor reproduced our upgrade
+  in a worktree and confirmed it.
+
 - **A file we wrote will come back as a template *collision*, for the second
   time.** `docs/reports/README.md` was written here 2026-09-03, sent to skeletor
   on request, and shipped in their `905d421`. It is **not** in our
