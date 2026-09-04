@@ -129,6 +129,14 @@ without a key.
   pretraining set than Textual. Fewer examples means more repair attempts, and a
   bad generation already costs more than a good one. **This is the one thing that
   could invert the whole argument, and it is measurable before committing.**
+
+  **Measured 2026-09-04, and it did not invert.** Six runs, three specs, both
+  targets: mean repair attempts identical at 2.33, every run green. The scarcity
+  is real but it shows up as *thinking time* — 1.69× wall clock, concentrated in
+  the `smoke` and `screens` passes — rather than as failure. Time is spent once
+  per generation; repair attempts compound. The risk this paragraph names was
+  the right one to name and the answer was no.
+  [The numbers](../reports/occasional/2026-09-04-terminal-target-go-no-go.md).
 - **Medium mismatch is real.** Some ideas want to be a web page. The honest answer
   is that this tool stops serving those, which is the point of narrowing.
 

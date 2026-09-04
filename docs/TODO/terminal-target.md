@@ -55,20 +55,41 @@ No `target` axis, no new package. A spike, thrown away after.
 
 - [x] Take three existing `spec.json` files spanning both archetypes — a `crud`
       tracker, a `turn_based_game`, and one deliberately awkward shape
-- [ ] Hand-run the five pass prompts against a Textual + SQLite brief, by
+- [x] Hand-run the five pass prompts against a Textual + SQLite brief, by
       script, outside the pipeline. The point is the model's output, not the
       plumbing
-- [ ] Boot each result and drive it with `App.run_test`. Count: repair attempts
+- [x] Boot each result and drive it with `App.run_test`. Count: repair attempts
       to green, tokens per generation, wall-clock to first green
-- [ ] Compare against the same three specs generated for the web target today.
+- [x] Compare against the same three specs generated for the web target today.
       **This is the number the whole plan turns on**
-- [ ] Record it in `docs/reports/occasional/` whichever way it goes. A no is
+- [x] Record it in `docs/reports/occasional/` whichever way it goes. A no is
       worth exactly as much as a yes here and costs the same to obtain
-- [ ] **Gate:** if the terminal target needs materially more repair attempts,
+- [x] **Gate:** if the terminal target needs materially more repair attempts,
       stop. Amend the idea doc with the finding and leave the web target as the
       default. Do not proceed on the strength of preferring the idea
 
-**The harness is built and the runs are not yet made.**
+**Gate passed 2026-09-04. Phases 2–6 proceed.** Six runs, three specs, two
+targets, all green. Mean repair attempts were **identical — 2.33 against
+2.33** — so the condition that would have stopped this plan was not met. The
+terminal target costs 1.69× wall clock and 1.77× output tokens, concentrated
+almost entirely in the `smoke` and `screens` passes: the pretraining-scarcity
+risk showed up **as thinking time rather than as failure**, which is the far
+better outcome because time is spent once per generation and repair attempts
+compound.
+
+Failures clustered almost perfectly — one dominant cause per target, 3/3 runs
+each, and **neither is model competence**. Web: `STACK_BRIEF` claims every
+`app.forms` parser takes an optional fallback, and `parse_bool` does not, so
+every spec with a bool field burned an attempt on a `TypeError` the model was
+told to write. Terminal: the spike's own smoke helper reads Static text via
+`.renderable`, which current Textual removed, so the app rendered correctly and
+the test could not see it — meaning the real `tui` figure is *better* than 2.33.
+
+Full numbers, per-pass breakdown and every repair reason:
+[`docs/reports/occasional/2026-09-04-terminal-target-go-no-go.md`](../reports/occasional/2026-09-04-terminal-target-go-no-go.md).
+Three findings there change phases below; they are marked inline.
+
+**The harness is built and the six runs are made.**
 [`scripts/spikes/terminal_target/`](../../scripts/spikes/terminal_target/) is
 the re-runnable measurement — three specs, a Textual brief, the five prompts, a
 write guard, a boot-and-paint check, and an incrementally written JSON record
@@ -130,6 +151,13 @@ four baselines to keep green in CI, growing as either axis does.
       Phase 2 of the archetypes plan did for CRUD
 - [ ] Textual + SQLite, one process. No compose file, no second service, no
       port allocation. `app.py`, `db.py`, the base screen, `tests/conftest.py`
+- [ ] **From Phase 1**: the smoke helper must probe several text attributes, not
+      just `.renderable` — current Textual keeps `Static` text on `_content` as
+      a `Content`. All three terminal runs failed on this and diagnosed it
+      independently; a fourth would be waste. A screen whose only content is a
+      `Static` is invisible to a buffer-reading harness, so either the helper
+      probes (`TEXT_ATTRS`, the shape one run settled on) or generated screens
+      carry text through `Screen.sub_title`, a `DataTable` or a `Button`
 - [ ] **What `proto gc` / `proto prune` / the Docker resource labels do for a
       tui-target tree is an open question, not a task.** They exist because a
       tree removed with `rm -rf` orphans a container, a volume and a network. A
@@ -141,7 +169,11 @@ four baselines to keep green in CI, growing as either axis does.
 - [ ] `schema → smoke → seed → routes → ui` maps roughly to
       `models → smoke → seed → screens → styling`, but a Textual app is often
       one file with a `compose()` method, so **the split may not be five**.
-      Decide this from Phase 1's spike output rather than by symmetry
+      Decide this from Phase 1's spike output rather than by symmetry. **Answered:
+      it is five.** Phase 1 ran all five and they all did work; the expensive
+      two are `smoke` (~6.4× the web pass) and `screens` (~4.3×), while
+      `schema`, `seed` and `ui` are at parity. If the split is revisited, that
+      is where the money is
 - [ ] Whatever the split, the two invariants hold and are tested: smoke is
       generated **before** the code it tests, from the spec; and each pass is
       handed the previous pass's **real source**, never a description of it
