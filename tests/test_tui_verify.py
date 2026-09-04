@@ -376,6 +376,78 @@ def test_a_probe_that_will_not_parse_is_reported_as_the_command(tree, tui_spec):
     assert "killed" in payload["traceback"] or "not json at all" in payload["traceback"]
 
 
+# ── the readable diagnostic, which must never decide anything ────────────
+#
+# `tui_probe.readable()` reads the tree's own `tests/screen.py` and falls back
+# to "" if it cannot. Nothing the pipeline produces is missing that file — it
+# is skeleton, and the write guard refuses every path that is not one of the
+# target's six — so the fallback is unreachable from a fresh generation and
+# looks like dead defence.
+#
+# It is not, for two reasons that outlive the pipeline. The tree belongs to the
+# user the moment it is handed back, and `proto add` re-verifies whatever is
+# there afterwards, deletions included. And the `except` catches the helper
+# *raising* as well as being absent, which is a live risk in a file whose whole
+# job is to reach for attributes Textual has moved three times.
+#
+# What both tests below assert is the durable rule rather than either cause:
+# `text` is diagnostic and the verdict is the buffer comparison, so a diagnostic
+# that cannot be gathered has to cost the diagnosis and nothing else. Without
+# the fallback the exception escapes `probe()`, `main()` catches it, and a
+# working application is reported red at `boot` with a traceback pointing at the
+# text reader — the single most misleading answer this stage could give.
+
+
+def silence_the_trees_own_suite(tree: Path) -> Path:
+    """Replace every test in the tree with one that passes.
+
+    Both `tests/test_boots.py` and the generated smoke suite import
+    `tests.screen`, so a tree that has lost it is red at the `tests` stage for
+    a reason that has nothing to do with the probe. Silencing them is what
+    leaves the boot payload as the only thing that can still speak — the same
+    technique `test_the_paint_stage_is_the_backstop_when_nothing_else_looks`
+    uses, and for the same reason.
+    """
+    for path in (tree / "tests").glob("test_*.py"):
+        path.write_text("def test_nothing() -> None:\n    assert True\n")
+    return tree
+
+
+def test_a_tree_that_has_lost_the_text_helper_still_verifies_green(tree, tui_spec):
+    """The app paints; only the diagnostic is gone."""
+    (tree / "tests" / "screen.py").unlink()
+    verifier = built(silence_the_trees_own_suite(tree), tui_spec)
+
+    result = verifier.verify()
+
+    assert result.ok, f"{result.stage}: {result.summary}\n{result.output}"
+    assert verifier.last_probe["text"] == "", "the helper is gone; there is nothing it could have read"
+    assert verifier.last_probe["painted"] is True
+    assert verifier.last_probe["widgets"] > 0, "the rest of the probe stopped working too"
+    assert verifier.last_probe["screen"] == "HomeScreen"
+
+
+def test_a_text_helper_that_raises_does_not_get_a_vote(tree, tui_spec):
+    """The half a missing file cannot demonstrate.
+
+    `screen_text` is handed live widgets out of model-authored screens, and it
+    is the one place in this loop reaching for attributes by name. A raise
+    there is a bug in the reader; reporting it as "the app raised while
+    starting" would be a bug in the reader blamed on the app.
+    """
+    (tree / "tests" / "screen.py").write_text(
+        "def screen_text(screen):\n" '    raise RuntimeError("the text reader blew up on a widget it did not expect")\n'
+    )
+    verifier = built(silence_the_trees_own_suite(tree), tui_spec)
+
+    result = verifier.verify()
+
+    assert result.ok, f"{result.stage}: {result.summary}\n{result.output}"
+    assert verifier.last_probe["text"] == ""
+    assert "the text reader blew up" not in result.output, "a diagnostic's failure reached the verdict"
+    assert verifier.last_probe["painted"] is True
+
+
 # ── the loop around it ───────────────────────────────────────────────────
 
 
