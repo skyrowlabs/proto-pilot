@@ -81,13 +81,15 @@ either to resolve it, and do not confuse `skeleton/` (product data) with
 These are the guarantees that make generated output trustworthy. Each was a
 deliberate decision, not an accident of implementation.
 
-- **The model can only write five paths**: on the web target `app/models.py`,
+- **The model can only write a handful of paths**: on the web target `app/models.py`,
   `app/routes.py`, `app/seed.py`, `app/templates/*.html` (except `base.html`),
   and `tests/test_smoke.py`. Everything else is refused by
   `protopilot/files.py` *before it reaches disk*. The list belongs to the
   target and lives in `protopilot/targets/<name>.py`; `files.py` is the
   mechanism and holds no list of its own, so a second target cannot inherit
-  the wrong five paths by default. Model output is data, not authority — the parts of
+  the wrong allowlist by default — the terminal target's six are
+  `app/models.py`, `app/screens.py`, `app/seed.py`, `app/widgets.py`,
+  `app/app.tcss` and `tests/test_smoke.py`. Model output is data, not authority — the parts of
   the tree known to work are exactly the parts the model must not be able to
   touch. Widening this list is a significant design change, not a convenience
   fix.
@@ -107,9 +109,11 @@ deliberate decision, not an accident of implementation.
   target may pick a different stack, which is the one thing an archetype may
   not do.
 - **Tests are generated before the code they test.** Pass order is
-  `schema -> smoke -> seed -> routes -> ui`. Smoke tests come second, from the
-  spec, when no route exists yet — so they describe what was *asked for*, not
-  what got built. Reordering the passes breaks this.
+  `schema -> smoke -> seed -> routes -> ui` on the web target and
+  `schema -> smoke -> seed -> screens -> ui` on the terminal one. Smoke tests
+  come second, from the spec, when no route or screen exists yet — so they
+  describe what was *asked for*, not what got built. Reordering the passes
+  breaks this. The tuple is the target's; the invariant is not.
 - **Each pass reads the previous pass's real source**, never a description of
   it. UI goes last and receives `routes.py`, because a template referencing a
   context key no route passes is the most common way a generated app 500s.
@@ -127,8 +131,9 @@ deliberate decision, not an accident of implementation.
 ### The offline baseline is the test suite
 
 Every pass has two implementations: a prompt, and a deterministic generator in
-`protopilot/baseline.py`. `--offline` runs the second — no API calls, no key, a
-plain CRUD app.
+`protopilot/baseline.py` (and `protopilot/baseline_tui.py` for the three files
+whose content depends on the medium). `--offline` runs the second — no API
+calls, no key, a plain CRUD app.
 
 It exists for three reasons, in increasing importance: a fast free path to a
 skeleton; the worked example each prompt is written against; and **it is what
@@ -144,7 +149,9 @@ because the baseline cannot read a change request.
 
 | Path | What |
 | ---- | ---- |
-| `protopilot/passes/` | One module per pass — `intake`, `clarify`, `models`, `smoke`, `seed`, `routes`, `ui`, `repair`; `_shared.py` holds the stack brief |
+| `protopilot/passes/` | One module per pass. The web target's are here — `intake`, `clarify`, `models`, `smoke`, `seed`, `routes`, `ui`, `repair`; `_shared.py` holds its stack brief |
+| `protopilot/passes/tui/` | The terminal target's five, same shape; `_brief.py` holds its stack brief and the archetype fragments in that medium |
+| `protopilot/baseline_tui.py` | The deterministic offline generator for the terminal target — screens, smoke suite and stylesheet |
 | `protopilot/files.py` | The write guard — the mechanism; the allowlist itself is the target's |
 | `protopilot/verify.py` | Boot, health-wait, smoke run, log capture |
 | `protopilot/baseline.py` | The deterministic offline implementation of every pass |

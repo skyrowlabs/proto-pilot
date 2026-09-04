@@ -25,7 +25,7 @@ from pathlib import Path
 
 from protopilot import targets
 from protopilot.llm import LLM
-from protopilot.passes import PassContext, PassResult, intake, repair, run_pass
+from protopilot.passes import PassContext, PassResult, intake, run_pass
 from protopilot.spec import MODEL_OWNED_EXCLUSIONS, Screen, Spec
 from protopilot.verify import Verifies, VerifyResult
 
@@ -241,7 +241,12 @@ def drive_to_green(
         ctx.failure = result.report()
         log("  pass repair...")
         try:
-            patch = run_pass(repair, spec, ctx, llm)
+            # The target's, not this module's. There used to be a
+            # `from protopilot.passes import repair` at the top of this file,
+            # and it named the web prompt -- which talks about container logs,
+            # template context keys and a 307 redirect, none of which a
+            # terminal tree has. Same loop, same three attempts, same floor.
+            patch = run_pass(targets.for_spec(spec).REPAIR, spec, ctx, llm)
         except Exception as exc:  # noqa: BLE001 -- a failed repair is an outcome
             log(f"    repair pass failed: {exc}")
             break

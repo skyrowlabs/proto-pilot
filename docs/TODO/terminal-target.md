@@ -251,7 +251,7 @@ four baselines to keep green in CI, growing as either axis does.
 
 ## Phase 4 — The passes, and how many there are
 
-- [ ] `schema → smoke → seed → routes → ui` maps roughly to
+- [x] `schema → smoke → seed → routes → ui` maps roughly to
       `models → smoke → seed → screens → styling`, but a Textual app is often
       one file with a `compose()` method, so **the split may not be five**.
       Decide this from Phase 1's spike output rather than by symmetry. **Answered:
@@ -259,11 +259,53 @@ four baselines to keep green in CI, growing as either axis does.
       two are `smoke` (~6.4× the web pass) and `screens` (~4.3×), while
       `schema`, `seed` and `ui` are at parity. If the split is revisited, that
       is where the money is
-- [ ] Whatever the split, the two invariants hold and are tested: smoke is
+- [x] Whatever the split, the two invariants hold and are tested: smoke is
       generated **before** the code it tests, from the spec; and each pass is
       handed the previous pass's **real source**, never a description of it
-- [ ] The stack brief for this target is byte-identical across passes and repair
+- [x] The stack brief for this target is byte-identical across passes and repair
       attempts, for the cache-prefix reason the web brief already has
+
+> **Phase 4 landed 2026-09-04.** `protopilot/passes/tui/` is the five passes
+> plus `repair`, and `protopilot/targets/tui.py` registers them —
+> `tests/test_skeleton_move_characterisation.py` no longer allows an unclaimed
+> skeleton tree, which is the signal this phase asked for.
+>
+> **The prompts are moved, not rewritten.** Every task block is the string the
+> six Phase 1 runs actually sent, so the numbers in the report still describe
+> what ships. Three deviations, all of them findings landing rather than
+> preferences: the brief no longer says `app.main` *pushes* the home screen
+> (it returns it from `get_default_screen`, see the fix below); it names
+> `tests/screen.py` as a module to import, because that helper did not exist
+> when the spike ran and all three runs wrote their own and got it wrong; and
+> it says `app/app.tcss` and `app/widgets.py` already exist as stubs.
+>
+> **The archetype brief is a fifth thing a target owns**, beyond Phase 2's
+> table of four. `archetypes.brief_for()` cannot be reused — both shipped
+> fragments say "in the same browser" and "draw the pieces as inline SVG" — so
+> the fragments are rewritten per medium and live with the passes.
+>
+> **Two things moved off `build.py` and `files.py` on the way past**, for the
+> same reason the first four moved in Phase 2. `repair` was a module-level
+> import in `build.drive_to_green` naming the web prompt, which talks about
+> container logs and 307 redirects; it is `targets.<name>.REPAIR` now.
+> `files.banner_for` grew a suffix table, because `app/app.tcss` is the first
+> generated file that is neither Python nor Jinja and a `#` comment in a
+> Textual stylesheet is a parse error at app construction.
+>
+> **The offline baseline came with them rather than waiting for Phase 6.**
+> `AGENTS.md`'s rule is that a pass ships with both implementations in the same
+> change, and it wins over this plan's ordering: a pass whose `offline()` does
+> not exist is a pass the suite cannot see. `protopilot/baseline_tui.py`
+> generates the three files whose content depends on the medium —
+> `app/screens.py`, `tests/test_smoke.py`, `app/app.tcss` — and calls
+> `baseline.models_py` / `baseline.seed_py` for the two that do not, because
+> both are pure SQLAlchemy and a second copy would drift.
+>
+> **The gate the web target does not have.** The report found the web target's
+> entire failure mode was one sentence of `STACK_BRIEF` that was not true of
+> `app/forms.py`. `tests/test_tui_target.py` checks every name the terminal
+> brief promises against the skeleton file it says provides it, in both
+> directions — the name must be in the brief *and* defined in that file.
 
 ## Phase 5 — Verify, which is where this target is better than the web one
 

@@ -122,7 +122,8 @@ def test_every_skeleton_directory_belongs_to_a_target():
     owned = {targets.get(name).SKELETON_DIR.name for name in targets.names()}
     assert on_disk >= owned, f"a target points at a skeleton that is not there: {sorted(owned - on_disk)}"
     unclaimed = on_disk - owned
-    # `tui/` is the one legitimate unclaimed tree today: Phase 3 built the
-    # skeleton, and Phases 4 and 5 build the passes and the verifier that a
-    # target module needs before it can honestly be registered.
-    assert unclaimed <= {"tui"}, f"skeleton trees with no target and no reason: {sorted(unclaimed - {'tui'})}"
+    # No allowance any more. `tui/` was the one legitimate unclaimed tree
+    # between Phase 3 (which built the skeleton) and Phase 4 (which gave it
+    # passes and a target module); this is the assertion that closed, and it is
+    # the signal that phase is done.
+    assert not unclaimed, f"skeleton trees with no target: {sorted(unclaimed)}"

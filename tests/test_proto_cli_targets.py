@@ -9,11 +9,13 @@ verified by hand.
 
 What is asserted here is recomputed from the target registry rather than
 written out, so the second target enrols by existing — the same property that
-makes the registry a registry and not a list. The one hard-coded string in the
-file is `tui`, and it is hard-coded on purpose: until Phase 4 of
-`docs/TODO/terminal-target.md` lands, `proto new --target tui` must **refuse by
-name**, and "the axis exists but the target does not yet" is a state worth
-pinning while it is true.
+makes the registry a registry and not a list.
+
+It used to hard-code `tui` in one place, pinning "the axis exists but the
+target does not yet" while that was true. Phase 4 of
+`docs/TODO/terminal-target.md` made it false, and the pin came out rather than
+being relaxed: the refusal test now uses a name no build will ever have, and
+every generation test runs over `targets.names()`.
 """
 
 from __future__ import annotations
@@ -95,15 +97,39 @@ def test_every_target_it_advertises_is_a_name_new_accepts(run, tmp_path):
 
 
 def test_new_refuses_an_unknown_target_by_name(run, tmp_path):
-    """Phase 4 of `docs/TODO/terminal-target.md` has not landed, so `tui` is a
-    tree and not a target. Refused, naming both the miss and what exists —
-    neither half is guessable from the other."""
-    result = run("new", IDEA, "--dir", str(tmp_path / "tree"), "--target", "tui", "--offline", "--no-verify", "-y")
+    """Refused naming both the miss and what exists — neither half is guessable
+    from the other.
+
+    `hologram` rather than a name that might be implemented one day: a refusal
+    test pinned to a real plan's next step is a test that goes red the week the
+    plan lands, and reads as a regression rather than as progress.
+    """
+    result = run("new", IDEA, "--dir", str(tmp_path / "tree"), "--target", "hologram", "--offline", "--no-verify", "-y")
 
     assert result.exit_code != 0
-    assert "unknown target 'tui'" in result.output
+    assert "unknown target 'hologram'" in result.output
     assert targets.DEFAULT in result.output, "a refusal that does not say what exists leaves nowhere to go"
     assert not (tmp_path / "tree").exists(), "a refused target must not leave a part-built tree"
+
+
+@pytest.mark.parametrize("name", targets.names())
+def test_every_target_generates_a_tree_offline(run, tmp_path, name):
+    """Every installed target, generated end to end through the real CLI.
+
+    Parametrised over the registry, so a third target is covered by existing.
+    This is the test that turns "the axis has two entries" into "both of them
+    build something", and it needs no key, no daemon and no browser.
+    """
+    tree = tmp_path / name
+    result = run("new", IDEA, "--dir", str(tree), "--target", name, "--offline", "--no-verify", "--no-git", "-y")
+    assert result.exit_code == 0, result.output + repr(result.exception)
+
+    spec = json.loads((tree / SPEC_DIR / SPEC_FILENAME).read_text())
+    assert spec["target"] == name
+    for path in targets.get(name).WRITABLE:
+        if "*" in path:
+            continue
+        assert (tree / path).exists(), f"{name}: the {path} pass wrote nothing"
 
 
 def test_the_target_is_checked_before_anything_is_spent(run, tmp_path, monkeypatch):
@@ -150,12 +176,13 @@ def test_the_target_reaches_the_review_checkpoint(run, tmp_path):
     assert f"target: {targets.DEFAULT}" in result.output
 
 
-def test_the_generated_tree_is_the_targets_skeleton(run, tmp_path):
+@pytest.mark.parametrize("name", targets.names())
+def test_the_generated_tree_is_the_targets_skeleton(run, tmp_path, name):
     """`--target` picks the tree, not just a string in a file. Compared against
     the target module's own skeleton, so this stays true for a second one."""
-    generated(run, tmp_path, "--target", targets.DEFAULT)
+    generated(run, tmp_path, "--target", name)
 
-    skeleton = targets.get(targets.DEFAULT).SKELETON_DIR
+    skeleton = targets.get(name).SKELETON_DIR
     for source in skeleton.rglob("*"):
         if not source.is_file() or "__pycache__" in source.parts:
             continue

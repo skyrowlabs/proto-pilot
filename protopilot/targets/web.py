@@ -17,6 +17,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from protopilot.passes import models as schema_pass
+from protopilot.passes import repair as repair_pass
 from protopilot.passes import routes, seed, smoke, ui
 from protopilot.runner import SubprocessRunner
 from protopilot.spec import Spec, checkable_paths
@@ -39,6 +40,15 @@ SKELETON_DIR = SKELETON_ROOT / "web"
 #: was asked for rather than what got built; UI comes last because it is the
 #: pass most dependent on real source. Reordering this breaks the invariant.
 CODE_PASSES = (schema_pass, smoke, seed, routes, ui)
+
+#: The pass the repair loop runs. Not in `CODE_PASSES`: it runs on failure
+#: rather than in sequence, and it may rewrite anything in `WRITABLE`.
+#:
+#: It moved here from a module-level import in `build.py` when the second
+#: target arrived, and for the reason the other four moved: the prompt is the
+#: medium's. This one names container logs, template context keys and a 307
+#: redirect, none of which exist in a terminal.
+REPAIR = repair_pass
 
 #: Only these paths are generated. Everything else in a project is skeleton,
 #: and `files.check_path` refuses it before it reaches disk.
