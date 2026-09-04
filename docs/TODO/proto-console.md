@@ -10,7 +10,7 @@ summary: "A terminal front end for the tool itself — type the idea in one pane
 
 # The proto Console
 
-> **Status**: 🟡 In progress — Phase 1 measured and green, Phases 2-6 open
+> **Status**: 🟡 In progress — Phases 1-2 done, Phases 3-6 open
 > **Shelf-Status**: in-progress
 > **Priority**: Medium — the default target has no front end but raw stdout,
 > which is a gap the pivot opened rather than a pre-existing one
@@ -141,14 +141,43 @@ times, wall clock exceeded the sleep budget — before it prints a single number
 Same shape as the `sed` that silently matched nothing during the same session's
 skeletor upgrade, twice in one afternoon, by two different roads.
 
-## Phase 2 — A structured event beside the text
+## Phase 2 — A structured event beside the text ✅
 
-- [ ] `Job` gains `events: list[dict]` **beside `lines`, not replacing it**. The
-      web front end renders `lines` today and must keep working unchanged
-- [ ] Emitted from the two loops that already know the structure: `build.py`'s
-      pass loop (which pass, of how many, what it wrote) and the verify/repair
-      loop (which attempt, which stage went red, what was patched)
-- [ ] `Job.snapshot()` carries them, so both front ends see the same thing
+- [x] `Job` gains `events: list[dict]` **beside `lines`, not replacing it**, with
+      `Job.event(kind, **fields)` stamping `at` so every producer's events are
+      comparable. The web front end renders `lines` and is untouched — measured,
+      not assumed: the same offline run produces the same 28 lines it did before
+- [x] Emitted from the two loops that already know the structure. `generate`
+      emits `pass_started` / `pass_done` / `pass_failed`; `drive_to_green` emits
+      `verify_started` / `verify_passed` / `verify_failed`, `repair_started` /
+      `repair_done` / `repair_empty` / `repair_failed` / `repair_rejected`, and
+      `exhausted`
+- [x] `Job.snapshot()` carries them, JSON-safe, so both front ends see the same
+      thing over the same poll endpoint
+
+The channel is a second parameter, `emit: Emit = no_emit`, threaded beside the
+existing `log: Log = print`. **Every existing caller keeps working untouched** —
+`proto new` passes no `emit` and gets the silent default, which is asserted by
+running the real loop with the parameter omitted rather than by inspection.
+
+### Two decisions worth keeping
+
+**`index` and `of` come from the producer.** A view cannot count the passes
+itself: which ones run belongs to `spec.target`, so *"pass 3 of 5"* is knowable
+in `generate` and nowhere downstream. This is the concrete reason the channel
+exists at all — the alternative is reading it back out of the sentence.
+
+**`exhausted` is a distinct event from `verify_failed`.** A view that only ever
+saw failures could not tell *still trying* from *gave up*, and that difference is
+the whole point of the `RUNBOOK.md` the caller writes next. Measured on the red
+path with a scripted verifier: `verify_failed → repair_started → repair_empty →
+exhausted`, with the stage named on both ends.
+
+`pass_done` carries `shown`, not `result.files` — `hide_tests` is presentation
+and the event feeds a presentation, so a demo that keeps the suite out of the log
+must not surface it in the progress region instead. Held by a test that first
+asserts its own fixture contains a test file, since the check is vacuous
+otherwise.
 
 **Why this is not optional and not cosmetic.** A progress view built by parsing
 `lines` would be reading human-formatted output to recover structure the producer

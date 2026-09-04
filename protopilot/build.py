@@ -33,6 +33,19 @@ SMOKE_PATH = "tests/test_smoke.py"
 
 Log = Callable[[str], None]
 
+#: The structured channel, beside `Log` and never instead of it. A producer
+#: calls both: `log` for the sentence a person reads, `emit` for the fields a
+#: view folds into a progress region. Loosely typed because the payload is
+#: per-kind -- the discipline is that a caller never has to *parse* the
+#: sentence to recover what the emit already carried.
+Emit = Callable[..., None]
+
+
+def no_emit(_kind: str, **_fields: object) -> None:
+    """The default channel. A caller that wants only text gets only text, and
+    every existing caller -- the CLI included -- keeps working untouched."""
+
+
 #: Identity. The slug is the database name and the port is the tab the user has
 #: open, so neither is the model's to revise on an amend.
 IDENTITY = ("slug", "port")
@@ -164,6 +177,7 @@ def generate(
     llm: LLM,
     log: Log = print,
     hide_tests: bool = False,
+    emit: Emit = no_emit,
 ) -> list[PassResult]:
     """Run the target's passes, in order.
 
@@ -177,18 +191,27 @@ def generate(
     the thing being demoed is not the thing that ships.
     """
     results = []
-    for module in targets.for_spec(spec).CODE_PASSES:
+    # Bound once: `of` is what turns "pass 3" into "pass 3 of 5", and a view
+    # cannot count the passes itself -- which ones run belongs to the target.
+    modules = list(targets.for_spec(spec).CODE_PASSES)
+    for index, module in enumerate(modules, start=1):
         log(f"  pass {module.NAME}...")
+        emit("pass_started", name=module.NAME, index=index, of=len(modules))
         try:
             result = run_pass(module, spec, ctx, llm)
         except Exception as exc:
             # Name the pass and leave a runbook before re-raising, so the
             # caller reports a stage rather than a stack trace.
             write_generation_runbook(ctx.project_dir, module.NAME, str(exc), [r.name for r in results])
+            emit("pass_failed", name=module.NAME, index=index, of=len(modules), error=str(exc))
             raise PassFailed(module.NAME, str(exc)) from exc
         shown = [f for f in result.files if not (hide_tests and is_test_path(f))]
         if shown:
             log(f"    {len(shown)} file(s): {', '.join(str(f) for f in shown)}")
+        # `shown`, not `result.files`: the event feeds a view, and a demo that
+        # hides the suite from the log must not surface it in the progress
+        # region instead. What got built is unchanged either way.
+        emit("pass_done", name=module.NAME, index=index, of=len(modules), files=[str(f) for f in shown])
         results.append(result)
     return results
 
@@ -211,6 +234,7 @@ def drive_to_green(
     verifier: Verifies,
     attempts: int = 3,
     log: Log = print,
+    emit: Emit = no_emit,
 ) -> Outcome:
     """Verify, and on failure repair and verify again, up to `attempts` times.
 
@@ -225,13 +249,16 @@ def drive_to_green(
 
     for attempt in range(1, attempts + 2):
         log(f"  verify (attempt {attempt})...")
+        emit("verify_started", attempt=attempt, of=attempts)
         result = verifier.verify()
         history.append(result)
         if result.ok:
             log(f"    {result.summary}")
+            emit("verify_passed", attempt=attempt, summary=result.summary)
             return Outcome(True, attempt, result, history, repairs)
 
         log(f"    failed at {result.stage}: {result.summary}")
+        emit("verify_failed", attempt=attempt, stage=result.stage, summary=result.summary)
         if attempt > attempts:
             break
 
@@ -240,6 +267,7 @@ def drive_to_green(
 
         ctx.failure = result.report()
         log("  pass repair...")
+        emit("repair_started", attempt=attempt, stage=result.stage)
         try:
             # The target's, not this module's. There used to be a
             # `from protopilot.passes import repair` at the top of this file,
@@ -249,11 +277,14 @@ def drive_to_green(
             patch = run_pass(targets.for_spec(spec).REPAIR, spec, ctx, llm)
         except Exception as exc:  # noqa: BLE001 -- a failed repair is an outcome
             log(f"    repair pass failed: {exc}")
+            emit("repair_failed", attempt=attempt, error=str(exc))
             break
         if not patch.files:
             log(f"    repair produced no changes: {patch.notes}")
+            emit("repair_empty", attempt=attempt, notes=patch.notes)
             break
         log(f"    patched {', '.join(str(f) for f in patch.files)}")
+        emit("repair_done", attempt=attempt, files=[str(f) for f in patch.files], notes=patch.notes)
         repairs.append(f"attempt {attempt} ({result.stage}): {patch.notes}")
 
         # A repair is not allowed to make the suite pass by shrinking it.
@@ -264,8 +295,13 @@ def drive_to_green(
         if before and after < before:
             (ctx.project_dir / SMOKE_PATH).write_text(original)
             log(f"    rejected: repair cut the smoke suite from {before} to " f"{after} tests; reverted {SMOKE_PATH}")
+            emit("repair_rejected", attempt=attempt, before=before, after=after)
             repairs[-1] += "  [test deletion rejected and reverted]"
 
+    # The floor, named. A view that only ever saw `verify_failed` could not
+    # tell "still trying" from "gave up", and the difference is the whole
+    # point of the RUNBOOK the caller is about to write.
+    emit("exhausted", attempts=len(history), stage=history[-1].stage if history else "")
     return Outcome(False, len(history), history[-1] if history else None, history, repairs)
 
 

@@ -96,11 +96,11 @@ def run_generation(
     job.port = spec.port
 
     ctx = PassContext(project_dir=target, change=job.direction)
-    builder.generate(spec, ctx, llm, log=log, hide_tests=demo)
+    builder.generate(spec, ctx, llm, log=log, hide_tests=demo, emit=job.event)
 
     log("verify...")
     make_verifier = verifier_factory or (lambda: targets.for_spec(spec).verifier(target, spec, SubprocessRunner()))
-    outcome = builder.drive_to_green(spec, ctx, llm, make_verifier(), attempts=attempts, log=log)
+    outcome = builder.drive_to_green(spec, ctx, llm, make_verifier(), attempts=attempts, log=log, emit=job.event)
 
     registry.record(slug=spec.slug, name=spec.name, path=target, port=spec.port, idea=job.idea)
     job.url = f"http://localhost:{spec.port}"
@@ -176,13 +176,13 @@ def run_amend(
     updated.save(target)
 
     ctx = PassContext(project_dir=target, change=change)
-    builder.generate(updated, ctx, llm, log=log, hide_tests=demo)
+    builder.generate(updated, ctx, llm, log=log, hide_tests=demo, emit=job.event)
 
     log("verify...")
     make_verifier = verifier_factory or (
         lambda: targets.for_spec(updated).verifier(target, updated, SubprocessRunner())
     )
-    outcome = builder.drive_to_green(updated, ctx, llm, make_verifier(), attempts=attempts, log=log)
+    outcome = builder.drive_to_green(updated, ctx, llm, make_verifier(), attempts=attempts, log=log, emit=job.event)
     job.project_dir = str(target)
     job.port = updated.port
     job.url = f"http://localhost:{updated.port}"

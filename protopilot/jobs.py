@@ -28,6 +28,18 @@ class Job:
     direction: str = ""
     status: str = "pending"  # pending | running | done | failed
     lines: list[str] = field(default_factory=list)
+    #: The structured half of the transcript, **beside `lines` and never
+    #: instead of it**. `lines` is what a person reads and is what the web
+    #: front end renders today; `events` is what a view derives a progress
+    #: region from. Two channels because the alternative is a view that parses
+    #: human-formatted text to recover structure the producer already had --
+    #: which is the anti-pattern the workspace guide names as *sky.boss never
+    #: parses human output*, and the reason a log line is free to be reworded.
+    #:
+    #: Append-only and untyped on purpose. A consumer folds the list to get
+    #: current state, so a new event kind is additive and an old reader that
+    #: does not know it skips it rather than breaking.
+    events: list[dict] = field(default_factory=list)
     error: str = ""
     project_dir: str = ""
     port: int | None = None
@@ -48,6 +60,15 @@ class Job:
         for line in str(message).splitlines() or [""]:
             self.lines.append(line)
 
+    def event(self, kind: str, **fields: object) -> None:
+        """Record one structured step.
+
+        Stamped here rather than by the caller, so every producer's events are
+        comparable and no loop has to remember to do it. `kind` is positional
+        because it is the one field every consumer switches on.
+        """
+        self.events.append({"kind": kind, "at": datetime.now(timezone.utc).isoformat(timespec="seconds"), **fields})
+
     def snapshot(self) -> dict:
         return {
             "id": self.id,
@@ -55,6 +76,7 @@ class Job:
             "direction": self.direction,
             "status": self.status,
             "lines": list(self.lines),
+            "events": list(self.events),
             "error": self.error,
             "project_dir": self.project_dir,
             "port": self.port,

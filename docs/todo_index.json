@@ -72,7 +72,7 @@
         "ux"
       ],
       "summary": "A terminal front end for the tool itself — type the idea in one pane, watch generation in another — built as a second view over the job seam `proto serve` already paid for.",
-      "open_tasks": 22,
+      "open_tasks": 19,
       "auto_generated": false
     }
   ]
