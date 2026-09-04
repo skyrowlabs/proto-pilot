@@ -18,6 +18,7 @@ pytestmark = [pytest.mark.unit]
 # owns every path below — can be imported. See scripts/paths.py.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from scripts import check_doc_tables as tables  # noqa: E402
 from scripts.docs import plans  # noqa: E402
 from scripts.docs.queue_order import UNORDERED, queue_position, run_order  # noqa: E402
 from scripts.paths import IMPL_DIR, PROJECT_ROOT, TODO_DIR  # noqa: E402
@@ -26,6 +27,92 @@ from scripts.paths import IMPL_DIR, PROJECT_ROOT, TODO_DIR  # noqa: E402
 @pytest.fixture(scope="module")
 def tank():
     return [p for p in plans.scan(TODO_DIR) if not p.auto_generated]
+
+
+#: Every path here is one this template really ships. An invented example reads
+#: as a dead reference to `check_source_doc_refs.py`, and the alternative is an
+#: allowlist entry for a test fixture — which is a list where a real path does.
+#:
+#: `(row text, what it should vouch for)`. The `None` row is the point: a
+#: folder routed by something that is not a claim about the folder is a folder
+#: nobody has actually indexed, and the gate stays green over it.
+DOC_TABLE_ROWS = [
+    ("- **Rules** (`docs/rules/`)", "docs/rules"),
+    ("- **Backlog** (`docs/TODO/README.md`)", "docs/TODO"),
+    ("- **Deep** (`docs/reports/regular/README.md`)", "docs/reports/regular"),
+    ("- **One rule** (`docs/rules/commits.md`)", None),
+]
+
+#: The fixture tree, and `docs/reports/` earns its place by holding no `.md` of
+#: its own: a folder that only contains folders is descended into rather than
+#: reported, so it proves the walk does not stop at the first unrouted level.
+#:
+#: Every path is one this tree really ships, and that is load-bearing rather
+#: than tidy: the template's version of this fixture named a plan that is real
+#: upstream and absent here, so the merged test failed `pp check doc-refs` on
+#: arrival — including, on the first attempt, from the comment explaining the
+#: failure, which names a path just as loudly. The fix is a real path,
+#: never a `.validate-ignore` entry — an exemption list is where a real path
+#: goes to stop being checked.
+FIXTURE_DOCS = [
+    "docs/rules/commits.md",
+    "docs/TODO/README.md",
+    "docs/TODO/proto-console.md",
+    "docs/reports/regular/README.md",
+]
+
+#: The three that hold docs directly, and so are the three a routing row must
+#: reach. Derived from the fixture rather than restated, because a second list
+#: is the thing this file keeps finding bugs in.
+FIXTURE_FOLDERS = {str(Path(d).parent) for d in FIXTURE_DOCS}
+
+
+@pytest.mark.parametrize("row,folder", DOC_TABLE_ROWS, ids=[r[0][:40] for r in DOC_TABLE_ROWS])
+def test_only_a_claim_about_a_folder_routes_it(row, folder, tmp_path, monkeypatch):
+    """Naming a file inside a folder is not naming the folder.
+
+    `_DOC_DIR` matched the directory portion of any file path, so a row for one
+    of seven files in `docs/rules/` routed the whole folder. The comment beside
+    it asserted the opposite — the exact property the regex lacked — which is
+    the worst place for a gap, because a reviewer checks the code against the
+    comment and the comment launders it. Reported by proto.pilot, measured.
+
+    A folder's **own** README still routes it, deliberately: the shipped index
+    routes three folders that way and no other, so the pattern could not simply
+    be tightened. A deeper README routes its own folder and never a parent.
+
+    The failure was permissive, which is why nothing caught it: `unrouted()`
+    under-reported and the gate stayed green over a folder nothing points at —
+    the thing this check exists to remove, one door along.
+
+    **Asked through `unrouted()`, not through the reference sets**, and that is
+    a deliberate divergence from the template's version of this test. Upstream
+    merges files and folders into one `referenced()` and can therefore ask a set
+    what it routes; here they are two functions — `referenced()` for exact file
+    paths, `routed_dirs()` for folder-shaped rows — and a folder's own README
+    routes it by matching *as a file*, which is why `_DOC_DIR` never had to carry
+    that case. Neither half of that split answers the question alone, so asking
+    either one would test an implementation detail and miss the predicate. The
+    real consumer is where the three ways of routing a folder are actually
+    combined, so that is what this asks.
+    """
+    for rel in FIXTURE_DOCS:
+        doc = tmp_path / rel
+        doc.parent.mkdir(parents=True, exist_ok=True)
+        doc.write_text("# fixture\n", encoding="utf-8")
+
+    table = tmp_path / "DOCS_INDEX.md"
+    table.write_text(row + "\n", encoding="utf-8")
+    monkeypatch.setattr(tables, "TABLES", [table])
+    monkeypatch.setattr(tables, "PROJECT_ROOT", tmp_path)
+
+    stranded = set(tables.unrouted(tmp_path / "docs", tables.referenced(), tables.routed_dirs()))
+    routed = FIXTURE_FOLDERS - stranded
+
+    if folder is None:
+        assert not routed, f"{row!r} names a file and should route no folder, got {sorted(routed)}"
+    else:
+        assert routed == {folder}, f"{row!r} should route exactly {folder!r}, got {sorted(routed)}"
 
 
 def test_every_gated_plan_names_its_gate(tank):

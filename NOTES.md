@@ -637,6 +637,49 @@ is only a pointer at it).
 
 ## Resolved
 
+- **2026-09-04 — skeletor `v0.2.11` → `v0.3.6`, and the merged test that could
+  not pass here.** Eight files: `scripts/yaml_text.py` and its two new suites,
+  the `pp worktree drop` live-hold guard, `tree_lock.holders(root=...)`, and the
+  YAML comment masker wired into `check_workflow_drift` and
+  `test_ci_draft_gate`. That last pair is the finding worth keeping — both gates
+  read a **comment** as code, so `# TODO: add actions/setup-python` satisfied the
+  check that requires the step, and `# note: ready_for_review used to be here`
+  kept five tests green over a deleted trigger. The false pass is perfectly
+  correlated with the defect: the string most likely to appear in a job that has
+  *not* done the thing is a comment saying it should.
+
+  **`scripts/check_doc_tables.py` conflicted and we kept ours**, for the second
+  upgrade running. Upstream merges file rows and folder rows into one
+  `referenced()` set and needs a `_FOLDER_INDEX` suffix-strip to recover a
+  folder from its README; ours splits `referenced()` (exact file paths) from
+  `routed_dirs()` (folder-shaped rows, lookahead-guarded), so a folder's own
+  README routes it **as a file, by exact path** and the lookahead never has to
+  carry that case. Same rule, and skeletor agreed ours expresses it where it
+  cannot be got wrong. Nothing was ported.
+
+  **The seam defect was in a file we had never edited.**
+  `tests/test_docs_pipeline.py` merged clean — no conflict, nothing to review —
+  and arrived carrying a new test written against upstream's `referenced()`. It
+  failed here immediately, which was the good outcome; a permissive version
+  would have passed and asserted nothing. Re-pointed at `unrouted()`, the real
+  consumer, which is where the three ways of routing a folder are actually
+  combined and the only place that answers the question in either shape. **A
+  clean merge is not a compatible one** when the merged file imports something
+  you diverged on, and no conflict is raised because the divergence is a door
+  away.
+
+  Then two things caught by planting rather than by reading. The first `sed`
+  plant silently matched nothing and the suite went green — a plant that did not
+  land is indistinguishable from a gate that works, so the Python replacement
+  now asserts its target exists before writing. And the fixture named
+  `docs/TODO/widget-cache.md`, real upstream and dead here, which
+  `pp check doc-refs` caught — then caught again in the comment written to
+  explain the first catch. Both fixed with a real path; neither with a
+  `.validate-ignore` entry, which is where a real path goes to stop being
+  checked.
+
+  Standing, unchanged: `tests/test_pyright_scope.py` stays deleted.
+
 - **2026-09-04 — the terminal target, all six phases, and `proto new` now
   builds one by default.** Filed at
   [docs/implementations/spec/terminal-target.md](docs/implementations/spec/terminal-target.md) with per-phase

@@ -43,10 +43,25 @@ from scripts.paths import PROJECT_ROOT, TMP_DIR  # noqa: E402
 
 LOCK_DIR = TMP_DIR / "tree-locks"
 
-#: A hold older than this with a live pid is still honoured — long jobs exist.
-#: This bound is only for records whose process is gone AND which are old enough
-#: that a pid reuse would be a coincidence rather than the same job.
-STALE_AFTER_S = 6 * 60 * 60
+#: How long a record whose process is gone is left alone before `sweep()` drops
+#: it. Small on purpose: once the pid is gone the holder is definitely gone, and
+#: the only thing this margin protects is the window between a record being
+#: written and its writer becoming observable — a concurrent sweeper must not
+#: unlink a hold that is racing its own creation.
+#:
+#: **A live pid is honoured at any age**, deliberately and with no upper bound.
+#: Long jobs exist, and dropping a running job's hold is fail-open — the same
+#: asymmetry `would_strand` is built on, where a false refusal costs one retry
+#: and a false clearance costs somebody's work.
+#:
+#: This replaced a `STALE_AFTER_S = 6 * 60 * 60` that `sweep()` never read: the
+#: constant was defined, documented with a pid-reuse rationale, and referenced
+#: nowhere, while the sweep hardcoded 60. A reader budgeting for that coincidence
+#: believed the window was six hours when it was one minute. Reported by
+#: jam.sense. A documented rule with no code under it is the harder direction of
+#: the failure this repository writes rules about — an undocumented rule at least
+#: reads as unknown, where this one reads as settled.
+DEAD_GRACE_S = 60
 
 
 @dataclass
@@ -95,17 +110,45 @@ def sweep() -> int:
             path.unlink(missing_ok=True)
             removed += 1
             continue
-        if not hold.alive and hold.age_s > 60:
+        if not hold.alive and hold.age_s > DEAD_GRACE_S:
             path.unlink(missing_ok=True)
             removed += 1
     return removed
 
 
-def holders() -> List[Hold]:
-    """Every live hold on this tree, newest first."""
-    sweep()
+def lock_dir_for(root: Optional[Path] = None) -> Path:
+    """The lock directory belonging to a checkout — this one by default.
+
+    Holds are **per-checkout**, structurally rather than by a recorded field:
+    `PROJECT_ROOT` resolves from `scripts/paths.py`'s own location, and a git
+    worktree has its own copy of that file, so each checkout gets its own
+    `tmp/tree-locks/`. A hold in one tree therefore cannot strand another, with
+    no root field and no compatibility rule to maintain.
+
+    jam.sense reached the same outcome by the opposite route — one lock
+    directory per *repository*, plus a `root` field on each hold to claw back
+    the over-reach — because they need to answer "who is holding **any** tree of
+    this repo". That question is not free, and this design deliberately cannot
+    ask it.
+
+    What it must be able to ask is "is somebody working in **that** tree", and
+    that is what this function is for. A caller reasoning about a checkout other
+    than its own has to *name* it — the module constant is this tree's answer,
+    and using it about another tree returns an empty list rather than an error.
+    `pp worktree drop` shipped exactly that way: it decided the fate of a
+    checkout it never asked about, and would have kept doing so if somebody had
+    "fixed" it by calling `holders()` with no argument.
+    """
+    return (Path(root) if root else PROJECT_ROOT) / "tmp" / "tree-locks"
+
+
+def holders(root: Optional[Path] = None) -> List[Hold]:
+    """Every live hold on a tree, newest first. This tree unless told otherwise."""
+    lock_dir = lock_dir_for(root)
+    if root is None:
+        sweep()
     out = []
-    for path in LOCK_DIR.glob("*.json"):
+    for path in lock_dir.glob("*.json"):
         try:
             out.append(Hold(**json.loads(path.read_text(encoding="utf-8"))))
         except (json.JSONDecodeError, TypeError, OSError):
