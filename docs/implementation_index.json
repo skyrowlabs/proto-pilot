@@ -1,10 +1,11 @@
 {
   "_generated_by": "scripts/docs/gen_impl_index.py",
   "_note": "Generated — never hand-edit. Edit the doc's frontmatter and rerun.",
-  "count": 2,
+  "count": 3,
   "by_category": {
     "spec": [
       "archetypes-and-theme",
+      "proto-console",
       "terminal-target"
     ]
   },
@@ -27,6 +28,26 @@
       "category": "spec",
       "completed": "2026-09-01",
       "agent_value": 1
+    },
+    {
+      "slug": "proto-console",
+      "title": "The proto Console",
+      "path": "docs/implementations/spec/proto-console.md",
+      "priority": "medium",
+      "updated": "2026-09-04",
+      "tags": [
+        "console",
+        "jobs",
+        "front-end",
+        "textual",
+        "ux"
+      ],
+      "summary": "A terminal front end for the tool itself — type the idea in one pane, watch generation in another — built as a second view over the job seam `proto serve` already paid for.",
+      "open_tasks": 0,
+      "auto_generated": false,
+      "category": "spec",
+      "completed": "2026-09-04",
+      "agent_value": 3
     },
     {
       "slug": "terminal-target",

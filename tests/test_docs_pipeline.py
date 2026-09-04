@@ -54,10 +54,16 @@ DOC_TABLE_ROWS = [
 #: failure, which names a path just as loudly. The fix is a real path,
 #: never a `.validate-ignore` entry — an exemption list is where a real path
 #: goes to stop being checked.
+#:
+#: `_TEMPLATE.md` rather than a real plan, and that is the second correction:
+#: the first choice here was a plan sitting in the tank, which broke the moment
+#: that plan was **filed** — the tank is the one directory in this tree whose
+#: contents are supposed to leave. The template and the README are the two
+#: things in `docs/TODO/` that structurally never move.
 FIXTURE_DOCS = [
     "docs/rules/commits.md",
     "docs/TODO/README.md",
-    "docs/TODO/proto-console.md",
+    "docs/TODO/_TEMPLATE.md",
     "docs/reports/regular/README.md",
 ]
 

@@ -1,25 +1,25 @@
 ---
-title: "The proto Console"
+title: The proto Console
 slug: proto-console
-shelf_status: in-review
 priority: medium
+category: spec
+agent_value: 3
+completed: 2026-09-04
 updated: 2026-09-04
 tags: [console, jobs, front-end, textual, ux]
-summary: "A terminal front end for the tool itself — type the idea in one pane, watch generation in another — built as a second view over the job seam `proto serve` already paid for."
+summary: A terminal front end for the tool itself — type the idea in one pane, watch generation in another — built as a second view over the job seam `proto serve` already paid for.
 ---
 
 # The proto Console
 
 > **Status**: 🟢 All six phases done — ready for review
-> **Shelf-Status**: in-review
 > **Priority**: Medium — the default target has no front end but raw stdout,
 > which is a gap the pivot opened rather than a pre-existing one
-> **Queue-Order**: unset until it is `ready`
 
 ## What this is not
 
 **This is not the `tui` target.** That is what `proto` *emits*, and it landed on
-2026-09-04 as [the terminal target](../implementations/spec/terminal-target.md).
+2026-09-04 as [the terminal target](terminal-target.md).
 This plan is what `proto` *is*: the tool's own interface.
 
 The distinction is load-bearing enough to constrain the code. `tui` already means
@@ -29,7 +29,7 @@ be called `tui` anything.** It lives in `protopilot/console/`. A reader who has
 to work out which `tui` a module means will get it wrong eventually, and the two
 are adjacent in every way that matters.
 
-[`docs/ideas/sketches-not-scaffolds.md`](../ideas/sketches-not-scaffolds.md)
+[`docs/ideas/sketches-not-scaffolds.md`](../../ideas/sketches-not-scaffolds.md)
 poses the fork this answers: *"Does `proto` become a TUI itself, or does it host
 one? These are separable."* This is the **becomes one** half. Hosting the running
 prototype in a pane is dropped below, deliberately.
@@ -44,7 +44,7 @@ missing counterpart to the pivot, not a nicety on top of it.
 ## Problem
 
 Generation is a twenty-one minute operation (`tui` mean wall clock, measured at
-1278s in [the go/no-go](../reports/occasional/2026-09-04-terminal-target-go-no-go.md))
+1278s in [the go/no-go](../../reports/occasional/2026-09-04-terminal-target-go-no-go.md))
 whose only interactive surface is a `[Y/n]` prompt in the middle. You type one
 command, answer one question, and then watch a wall of text with no way to
 change your mind, compare two ideas, or see where you are.
