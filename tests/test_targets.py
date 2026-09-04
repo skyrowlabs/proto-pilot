@@ -190,6 +190,33 @@ def test_the_write_guard_uses_the_running_targets_list(spec, tmp_path):
     assert not (tmp_path / "app" / "screens.py").exists()
 
 
+def test_the_write_guard_is_still_handed_the_targets_protected_list(spec, tmp_path):
+    """The half of the same seam that fails **quietly**.
+
+    `files.write_all(...)` defaults `protected` to `()`, so a caller that stops
+    passing it does not raise — it silently makes `app/templates/base.html`
+    writable, and the only symptom is a prototype whose chrome the model
+    rewrote. `run_pass` is the one product caller of that function; this is the
+    assertion that it still hands both lists over.
+    """
+    from protopilot.files import UnsafePath
+    from protopilot.passes import PassContext, run_pass
+    from protopilot.passes import ui as ui_pass
+    from protopilot.render import render_skeleton
+
+    render_skeleton(spec, tmp_path)
+    base = tmp_path / "app" / "templates" / "base.html"
+    skeleton_chrome = base.read_text()
+
+    # `base.html` matches `app/templates/*.html`, so only PROTECTED refuses it.
+    rogue = FakeLLM([{"files": [{"path": "app/templates/base.html", "content": "<h1>mine</h1>"}], "notes": ""}])
+    with pytest.raises(UnsafePath) as caught:
+        run_pass(ui_pass, spec, PassContext(project_dir=tmp_path), rogue)
+
+    assert "base.html" in str(caught.value) and "skeleton" in str(caught.value)
+    assert base.read_text() == skeleton_chrome, "the model rewrote the one template it must never touch"
+
+
 # ── the matrix ───────────────────────────────────────────────────────────
 
 

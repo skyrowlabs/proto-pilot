@@ -275,3 +275,149 @@ async def test_where_names_the_screen_and_its_ids(helper):
         report = helper.where(app)
         assert "#the-thing" in report
         assert "Screen" in report
+
+
+# ── what the helper does when a widget will not answer ───────────────────
+#
+# Every branch below is a tolerance rather than a feature, and a tolerance is
+# the thing nobody notices has stopped working. The helper's job is to be the
+# one part of a generated smoke suite that cannot itself be the reason a test
+# is red: a widget mid-rebuild, a property that throws, or an attribute holding
+# something that is not text must each cost the harness that one widget and
+# never the screen.
+
+
+def unreadable_store():
+    """A `DataTable.columns` store that cannot be read right now.
+
+    A dict subclass, because that is what the attribute holds and what
+    `table_text` iterates — the point is a store caught mid-rebuild, not a
+    widget of an unusual class.
+    """
+
+    class Unreadable(dict):
+        def values(self):
+            raise RuntimeError("the row store is being rebuilt")
+
+    return Unreadable()
+
+
+def test_flatten_reads_a_rich_renderable(helper):
+    """Neither of these is a `str`, and both are what a `Static` actually
+    holds depending on the Textual version — which is the reason the `.plain`
+    branch exists at all."""
+    from rich.text import Text
+    from textual.content import Content
+
+    assert helper.flatten(Text("RICH TEXT")) == "RICH TEXT"
+    assert helper.flatten(Content("TEXTUAL CONTENT")) == "TEXTUAL CONTENT"
+
+
+def test_flatten_will_not_read_text_out_of_a_container(helper):
+    """A list of options is not screen text, and `str()` on one would put every
+    element plus its quotes and brackets into the haystack — so `mentions(app,
+    "packed")` would match a widget that merely *knows* the word rather than
+    one showing it. False positives are worse here than misses: the harness
+    exists to catch a screen that renders nothing."""
+    for container in (["packed", "unpacked"], ("packed",), {"packed": 1}, {"packed"}):
+        assert helper.flatten(container) == ""
+
+
+def test_flatten_never_raises_on_something_that_is_not_text(helper):
+    """The fourth case the docstring names. A helper that throws here turns
+    "this screen has no button" into an error nobody can read."""
+
+    class Renderable:
+        def __str__(self) -> str:
+            return "STRINGIFIED"
+
+    assert helper.flatten(None) == ""
+    assert helper.flatten(Renderable()) == "STRINGIFIED"
+    assert helper.flatten(7) == "7"
+    # Booleans are excluded before the `str()` fallback on purpose: `True`
+    # would otherwise put the word "true" on every screen holding a flag.
+    assert helper.flatten(True) == ""
+    assert helper.flatten(False) == ""
+
+
+@pytest.mark.asyncio
+async def test_a_table_mid_rebuild_says_nothing_rather_than_raising(helper):
+    """A `DataTable` whose row store cannot be read right now.
+
+    The generated list screen is usually a `DataTable`, and it is repopulated
+    on every screen change — so "read while being rebuilt" is the normal
+    hazard, not an exotic one.
+    """
+    from textual.app import App, ComposeResult
+    from textual.widgets import DataTable
+
+    class WithATable(App):
+        CSS = ""
+
+        def compose(self) -> ComposeResult:
+            yield DataTable(id="rows")
+
+        def on_mount(self) -> None:
+            table = self.query_one("#rows", DataTable)
+            table.add_columns("Trip")
+            table.add_row("Cairngorms")
+
+    app = WithATable()
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        table = app.query_one("#rows", DataTable)
+        assert "Cairngorms" in helper.table_text(table), "the readable case first, or the next assertion is free"
+
+        # The row store, replaced with one that will not be read right now.
+        # `setattr` rather than a subclass: what breaks mid-rebuild is the
+        # store, not the widget class, and a `DataTable` has to stay a
+        # `DataTable` or `widget_text` never reaches this branch at all.
+        setattr(table, "columns", unreadable_store())
+
+        assert helper.table_text(table) == ""
+        assert helper.widget_text(table) == ""
+
+
+@pytest.mark.asyncio
+async def test_one_unreadable_widget_does_not_blind_the_whole_screen(helper):
+    """The assertion the two tolerances are actually for.
+
+    A screen holding one widget that throws must still report the text on
+    every other widget. The failure this prevents is the expensive one Phase 1
+    measured three times: a correct app reported blank, which is
+    indistinguishable from the app being broken.
+    """
+    from textual.app import App, ComposeResult
+    from textual.widgets import DataTable, Static
+
+    class Moody(Static):
+        """A widget whose text attribute throws when it is read."""
+
+    def raises(_self):
+        raise RuntimeError("not ready")
+
+    # Installed with `setattr` for the same reason as above: `Moody` has to
+    # stay a plain `Static` as far as the helper is concerned.
+    setattr(Moody, "content", property(raises, lambda _self, _value: None))
+
+    class Mixed(App):
+        CSS = ""
+
+        def compose(self) -> ComposeResult:
+            yield Static("STILL HERE", id="fine")
+            yield DataTable(id="rows")
+            yield Moody("MOODY BUT READABLE", id="moody")
+
+        def on_mount(self) -> None:
+            setattr(self.query_one("#rows", DataTable), "columns", unreadable_store())
+
+    app = Mixed()
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        text = helper.visible(app)
+
+        assert "STILL HERE" in text, "one broken widget took the whole screen with it"
+        # And the throwing property costs that widget only that attribute --
+        # `TEXT_ATTRS` keeps reading, so its text still comes through.
+        assert "MOODY BUT READABLE" in text
+        assert helper.mentions(app, "still here", "moody but readable")
