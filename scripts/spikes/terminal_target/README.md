@@ -153,27 +153,53 @@ than asserted.
 
 ## What a run costs, measured
 
-From the first live runs on 2026-09-03, `claude-opus-5` at `effort=high`,
-tools on:
+One complete terminal run, `field_notes`, `claude-opus-5` at `effort=high`,
+tools on, 2026-09-03. **Green in 2 verify attempts** — one repair — in 25
+minutes, 6 model calls, 118k output tokens, $7.44 API-equivalent.
 
-| | wall clock | output tokens |
-| --- | --- | --- |
-| terminal `schema` pass | 24s | 1.9k |
-| terminal `seed` pass | 55s | 4.5k |
-| terminal `smoke` pass | 602s | 47k |
-| web, offline baseline, five passes + Docker verify | 20s | — (no calls) |
+| pass | wall clock | turns | output tokens | of which thinking |
+| --- | --- | --- | --- | --- |
+| `schema` | 24s | 3 | 1.9k | 0.5k |
+| `smoke` | 602s | 18 | 47k | 22k |
+| `seed` | 55s | 3 | 4.5k | 1.6k |
+| `screens` | 708s | 33 | 56k | 22k |
+| `ui` | 81s | 2 | 6.9k | 3.6k |
+| `repair` | 20s | 3 | 1.7k | 0.2k |
 
-The last row is not a comparison; it is the harness's own end-to-end proof that
-the web half works, run with `--backend offline` so it costs nothing. It does
-show one thing worth knowing before starting: **Docker is not the slow part.**
-The whole compose build, boot, health wait, smoke suite and browser stage came
-to twenty seconds. Whatever the terminal target saves, it does not save that.
+The shape of that column is the finding. Two passes account for **88% of the
+wall clock and 87% of the tokens**, and they are the two where the model went
+away and checked itself — 18 and 33 turns against 2 or 3 everywhere else. The
+plan's chosen metric would have recorded this run as "one repair attempt",
+which is true and which hides a factor of thirty.
 
-Extrapolating six live runs from these: five passes plus up to three repairs,
-at somewhere between 25s and 600s a pass, is **roughly 8–20 minutes per run and
-30 to 120 minutes for all six** — dominated entirely by how often a pass decides
-to go and check its own work. Budget the wide end. Runs are independent, so
-stop after any of them and re-run only that one.
+Beside it, the same spec through the **real web pipeline with `--backend
+offline`**: five passes, `docker compose up --build`, the health wait, the
+smoke suite and the browser stage, **green first time in 20 seconds** with no
+model calls. That is not a comparison — it is the harness's own end-to-end
+proof that the web half works. It does settle one thing worth knowing before
+starting: **Docker is not the slow part.** Whatever the terminal target saves,
+it does not save that.
+
+Extrapolating: budget **10–25 minutes per run and two to three hours for all
+six**, dominated entirely by how often a pass decides to go and check its own
+work. Runs are independent, so stop after any of them and re-run only that one.
+
+## The one failure so far was not about Textual
+
+Worth reading before the six, because it is the whole argument for keeping the
+failure text rather than the failure count. The single red stage in that run
+was `import`, and the cause was this, in `app/models.py`:
+
+```
+from sqlalchemy.orm import Mapped, мapped_column, relationship
+ImportError: cannot import name 'мapped_column' from 'sqlalchemy.orm'
+```
+
+A Cyrillic `м` (U+043C) in one identifier. The repair pass found it in 20
+seconds and fixed exactly that character. It is a decoding glitch, it is
+orthogonal to the target, and the *same prompt* had produced a clean
+`models.py` in an earlier run — so counted as a number it reads as "the
+terminal target needed a repair", which is false. Classify against the text.
 
 ## Three things the plan under-reads, found while building this
 
