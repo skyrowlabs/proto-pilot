@@ -74,6 +74,21 @@ PROTECTED = ("app/templates/base.html",)
 ARCHETYPES = ("crud", "turn-based-game")
 
 
+#: Whether `spec.port` means anything for this target.
+#:
+#: It does here: the port is the tab the user has open, it is frozen into
+#: `compose.yml`, and `free_port()` avoids collisions with it. The review
+#: checkpoint prints it because a person approving a generation wants to know
+#: where the thing will be.
+USES_PORT = True
+
+#: The line printed when a generation comes back green.
+#:
+#: A format string over `name`, `slug`, `port` and `directory`. It is the
+#: target's because it is the one sentence that says what the user now HAS,
+#: and "http://localhost:8080" is only true of a medium that listens.
+HANDOFF = "{name} is up:  http://localhost:{port}"
+
 #: What a person types to start this prototype, once they have the tree.
 #:
 #: Printed by `proto new --no-verify` and used nowhere else. It belongs to the

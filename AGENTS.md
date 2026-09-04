@@ -46,7 +46,8 @@ port are the optional front end and the *output* of the tool.
 | Piece | Stack | Port | Purpose |
 | ----- | ----- | ---- | ------- |
 | `proto serve` | FastAPI + Jinja | 7000 | A web face on `proto new`. A second *caller* of the pipeline, never a second implementation of it |
-| a generated prototype | FastAPI + Postgres, in Docker | first free from 8080 | The output. One compose project per tree, named `<slug>_<path-hash>` |
+| a generated prototype, `--target web` | FastAPI + Postgres, in Docker | first free from 8080 | The output. One compose project per tree, named `<slug>_<path-hash>` |
+| a generated prototype, `--target tui` (**default**) | Textual + SQLite, one process | none | The output. Nothing listens, nothing to orphan |
 
 The generated prototype's stack is fixed and is not this repo's stack — see the
 invariants below before changing anything under `skeleton/`.
@@ -55,11 +56,17 @@ invariants below before changing anything under `skeleton/`.
 
 ## What this repo is
 
-`proto new "an idea"` turns a sentence into a running Dockerised FastAPI app:
-idea -> typed `spec.json` -> skeleton copied -> five generation passes ->
-`docker compose up` -> observed -> bounded repair loop -> a URL. The output is a
-thing to look at this afternoon and throw away, explicitly not a production
-starting point.
+`proto new "an idea"` turns a sentence into a running prototype: idea -> typed
+`spec.json` -> the target's skeleton copied -> five generation passes -> started
+and driven -> observed -> bounded repair loop -> a thing you can run. The output
+is something to look at this afternoon and throw away, explicitly not a
+production starting point.
+
+**The default target is `tui`** since 2026-09-04 — a Textual + SQLite app in
+your terminal, one process, no container. `--target web` is the original
+medium and stays reachable, green and generated in CI, because it is the only
+control this repo has for telling a target regression apart from a change
+regression.
 
 **[`README.md`](README.md) is the design document.** It explains the five
 load-bearing decisions and why each exists. Read it before changing pipeline
@@ -117,13 +124,17 @@ deliberate decision, not an accident of implementation.
 - **Each pass reads the previous pass's real source**, never a description of
   it. UI goes last and receives `routes.py`, because a template referencing a
   context key no route passes is the most common way a generated app 500s.
-- **Nothing is handed back unobserved.** `verify.py` brings the stack up, waits
-  on `/healthz` (which checks the DB, so it stays red while Postgres boots),
-  runs the smoke suite inside the container, and captures logs. Three repair
-  attempts, then a **floor**: the tree is handed back anyway with a
-  `RUNBOOK.md` naming the red stage, the last error, and what was tried. A
-  known-broken prototype beats a mystery, and both beat a loop that never
-  terminates.
+- **Nothing is handed back unobserved.** The verifier is the target's.
+  `verify.py` brings the web stack up, waits on `/healthz` (which checks the DB,
+  so it stays red while Postgres boots), runs the smoke suite inside the
+  container, and captures logs — `build -> health -> tests -> browser`.
+  `verify_tui.py` imports the terminal tree, starts it under `App.run_test`,
+  drives it, runs the smoke suite and compares the rendered screen buffer to an
+  empty application's — `import -> boot -> tests -> paint`, no daemon and no
+  port. Three repair attempts either way, then a **floor**: the tree is handed
+  back anyway with a `RUNBOOK.md` naming the red stage, the last error, and what
+  was tried. A known-broken prototype beats a mystery, and both beat a loop that
+  never terminates.
 - **The shrink guard**: if a repair shrinks the smoke suite, the file is
   reverted. Green because there is nothing left to fail is the one failure mode
   nobody would otherwise notice.

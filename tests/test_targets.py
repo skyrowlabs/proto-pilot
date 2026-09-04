@@ -58,9 +58,29 @@ def test_every_target_declares_the_whole_contract():
     registry has no list to update.
     """
     for name, module in targets.all().items():
-        for attr in ("NAME", "LABEL", "SKELETON_DIR", "CODE_PASSES", "WRITABLE", "PROTECTED", "ARCHETYPES"):
+        for attr in (
+            "NAME",
+            "LABEL",
+            "SKELETON_DIR",
+            "CODE_PASSES",
+            "REPAIR",
+            "WRITABLE",
+            "PROTECTED",
+            "ARCHETYPES",
+            # What the CLI has to know about the medium, and could not derive.
+            # Each of these was a sentence hardcoded somewhere that turned out
+            # to be true only of the web target: a port in the review
+            # checkpoint, a URL in the hand-back line, `make up`, "Container
+            # logs", a `docker compose` block in the RUNBOOK.
+            "USES_PORT",
+            "HANDOFF",
+            "RUN_HINT",
+            "LOGS_LABEL",
+            "MANUAL",
+        ):
             assert hasattr(module, attr), f"target {name!r} does not declare {attr}"
         assert callable(module.verifier), f"target {name!r} has no verifier()"
+        assert callable(module.preflight), f"target {name!r} has no preflight()"
         assert module.SKELETON_DIR.is_dir(), f"target {name!r} points at a skeleton that is not there"
         assert module.CODE_PASSES, f"target {name!r} has no passes"
 
@@ -120,13 +140,42 @@ def test_a_saved_spec_keeps_its_target(tmp_path, spec):
 
 
 def test_the_cli_default_and_the_field_default_are_separate_constants():
-    """Equal today, and the day Phase 6 moves one it must not move the other.
+    """They moved apart on 2026-09-04 and that is the whole of Phase 6.
 
-    Collapsing them is a one-line tidy-up that silently rewrites the meaning of
-    every spec written before the axis existed, and nothing else would go red.
+    `targets.DEFAULT` is now `tui` — what a NEW spec is born with. The field
+    default is still `web` — what a spec written before the axis existed
+    MEANT. Collapsing them is a one-line tidy-up that would silently rewrite
+    the meaning of every old `spec.json` on disk, and until the flip nothing
+    else would have gone red, because the two constants held the same string.
+
+    Pinned to the literals on purpose. A test written as `DEFAULT != field
+    default` would pass again the day somebody flipped the wrong one back.
     """
+    assert targets.DEFAULT == "tui"
     assert targets.DEFAULT in targets.names()
     assert Spec.model_fields["target"].default == "web"
+
+
+def test_an_old_spec_still_generates_the_web_app_it_always_did(tmp_path):
+    """The compatibility half of the flip, end to end rather than by field.
+
+    A `spec.json` with no `target` key is loaded, and the tree it renders is
+    the web skeleton — not the new default. This is the guarantee the field
+    default exists for, and after the flip it is the only thing standing
+    between an old prototype and a regeneration in the wrong medium.
+    """
+    from protopilot.render import render_skeleton
+
+    payload = {"name": "Gear List", "slug": "gearlist", "purpose": "Track gear.", "port": 8099}
+    path = tmp_path / "old" / ".protopilot" / "spec.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps(payload))
+
+    loaded = Spec.load(tmp_path / "old")
+    render_skeleton(loaded, tmp_path / "tree")
+
+    assert (tmp_path / "tree" / "compose.yml").exists(), "an old spec rendered something other than the web tree"
+    assert not (tmp_path / "tree" / "app" / "screens.py").exists()
 
 
 # ── what a target owns, and that it owns it alone ────────────────────────
@@ -261,6 +310,35 @@ def test_an_unknown_target_is_refused_at_intake_too():
 
 
 # ── the review checkpoint ────────────────────────────────────────────────
+
+
+def test_the_handoff_line_never_promises_a_url_without_a_port(spec):
+    """One sentence per target, and it is the last thing a user reads.
+
+    It was `http://localhost:{port}` in `cli._finish` for as long as there was
+    one medium. A target that does not listen has to say something else, and
+    a target that does must still say the URL — so this checks the pairing
+    rather than either half.
+    """
+    for name, module in targets.all().items():
+        line = module.HANDOFF.format(name=spec.name, slug=spec.slug, port=spec.port, directory="/tmp/x")
+        assert spec.name in line, f"{name}: the hand-back line does not say what was built"
+        if not module.USES_PORT:
+            assert "localhost" not in line, f"{name} has no port and its hand-back line offers a URL"
+        else:
+            assert str(spec.port) in line, f"{name} has a port and does not say where to find it"
+
+
+def test_the_summary_prints_a_port_only_for_a_target_that_has_one(spec):
+    """The review checkpoint is the one gate in the tool. A headline reading
+    "port 8099" over an app that listens on nothing is the tool being
+    confidently wrong at the only moment somebody could object."""
+    spec.target = "web"
+    assert f"port {spec.port}" in spec.summary()
+
+    spec.target = "tui"
+    assert f"port {spec.port}" not in spec.summary()
+    assert spec.slug in spec.summary(), "the headline lost the thing it is a headline for"
 
 
 def test_the_summary_prints_the_target(spec):

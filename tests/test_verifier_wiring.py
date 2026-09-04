@@ -261,6 +261,37 @@ def test_the_front_end_asks_the_target_rather_than_naming_the_class(tmp_path, mo
     assert asked == [(Path(job.project_dir), "web")]
 
 
+def test_the_front_end_is_pinned_to_web_rather_than_following_the_default(tmp_path, monkeypatch):
+    """`proto serve` hands back a link you click.
+
+    It used to take `targets.DEFAULT`, with the reason "no target picker yet" —
+    a workaround, and the Phase 6 flip falsified it. The durable reason is that
+    a terminal app has no URL, so `job.url` would point at nothing. Asserted
+    against the constant AND against the tree, because a pin nobody checks is
+    a literal waiting to drift.
+    """
+    from fakes import FakeVerifier
+
+    from protopilot.jobs import JobStore
+    from protopilot.verify import VerifyResult
+    from protopilot.web import app as web_app
+
+    assert web_app.TARGET == "web"
+
+    job = JobStore().create("track camping gear across trips")
+    web_app.run_generation(
+        job,
+        tmp_path,
+        backend="offline",
+        verifier_factory=lambda: FakeVerifier([VerifyResult(ok=True, stage="tests", summary="green")]),
+    )
+
+    root = Path(job.project_dir)
+    assert Spec.load(root).target == "web"
+    assert (root / "app" / "routes.py").exists()
+    assert job.url.startswith("http://localhost:"), "the front end promised a URL it could not honour"
+
+
 def test_an_injected_factory_still_wins(tmp_path, monkeypatch):
     """The other half of `verifier_factory or (...)`: when a caller supplies
     one, the default must not run as well. Every other test of the front end

@@ -34,6 +34,21 @@ def archetypes_default() -> str:
     return archetypes.DEFAULT
 
 
+#: The medium this front end generates in, pinned rather than defaulted.
+#:
+#: It used to take `targets.DEFAULT`, with the reason "the web front end has no
+#: target picker yet" -- a **workaround**, and the flip in Phase 6 of
+#: `docs/TODO/terminal-target.md` falsified it. The durable reason is the one
+#: that survives: what this front end hands back is a link you click, and a
+#: terminal app has no link. `job.url` would be a URL to nothing.
+#:
+#: So this is not "the default, copied". It is a constraint of the medium the
+#: front end is itself built in, and it stays `web` until somebody builds the
+#: half of the UI that tells a browser user how to run a thing that is not in a
+#: browser. `proto new --target web` is the same generation from a shell.
+TARGET = "web"
+
+
 def run_generation(
     job,
     workspace: Path,
@@ -62,10 +77,8 @@ def run_generation(
         job.idea,
         llm,
         archetype=chosen,
-        # The web front end has no target picker yet, so it takes the same
-        # default `proto new` does -- from `targets.DEFAULT` and never from a
-        # literal, because the day that constant moves this must move with it.
-        target=targets.DEFAULT,
+        # Pinned, and not `targets.DEFAULT`. See TARGET above.
+        target=TARGET,
         port=free_port(),
         direction=job.direction,
         theme=Theme(**job.theme) if job.theme else None,

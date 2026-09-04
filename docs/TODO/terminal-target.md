@@ -3,14 +3,14 @@ title: "The Terminal Target"
 slug: terminal-target
 shelf_status: planned
 priority: high
-updated: 2026-09-03
+updated: 2026-09-04
 tags: [target, skeleton, passes, verify, archetypes, tui]
 summary: "Make the output medium an axis and build a terminal target beside the web one — gated on a measurement, because the model has seen far less Textual than FastAPI."
 ---
 
 # The Terminal Target
 
-> **Status**: 🔴 Planned — designed, unreviewed
+> **Status**: 🟢 Landed 2026-09-04 — all six phases
 > **Shelf-Status**: planned
 > **Priority**: High — it is the direction the tool is being pointed, and the
 > first phase is what decides whether the direction is affordable
@@ -90,12 +90,17 @@ Full numbers, per-pass breakdown and every repair reason:
 Three findings there change phases below; they are marked inline.
 
 **The harness is built and the six runs are made.**
-[`scripts/spikes/terminal_target/`](../../scripts/spikes/terminal_target/) is
-the re-runnable measurement — three specs, a Textual brief, the five prompts, a
-write guard, a boot-and-paint check, and an incrementally written JSON record
-per run. Its README carries how to run the six, what comes out, and three
-things found while building it that this plan under-reads. Nothing under
-`protopilot/` was touched, so the gate below can still say no.
+`scripts/spikes/terminal_target/` was the re-runnable measurement — three
+specs, a Textual brief, the five prompts, a write guard, a boot-and-paint
+check, and an incrementally written JSON record per run. Nothing under
+`protopilot/` was touched, so the gate below could still say no.
+
+**Deleted 2026-09-04, once Phase 6 was green**, which is what
+[`scripts/spikes/README.md`](../../scripts/spikes/README.md) says a spike is
+for. The report keeps the finding. The prompts were **moved** into
+`protopilot/passes/tui/_brief.py` rather than deleted, because the numbers
+below describe those exact strings and a rewritten brief would have
+invalidated them.
 
 **Structured output holds.** Confirmed live on 2026-09-03: a `structured()`
 call with a Textual prompt and the `FILES_SCHEMA` shape returned a well-formed
@@ -365,15 +370,15 @@ The reason to be optimistic about the whole plan.
 
 ## Phase 6 — The offline baseline, without which none of this is tested
 
-- [ ] A deterministic Textual CRUD app in `baseline.py`'s terminal equivalent,
+- [x] A deterministic Textual CRUD app in `baseline.py`'s terminal equivalent,
       good enough that CI exercises the whole pipeline for this target with no
       key and no Docker. **This is not optional and it is not last because it
       is least important** — it is last because it needs the four phases above
       to exist. A target without a baseline is a target the suite cannot see
-- [ ] `--offline` produces a running terminal app end to end
-- [ ] The characterisation discipline: the offline output for a fixed spec is
+- [x] `--offline` produces a running terminal app end to end
+- [x] The characterisation discipline: the offline output for a fixed spec is
       byte-stable, so the golden manifests do not churn
-- [ ] **`proto new` defaults to `--target tui`, and writes it explicitly into
+- [x] **`proto new` defaults to `--target tui`, and writes it explicitly into
       every new `spec.json`.** Decided 2026-09-04 on Phase 1's numbers: equal
       competence, a cost paid in thinking time rather than in failure, and the
       medium enforcing the disclaimer the tool exists to make. This is the last
@@ -389,22 +394,75 @@ The reason to be optimistic about the whole plan.
       the terminal target regresses, "is this the target or the change?" is
       answerable only against a second target that still works
 
+> **Phase 6 landed 2026-09-04.** `targets.DEFAULT` is `tui`;
+> `Spec.target`'s field default is still `web` and
+> `tests/test_targets.py::test_the_cli_default_and_the_field_default_are_separate_constants`
+> now pins both literals, so flipping the wrong one back goes red.
+>
+> **The baseline arrived in Phase 4, not here**, and that is a deliberate
+> departure from this plan's order. `AGENTS.md` says a pass ships with both
+> implementations in the same change, and it wins: a pass whose `offline()`
+> does not exist is a pass the suite cannot see. What Phase 6 actually did with
+> it is the golden manifest (`tests/golden/tui_offline_manifest.json`) and the
+> end-to-end run through the real CLI and the real verifier.
+>
+> **Completing the archetype × target matrix was not optional once the flip
+> happened**, and this plan under-reads it. `tests/test_targets.py` asserts the
+> DEFAULT target can build every installed archetype — with the reason that a
+> hole *there* is `proto new` refusing its own classifier's answer — so
+> `turn-based-game` needed a terminal baseline. It cost three generators on the
+> archetype (`tui_screens_py`, `tui_smoke_py`, `tui_tcss`) and no change to its
+> `models_py` or `seed_py`, which are pure SQLAlchemy and correct in both
+> media. The matrix is four baselines, all four green in the unit suite.
+>
+> **The flip found five sentences that were true only of Docker**, none of them
+> in this plan. The review checkpoint printed `-> port 8082` for an app that
+> listens on nothing; the hand-back line offered `http://localhost:8082`;
+> `--no-verify` said `make up`; the RUNBOOK said "Container logs" and told the
+> reader to run `docker compose logs -f app`. Each is now a constant on the
+> target — `USES_PORT`, `HANDOFF`, `RUN_HINT`, `LOGS_LABEL`, `MANUAL` — and
+> `test_every_target_declares_the_whole_contract` covers all five, so a third
+> target cannot omit one. That is the real cost of a second medium and it is
+> larger than the four-row table in Phase 2.
+>
+> **`proto serve` is pinned to `web` rather than following the default.** It
+> hands back a link you click, and a terminal app has no link. The old comment
+> said "no target picker yet", which was a workaround; the durable reason is in
+> `protopilot/web/app.py::TARGET` and the open half is in `NOTES.md`.
+>
+> **`scripts/spikes/terminal_target/` is deleted**, along with
+> `tests/test_terminal_spike.py`, which is what a spike is for. The report keeps
+> the finding, its "Reproducing" section says the harness is gone and how to
+> recover it, and the prompts were *moved* rather than rewritten.
+
 ## Acceptance
 
-- [ ] `./pp check pre-push` green
-- [ ] Phase 1's numbers exist and are recorded, whichever way they fell
-- [ ] A `spec.json` written before this plan loads, and generates a web app
-      byte-identical to what it generated before
-- [ ] `proto new "<idea>" --target tui --offline` produces a terminal app that
+- [x] `./pp check pre-push` green
+- [x] Phase 1's numbers exist and are recorded, whichever way they fell —
+      [the go/no-go report](../reports/occasional/2026-09-04-terminal-target-go-no-go.md)
+- [x] A `spec.json` written before this plan loads, and generates a web app
+      byte-identical to what it generated before —
+      `tests/test_crud_characterisation.py` against
+      `tests/golden/crud_offline_manifest.json`, plus
+      `test_an_old_spec_still_generates_the_web_app_it_always_did`
+- [x] `proto new "<idea>" --target tui --offline` produces a terminal app that
       starts, renders a non-empty screen, and passes its own smoke suite — with
-      no key, no Docker, and no Playwright
-- [ ] A terminal app whose screen renders nothing **fails verify**, demonstrated
-      by generating one, not asserted
-- [ ] An unsupported archetype × target pair is refused at intake, naming both
-- [ ] The web target's five passes, skeleton and verifier are reachable and
-      green, unchanged
-- [ ] `proto new "<idea>"` with no `--target` produces a terminal app, and a
-      `spec.json` written before this plan still produces a web one
+      no key, no Docker, and no Playwright —
+      `test_proto_new_target_tui_offline_produces_a_working_terminal_app`
+- [x] A terminal app whose screen renders nothing **fails verify**, demonstrated
+      by generating one, not asserted —
+      `test_a_screen_that_renders_nothing_fails_verify`, with
+      `test_the_paint_stage_is_the_backstop_when_nothing_else_looks` reaching the
+      stage past the skeleton's own boot check
+- [x] An unsupported archetype × target pair is refused at intake, naming both —
+      `test_the_pair_is_refused_at_intake_before_any_call`
+- [x] The web target's five passes, skeleton and verifier are reachable and
+      green, unchanged — the two golden manifests, and
+      `test_the_web_runbook_is_unchanged_in_shape`
+- [x] `proto new "<idea>"` with no `--target` produces a terminal app, and a
+      `spec.json` written before this plan still produces a web one —
+      `test_new_with_no_target_produces_a_terminal_app` and
+      `test_an_old_spec_still_generates_the_web_app_it_always_did`
 
 ## Dropped, and why
 

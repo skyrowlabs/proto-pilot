@@ -28,6 +28,8 @@ looks like it should be.
 from __future__ import annotations
 
 import ast
+import hashlib
+import json
 import os
 import subprocess
 import sys
@@ -142,18 +144,29 @@ def test_every_declared_archetype_has_a_terminal_brief():
 
 
 def test_an_unsupported_pair_is_refused_naming_both_halves():
-    """The matrix hole this target actually has today, at the place it is
-    enforced. `turn-based-game` has a terminal fragment and no terminal
-    baseline, so the honest answer is a refusal rather than a tracking app
-    where somebody asked for a board."""
-    unsupported = sorted(set(_brief.ARCHETYPE_BRIEFS) - set(TUI.ARCHETYPES))
-    if not unsupported:
-        pytest.skip("the tui target now builds every shape it can describe")
+    """A shape this target does not build is refused at intake, by name.
+
+    The matrix has no hole in it today — `ARCHETYPES` is every installed
+    archetype, which it has to be now that this is `targets.DEFAULT`. So the
+    refusal is exercised with a name no build will ever have, rather than by
+    skipping when the hole closes: a skip is how a suite quietly stops testing,
+    and this assertion is about the mechanism rather than about today's
+    coverage.
+    """
     with pytest.raises(targets.UnsupportedPair) as caught:
-        targets.check_pair("tui", unsupported[0])
+        targets.check_pair("tui", "holodeck")
     message = str(caught.value)
-    assert "tui" in message and unsupported[0] in message
+    assert "tui" in message and "holodeck" in message
     assert "crud" in message, "a refusal that does not say what it CAN build leaves nowhere to go"
+
+
+def test_it_builds_every_installed_archetype():
+    """No hole in the default target. `tests/test_targets.py` asserts this of
+    whichever target is default; this says it of `tui` by name, so demoting it
+    later does not silently take the coverage with it."""
+    from protopilot import archetypes
+
+    assert set(TUI.ARCHETYPES) == set(archetypes.names())
 
 
 # ── the passes ───────────────────────────────────────────────────────────
@@ -451,3 +464,62 @@ def test_the_generation_is_byte_stable(tui_spec, tmp_path):
     for path in sorted(first.rglob("*.py")):
         rel = path.relative_to(first)
         assert path.read_text() == (second / rel).read_text(), f"{rel} differs between two identical generations"
+
+
+# ── the characterisation ─────────────────────────────────────────────────
+
+
+GOLDEN = Path(__file__).resolve().parent / "golden" / "tui_offline_manifest.json"
+
+
+def manifest(tree: Path) -> dict:
+    """Every file in a generated terminal tree, hashed.
+
+    Nothing is normalised, and nothing needs to be: unlike the web tree this
+    one embeds no absolute path and no port anywhere — the only substitutions
+    it makes are the app's name, purpose and slug. The absence of a
+    normalisation step here is itself a fact about the target.
+    """
+    out = {}
+    for path in sorted(tree.rglob("*")):
+        if not path.is_file() or {"__pycache__", ".pytest_cache", ".git"} & set(path.parts):
+            continue
+        out[str(path.relative_to(tree))] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return out
+
+
+def test_the_offline_terminal_generation_is_unchanged(tree):
+    """A characterisation, not a specification. It asserts nothing about
+    whether the output is good — only that it is the same as last time, so a
+    change to a generator that was meant to be cosmetic has to be looked at.
+
+    Regenerate deliberately, and read the diff before committing it:
+
+        PROTOPILOT_REGOLD=1 python -m pytest tests/test_tui_target.py
+
+    A golden file updated without reading the diff asserts nothing.
+    """
+    current = manifest(tree)
+    if os.environ.get("PROTOPILOT_REGOLD"):
+        GOLDEN.parent.mkdir(parents=True, exist_ok=True)
+        GOLDEN.write_text(json.dumps(current, indent=2, sort_keys=True) + "\n")
+        pytest.skip("regenerated the golden manifest")
+
+    expected = json.loads(GOLDEN.read_text())
+    assert sorted(current) == sorted(expected), "the set of files in a generated terminal tree changed"
+    changed = sorted(name for name in expected if current[name] != expected[name])
+    assert not changed, f"generated output changed for: {changed}"
+
+
+def test_the_golden_manifest_covers_the_files_that_matter():
+    """A manifest that silently stopped covering the tree would pass forever."""
+    expected = json.loads(GOLDEN.read_text())
+    for path in (
+        "app/main.py",
+        "app/screens.py",
+        "app/app.tcss",
+        "tests/screen.py",
+        "tests/test_smoke.py",
+        ".gitignore",
+    ):
+        assert path in expected, f"{path} is missing from the tree being characterised"

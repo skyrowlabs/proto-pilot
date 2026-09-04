@@ -540,3 +540,450 @@ def templates_for(spec: Spec) -> dict[str, str]:
         "app/templates/matches_list.html": _LIST,
         "app/templates/matches_detail.html": _DETAIL,
     }
+
+
+# ── the terminal generators ──────────────────────────────────────────────
+#
+# The same shape one medium over, and the reason they exist is
+# `docs/TODO/terminal-target.md` Phase 6: the default target has to be able to
+# build every installed archetype, because a hole there is `proto new` refusing
+# its own classifier's answer.
+#
+# `models_py` and `seed_py` above are reused unchanged -- both are pure
+# SQLAlchemy and neither knows whether a route or a screen is going to read
+# them. Only these three differ, which is the same three
+# `protopilot/baseline_tui.py` generates for `crud`.
+#
+# The game logic lives in `app/screens.py` rather than in a module of its own,
+# for the same reason it lives in `app/routes.py` on the web side: the terminal
+# target's write allowlist is six paths and a seventh is not worth widening it
+# for. The generated smoke suite imports `LINES` from there exactly as the web
+# one does.
+
+_TUI_LOGIC = '''\
+def lines() -> list[list[int]]:
+    """Every run of WIN_LENGTH cells, in all four directions."""
+    out = []
+    for y in range(HEIGHT):
+        for x in range(WIDTH):
+            for dx, dy in ((1, 0), (0, 1), (1, 1), (1, -1)):
+                end_x, end_y = x + dx * (WIN_LENGTH - 1), y + dy * (WIN_LENGTH - 1)
+                if 0 <= end_x < WIDTH and 0 <= end_y < HEIGHT:
+                    out.append([(y + dy * i) * WIDTH + (x + dx * i) for i in range(WIN_LENGTH)])
+    return out
+
+
+LINES = lines()
+
+
+def winner_of(board: str) -> str:
+    """The piece occupying a full line, or an empty string."""
+    for line in LINES:
+        first = board[line[0]]
+        if first != EMPTY and all(board[i] == first for i in line):
+            return first
+    return ""
+
+
+def current(db: Session) -> Match:
+    """The game on the board: the most recent one, finished or not.
+
+    Deliberately NOT the most recent *unfinished* game. That version replaces
+    the board with a fresh empty one the instant somebody wins, so the result
+    is never visible -- you play the winning move and the screen shows you a
+    new game.
+    """
+    match = db.scalars(select(Match).order_by(Match.id.desc()).limit(1)).first()
+    if match is None:
+        match = Match(board=EMPTY * (WIDTH * HEIGHT), turn=PIECES[0], winner="", finished=False, moves=0)
+        db.add(match)
+        db.commit()
+        db.refresh(match)
+    return match
+
+
+def play(db: Session, match: Match, index: int) -> bool:
+    """Take a turn. An illegal move changes nothing and says so by returning
+    False -- it must not raise, and it must not silently look like it worked."""
+    if match.finished or not (0 <= index < WIDTH * HEIGHT) or match.board[index] != EMPTY:
+        return False
+
+    cells = list(match.board)
+    cells[index] = match.turn
+    match.board = "".join(cells)
+    match.moves += 1
+
+    won = winner_of(match.board)
+    if won:
+        match.winner, match.finished = won, True
+    elif EMPTY not in match.board:
+        match.winner, match.finished = "draw", True
+    else:
+        match.turn = PIECES[match.moves % len(PIECES)]
+    db.commit()
+    return True
+
+
+def board_text(board: str) -> str:
+    """The grid as lines of text, for a screen that is not the board itself."""
+    return "\\n".join(" ".join(board[y * WIDTH : (y + 1) * WIDTH]) for y in range(HEIGHT))
+'''
+
+_TUI_HOME = '''\
+class HomeScreen(AppScreen):
+    """__PURPOSE__
+
+    The name `app/main.py` hard-codes: it is returned from
+    `get_default_screen()`, so it is the bottom of the stack and Escape on it
+    does nothing.
+    """
+
+    BINDINGS = [
+        Binding("b", "open_board", "Board"),
+        Binding("m", "open_matches", "Matches"),
+    ]
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Static("__NAME__", id="app-name")
+        yield Static("__PURPOSE__", id="app-purpose")
+        yield Static("", id="status")
+        yield Static("", id="grid")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        with self.db() as db:
+            match = current(db)
+            label, board = match.display, match.board
+        self.sub_title = label
+        self.query_one("#status", Static).update(label)
+        self.query_one("#grid", Static).update(board_text(board))
+
+    def action_open_board(self) -> None:
+        self.app.push_screen(BoardScreen())
+
+    def action_open_matches(self) -> None:
+        self.app.push_screen(MatchesScreen())
+'''
+
+_TUI_BOARD = '''\
+class BoardScreen(AppScreen):
+    """The game. One `Button` per square, in a `Grid`.
+
+    Pressing a button is a move and the screen redraws from the database after
+    every one. That is the whole interaction model -- no dragging, no
+    animation, no timer -- and the state is one row, so quitting and restarting
+    shows the same game.
+    """
+
+    BINDINGS = [
+        Binding("n", "new_game", "New game"),
+    ]
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Static("", id="status")
+        with Grid(id="board"):
+            for index in range(WIDTH * HEIGHT):
+                yield Button(EMPTY, id=f"cell-{index}")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        self.redraw()
+
+    def redraw(self) -> None:
+        """Repaint every square from the database.
+
+        Read whole, inside one session, and applied to the widgets afterwards.
+        A screen that patched only the square it just played would drift from
+        the row the moment anything else touched it.
+        """
+        with self.db() as db:
+            match = current(db)
+            board, label = match.board, match.display
+        for index, piece in enumerate(board):
+            self.query_one(f"#cell-{index}", Button).label = piece
+        self.sub_title = label
+        self.query_one("#status", Static).update(label)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        identifier = event.button.id or ""
+        if not identifier.startswith("cell-"):
+            return
+        with self.db() as db:
+            play(db, current(db), int(identifier.split("-")[1]))
+        self.redraw()
+
+    def action_new_game(self) -> None:
+        """Start a fresh game, leaving the finished one in the history."""
+        with self.db() as db:
+            db.add(Match(board=EMPTY * (WIDTH * HEIGHT), turn=PIECES[0], winner="", finished=False, moves=0))
+            db.commit()
+        self.redraw()
+'''
+
+_TUI_MATCHES = '''\
+class MatchesScreen(AppScreen):
+    """Every game played, newest first. Enter opens one."""
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Static("Matches", id="heading")
+        yield DataTable(id="rows")
+        yield Static("", id="empty")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        self.sub_title = "Matches"
+        table = self.query_one("#rows", DataTable)
+        table.cursor_type = "row"
+        table.add_columns("Id", "Result", "To play", "Moves")
+        with self.db() as db:
+            rows = [
+                (str(row.id), row.winner or "in progress", row.turn, str(row.moves))
+                for row in db.scalars(select(Match).order_by(Match.id.desc())).all()
+            ]
+        for row in rows:
+            table.add_row(*row, key=row[0])
+        self.query_one("#empty", Static).update("" if rows else "No games yet -- press b on the home screen.")
+
+    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
+        if event.row_key.value is not None:
+            self.app.push_screen(MatchRecordScreen(int(event.row_key.value)))
+
+
+class MatchRecordScreen(AppScreen):
+    """One finished or abandoned game, as it stood."""
+
+    def __init__(self, row_id: int) -> None:
+        super().__init__()
+        self.row_id = row_id
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Static("", id="heading")
+        yield Static("", id="grid")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        with self.db() as db:
+            row = db.get(Match, self.row_id)
+            if row is None:
+                self.query_one("#heading", Static).update(f"Match {self.row_id} is not here any more.")
+                return
+            label, board = row.display, row.board
+        self.sub_title = label
+        self.query_one("#heading", Static).update(label)
+        self.query_one("#grid", Static).update(board_text(board))
+'''
+
+
+def tui_screens_py(spec: Spec) -> str:
+    """The board, the history, and the game logic the smoke suite imports."""
+    header = (
+        BANNER + "from __future__ import annotations\n\n"
+        "from app.base import AppScreen\n"
+        "from app.models import EMPTY, HEIGHT, PIECES, WIDTH, WIN_LENGTH, Match\n"
+        "from sqlalchemy import select\n"
+        "from sqlalchemy.orm import Session\n"
+        "from textual.app import ComposeResult\n"
+        "from textual.binding import Binding\n"
+        "from textual.containers import Grid\n"
+        "from textual.widgets import Button, DataTable, Footer, Header, Static\n\n\n"
+    )
+    home = _TUI_HOME.replace("__NAME__", _one_line(spec.name)).replace("__PURPOSE__", _one_line(spec.purpose))
+    return header + "\n\n".join([_TUI_LOGIC, home, _TUI_BOARD, _TUI_MATCHES])
+
+
+def _one_line(text: str) -> str:
+    """Model-written prose, safe inside a double-quoted literal and a docstring."""
+    return text.replace("\\", " ").replace('"', "'").replace("\n", " ").strip()
+
+
+_TUI_TCSS = """\
+/* The board is the screen. Everything else gets out of its way. */
+
+Screen {
+    layout: vertical;
+}
+
+#app-name {
+    text-style: bold;
+    color: $primary;
+    padding: 1 2 0 2;
+}
+
+#app-purpose {
+    color: $text-muted;
+    padding: 0 2 1 2;
+}
+
+#status, #heading {
+    text-style: bold;
+    color: $accent;
+    padding: 1 2;
+}
+
+#grid {
+    padding: 1 2;
+    color: $text;
+}
+
+#board {
+    grid-size: __WIDTH__ __HEIGHT__;
+    grid-gutter: 1;
+    align: center middle;
+    height: 1fr;
+    padding: 1 2;
+}
+
+#board Button {
+    width: 100%;
+    height: 100%;
+    min-width: 5;
+    content-align: center middle;
+}
+
+DataTable {
+    height: 1fr;
+    margin: 0 2;
+}
+
+#empty {
+    color: $warning;
+    padding: 1 2;
+}
+"""
+
+
+def tui_tcss(spec: Spec) -> str:
+    """The one place the board's dimensions become a layout.
+
+    `grid-size` is the reason this is generated rather than fixed: a 3x3 board
+    and a 7x6 one are the same screens and different stylesheets, and a Grid
+    with no `grid-size` stacks its children into a column.
+    """
+    board = board_of(spec)
+    return _TUI_TCSS.replace("__WIDTH__", str(board.width)).replace("__HEIGHT__", str(board.height))
+
+
+def tui_smoke_py(spec: Spec) -> str:
+    """Generated before the screens, from the spec.
+
+    The test that matters is `test_playing_to_a_win_shows_the_result`. Every
+    other check here would pass against a static picture of a board; that one
+    is the difference between a game and a screenshot of one -- and in this
+    medium it is also the only test that would catch a board which redraws from
+    an attribute instead of from the row.
+    """
+    return (
+        BANNER + "from __future__ import annotations\n\n"
+        "from sqlalchemy import select\n"
+        "from textual.widgets import Button, DataTable\n\n"
+        "from app.models import EMPTY, Match\n"
+        "from app.screens import LINES\n"
+        "from tests.screen import mentions, visible, where\n\n\n"
+        "async def test_the_app_starts_on_the_home_screen(app) -> None:\n"
+        "    async with app.run_test(size=(100, 30)) as pilot:\n"
+        "        await pilot.pause()\n"
+        '        assert type(app.screen).__name__ == "HomeScreen", where(app)\n'
+        "        assert len(app.screen_stack) == 1, where(app)\n"
+        "        assert visible(app).strip(), where(app)\n\n\n"
+        "async def test_a_game_is_seeded(app, db) -> None:\n"
+        '    """A prototype with no game in it cannot be demonstrated."""\n'
+        "    async with app.run_test(size=(100, 30)) as pilot:\n"
+        "        await pilot.pause()\n"
+        "    db.rollback()\n"
+        "    assert db.scalars(select(Match)).first() is not None\n\n\n"
+        "async def test_the_board_can_be_reached_and_is_drawn(app) -> None:\n"
+        '    """Reached the way a person reaches it, and the squares are widgets\n'
+        '    rather than a picture of widgets."""\n'
+        "    async with app.run_test(size=(100, 30)) as pilot:\n"
+        "        await pilot.pause()\n"
+        '        await pilot.press("b")\n'
+        "        await pilot.pause()\n"
+        '        assert type(app.screen).__name__ == "BoardScreen", where(app)\n'
+        "        assert len(app.screen.query(Button)) > 1, where(app)\n\n\n"
+        "async def test_playing_a_square_changes_the_board(app, db) -> None:\n"
+        '    """The one test a static screen could not pass."""\n'
+        "    async with app.run_test(size=(100, 30)) as pilot:\n"
+        "        await pilot.pause()\n"
+        '        await pilot.press("b")\n'
+        "        await pilot.pause()\n"
+        "        db.rollback()\n"
+        "        before = db.scalars(select(Match).order_by(Match.id.desc()).limit(1)).first()\n"
+        '        assert before is not None, "no game to play"\n'
+        "        empty_index = before.board.index(EMPTY)\n"
+        "        moves = before.moves\n\n"
+        '        await pilot.click(f"#cell-{empty_index}")\n'
+        "        await pilot.pause()\n\n"
+        "    db.rollback()\n"
+        "    after = db.get(Match, before.id)\n"
+        "    assert after is not None\n"
+        '    assert after.board[empty_index] != EMPTY, "the move did not land on the board"\n'
+        '    assert after.moves == moves + 1, "the move was not counted"\n\n\n'
+        "async def test_playing_an_occupied_square_is_refused(app, db) -> None:\n"
+        '    """It must not raise, and it must not silently look like it worked."""\n'
+        "    async with app.run_test(size=(100, 30)) as pilot:\n"
+        "        await pilot.pause()\n"
+        '        await pilot.press("b")\n'
+        "        await pilot.pause()\n"
+        "        db.rollback()\n"
+        "        match = db.scalars(select(Match).order_by(Match.id.desc()).limit(1)).first()\n"
+        "        assert match is not None\n"
+        "        taken = match.board.index(EMPTY)\n\n"
+        '        await pilot.click(f"#cell-{taken}")\n'
+        "        await pilot.pause()\n"
+        "        db.rollback()\n"
+        "        after_first = db.get(Match, match.id).moves\n\n"
+        '        await pilot.click(f"#cell-{taken}")\n'
+        "        await pilot.pause()\n\n"
+        "    db.rollback()\n"
+        "    assert db.get(Match, match.id).moves == after_first\n\n\n"
+        "async def test_playing_to_a_win_shows_the_result(app, db) -> None:\n"
+        '    """The test that a static screen and a half-working one both fail.\n\n'
+        "    It starts its own game rather than using the seeded one: the suite\n"
+        "    shares a database and earlier tests have already put pieces on that\n"
+        "    board, so a test assuming an empty grid would pass or fail on the\n"
+        "    order it happened to run in.\n"
+        '    """\n'
+        "    async with app.run_test(size=(100, 30)) as pilot:\n"
+        "        await pilot.pause()\n"
+        '        await pilot.press("b")\n'
+        "        await pilot.pause()\n"
+        '        await pilot.press("n")\n'
+        "        await pilot.pause()\n\n"
+        "        db.rollback()\n"
+        "        match = db.scalars(select(Match).order_by(Match.id.desc()).limit(1)).first()\n"
+        '        assert match is not None and match.board.count(EMPTY) == len(match.board), "new game is not empty"\n\n'
+        "        line = LINES[0]\n"
+        "        others = [i for i in range(len(match.board)) if i not in line]\n"
+        "        for step, cell in enumerate(line):\n"
+        '            await pilot.click(f"#cell-{cell}")\n'
+        "            await pilot.pause()\n"
+        "            if step < len(line) - 1:\n"
+        '                await pilot.click(f"#cell-{others[step]}")\n'
+        "                await pilot.pause()\n\n"
+        "        db.rollback()\n"
+        "        played = db.get(Match, match.id)\n"
+        '        assert played.winner, "a completed line did not register a winner"\n'
+        '        assert played.finished, "the game did not end"\n'
+        '        assert mentions(app, played.winner), f"the board does not show the result; {where(app)}"\n\n\n'
+        "async def test_the_history_lists_every_game(app, db) -> None:\n"
+        "    async with app.run_test(size=(100, 30)) as pilot:\n"
+        "        await pilot.pause()\n"
+        '        await pilot.press("m")\n'
+        "        await pilot.pause()\n"
+        '        assert type(app.screen).__name__ == "MatchesScreen", where(app)\n'
+        '        table = app.screen.query_one("#rows", DataTable)\n'
+        '        assert table.row_count > 0, f"no games in the history; {where(app)}"\n\n\n'
+        "async def test_a_match_record_opens(app, db) -> None:\n"
+        "    async with app.run_test(size=(100, 30)) as pilot:\n"
+        "        await pilot.pause()\n"
+        '        await pilot.press("m")\n'
+        "        await pilot.pause()\n"
+        '        await pilot.press("enter")\n'
+        "        await pilot.pause()\n"
+        '        assert type(app.screen).__name__ == "MatchRecordScreen", where(app)\n'
+        "        assert visible(app).strip(), where(app)\n"
+    )

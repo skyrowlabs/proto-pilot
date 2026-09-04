@@ -66,9 +66,25 @@ SKELETON_ROOT = Path(__file__).resolve().parents[2] / "skeleton"
 
 #: The target `proto new` chooses when the user does not say.
 #:
-#: See the module docstring: this is NOT `Spec.target`'s field default, and the
-#: two are only equal until Phase 6 of `docs/TODO/terminal-target.md`.
-DEFAULT = "web"
+#: **`tui` since 2026-09-04**, and this is the whole of the change Phase 6 of
+#: `docs/TODO/terminal-target.md` describes. It is NOT `Spec.target`'s field
+#: default and must never be collapsed into it -- see the module docstring, and
+#: `tests/test_targets.py`, which holds that line. A spec written before the
+#: axis existed still means `web`, permanently; this says what a *new* spec is
+#: born with.
+#:
+#: Decided on the Phase 1 numbers rather than on preference: equal repair
+#: attempts (2.33 against 2.33 over six live runs), a cost paid in thinking
+#: time rather than in failure, and a medium that enforces the disclaimer the
+#: tool exists to make -- nobody mistakes a terminal app for a product.
+#:
+#: The web target is not demoted by this. It stays reachable with
+#: `--target web`, keeps its passes, its skeleton, its verifier and its offline
+#: baseline green, and keeps being generated in CI, because it is the only
+#: control this repo has: when the terminal target regresses, "is this the
+#: target or the change?" is answerable only against a second target that still
+#: works.
+DEFAULT = "tui"
 
 
 class MissingTarget(KeyError):

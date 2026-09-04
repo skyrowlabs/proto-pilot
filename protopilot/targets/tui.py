@@ -104,12 +104,35 @@ WRITABLE = (
 PROTECTED: tuple[str, ...] = ()
 
 #: Every archetype this target can build -- see the module docstring for what
-#: that claim requires. `crud` only, for now: `turn-based-game` has a terminal
-#: prompt fragment and no terminal offline baseline, so the honest failure for
-#: that pair is `UnsupportedPair` naming both halves rather than a generated
-#: tracking app where somebody asked for a board.
-ARCHETYPES = ("crud",)
+#: that claim requires.
+#:
+#: Both of them since Phase 6, and completing the matrix was not optional once
+#: this became `targets.DEFAULT`: a hole in the DEFAULT target is `proto new`
+#: refusing its own classifier's answer, which is a worse failure than any
+#: stated hole elsewhere. `tests/test_targets.py` holds exactly that line.
+#:
+#: What it cost is the concrete form of "the one that will hurt":
+#: `archetypes/turn_based_game.py` grew `tui_screens_py`, `tui_smoke_py` and
+#: `tui_tcss` beside its web three. Its `models_py` and `seed_py` are reused
+#: unchanged, because both are pure SQLAlchemy -- so the multiplication is
+#: three files per pair rather than five.
+ARCHETYPES = ("crud", "turn-based-game")
 
+
+#: Whether `spec.port` means anything for this target. It does not.
+#:
+#: A terminal app listens on nothing. The field is still on `Spec` -- it is
+#: identity for the web target and it is carried through an amend -- but the
+#: review checkpoint must not print it, because a person approving a
+#: generation and reading "port 8082" has been told something false about the
+#: thing they are approving.
+USES_PORT = False
+
+#: The line printed when a generation comes back green.
+#:
+#: Not a URL. The most common way a tool lies is by reusing the sentence that
+#: was true of the only medium it used to have.
+HANDOFF = "{name} is ready:  cd {directory} && make run"
 
 #: What a person types to start this prototype. One process, no port.
 RUN_HINT = "cd {directory} && make run"

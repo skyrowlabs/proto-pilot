@@ -63,8 +63,22 @@ is only a pointer at it).
   the *registry*, not about Docker, and a terminal tree is registered like any
   other — so it probably applies unchanged and just needs saying. `proto gc` and
   the labels are the half that does not apply, and the question is whether they
-  should say so for a `tui` project or stay silent. Neither is decidable before
-  Phase 5 settles what a terminal verify leaves behind.
+  should say so for a `tui` project or stay silent.
+
+  **Phase 5 answered what a terminal verify leaves behind, and the answer is
+  "one directory".** `verify_tui` writes a fresh SQLite file per attempt into
+  `<tree>/.dbs/`, which is inside the tree and goes when the tree goes. Nothing
+  outlives the directory, so `gc` genuinely has nothing to collect — the
+  question is now purely one of what to *say*, which makes it cheaper than it
+  looked and still not answered.
+
+  Two smaller ones opened alongside it, and both are cosmetic rather than
+  broken. `proto ls` prints a port and an up/down state for every prototype,
+  and a terminal tree has neither — it is registered with the port `free_port`
+  handed out and will always read as `down`. And `registry.record` allocates
+  that port at all, which is one number out of a range nothing will bind. The
+  honest fix for both is a registry that knows the target; the honest reason
+  not to do it today is that neither misleads anybody into a wrong action.
 
 - **`auth: "password"` is accepted by the spec and implemented by no pass.** A
   spec can ask for it and nothing will build it. Either implement it or reject it
@@ -77,6 +91,17 @@ is only a pointer at it).
   route, a template and a smoke test for every custom screen. The bug had teeth:
   `checkable_paths()` handed such a path to the browser stage, which fetched a
   404 and reported the screen as broken.
+
+- **The web front end generates web prototypes only, and that is pinned rather
+  than defaulted.** `protopilot/web/app.py::TARGET` is `"web"`. It used to take
+  `targets.DEFAULT`, with the reason "no target picker yet" — a workaround, and
+  the Phase 6 flip falsified it. The durable reason is that `proto serve` hands
+  back a link you click, and a terminal app has no link.
+
+  What is open is the half of the UI that would make a picker honest: a browser
+  user choosing `tui` needs to be told a path and a command rather than shown a
+  URL, and `job.url` is a single string that assumes otherwise. Small, and not
+  worth doing until somebody wants it.
 
 ## Open — the direction
 
@@ -578,6 +603,29 @@ is only a pointer at it).
   the natural scoreboard. It is an experiment with a built-in grader, not a swap.
 
 ## Resolved
+
+- **2026-09-04 — the terminal target, all six phases, and `proto new` now
+  builds one by default.** Filed at
+  [docs/TODO/terminal-target.md](docs/TODO/terminal-target.md) with per-phase
+  landed notes; the go/no-go that gated it is
+  [the 2026-09-04 report](docs/reports/occasional/2026-09-04-terminal-target-go-no-go.md).
+
+  `targets.DEFAULT` is `tui`; `Spec.target`'s field default is still `web` and
+  always will be, because that one answers "what did a spec written before the
+  axis mean". The web target is not demoted — same passes, same skeleton, same
+  verifier, still generated in CI — because it is the only control for telling
+  a target regression apart from a change regression.
+
+  Four things worth knowing that are not in the plan. The archetype brief is a
+  **fifth** thing a target owns beyond the four Phase 2 listed, because both
+  shipped fragments are written in web down to "draw the pieces as inline SVG".
+  The CLI needed five more medium facts from a target — `USES_PORT`, `HANDOFF`,
+  `RUN_HINT`, `LOGS_LABEL`, `MANUAL` — every one of them a sentence that had
+  been hardcoded and was true only of Docker. `textual` and `sqlalchemy` became
+  runtime dependencies, because this target verifies in process and there is no
+  container between proto.pilot and the tree it is checking. And the matrix is
+  now four baselines: two archetypes against two targets, all four green in the
+  unit suite with no key, no daemon and no browser.
 
 - **2026-09-01 — Phase 0 of the lifecycle work: both standing traps are gone.**
 

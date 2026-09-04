@@ -190,9 +190,24 @@ def test_new_writes_the_chosen_target_into_the_spec(run, tmp_path):
 
 
 def test_new_with_no_target_uses_the_registrys_default(run, tmp_path):
-    """`targets.DEFAULT`, never a literal in `cli.py`. Phase 6 moves the
-    constant and this must move with it rather than pinning `web`."""
+    """`targets.DEFAULT`, never a literal in `cli.py`. Phase 6 moved the
+    constant and this moved with it rather than pinning `web`."""
     assert generated(run, tmp_path)["target"] == targets.DEFAULT
+
+
+def test_new_with_no_target_produces_a_terminal_app(run, tmp_path):
+    """The flip, at the command a person actually types.
+
+    Pinned to the tree rather than to the constant. `test_..._uses_the_
+    registrys_default` above would stay green if `DEFAULT` were flipped back,
+    because it compares the spec to whatever the constant says; this one says
+    what a person gets.
+    """
+    generated(run, tmp_path)
+    tree = tmp_path / "tree"
+    assert (tree / "app" / "screens.py").exists(), "`proto new` with no --target did not build a terminal app"
+    assert not (tree / "compose.yml").exists()
+    assert not (tree / "Dockerfile").exists()
 
 
 def test_the_target_reaches_the_review_checkpoint(run, tmp_path):

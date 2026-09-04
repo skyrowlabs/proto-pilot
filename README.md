@@ -9,7 +9,7 @@
 
 A framework for prototyping ideas with agents.
 
-Give it an idea and a little direction; get back a prototype running in Docker.
+Give it an idea and a little direction; get back a prototype you can run.
 
 ```bash
 proto new "track camping gear across trips" --direction "make it feel like a checklist"
@@ -18,8 +18,10 @@ proto new "track camping gear across trips" --direction "make it feel like a che
 ```
 intake...
 
-Gear List (gear_list)  ->  port 8080
+Gear List (gear_list)
   Track what gear goes on which trip, and what is still unpacked.
+  target: tui
+  archetype: crud
   entities:
     Trip
       title: str
@@ -34,25 +36,30 @@ Gear List (gear_list)  ->  port 8080
 
 Generate this? [Y/n]
 
-rendering skeleton...   24 skeleton files
-  pass schema...  app/models.py
-  pass smoke...   tests/test_smoke.py
-  pass seed...    app/seed.py
-  pass routes...  app/routes.py
-  pass ui...      5 templates
+rendering skeleton...   19 skeleton files
+  pass schema...   app/models.py
+  pass smoke...    tests/test_smoke.py
+  pass seed...     app/seed.py
+  pass screens...  app/screens.py
+  pass ui...       app/app.tcss
   verify (attempt 1)...
     failed at tests: the smoke tests failed
   pass repair...
-    patched app/templates/trips_list.html
+    patched app/screens.py
   verify (attempt 2)...
-    green -- app is up on http://localhost:8080
+    green -- HomeScreen painted 14 widget(s)
 
-  Gear List is up:  http://localhost:8080
+  Gear List is ready:  cd ./gear_list && make run
 ```
 
-The output is a small FastAPI + Postgres app you can open, click through, and
-throw away. Not a starting point for production — a thing to look at this
-afternoon.
+The output is a small Textual + SQLite app you run in your terminal: one
+process, one file, no container. Not a starting point for production — a thing
+to look at this afternoon and throw away.
+
+`--target web` gives you the other medium instead: FastAPI + Postgres in
+Docker, opened in a browser. Both are first class and both are generated in CI;
+the terminal one is the default because it is the cheaper thing to look at and
+because nobody mistakes it for a product. `proto targets` lists them.
 
 ## Install
 
@@ -60,26 +67,29 @@ afternoon.
 git clone https://github.com/skyrowlabs/proto-pilot && cd proto-pilot
 python -m venv .venv && . .venv/bin/activate
 pip install -e ".[dev]"
-proto doctor          # checks Docker, the SDK, credentials and a free port
+proto doctor          # what each target needs, the SDK, credentials, a port
 ```
 
 The virtualenv is not optional advice — on a distro whose Python is externally
 managed (Arch, and Debian since 3.11) a bare `pip install -e .` refuses to run.
 
-Needs Python 3.11 or newer, Docker with Compose v2, and Claude credentials —
-either `ANTHROPIC_API_KEY`, or a Claude subscription driven through the Claude
-Code CLI.
+Needs Python 3.11 or newer and Claude credentials — either `ANTHROPIC_API_KEY`,
+or a Claude subscription driven through the Claude Code CLI. **Docker with
+Compose v2 is needed only for `--target web`**; the default target is one
+process and a SQLite file, so `proto doctor` reports a missing daemon as a
+limitation on one target rather than as a failure.
 
-Three optional extras: `dev` pulls the generated app's stack too, because the
+Three optional extras: `dev` pulls the web target's stack too, because the
 end-to-end test runs a generated tree in process; `browser` adds Playwright, and
-without it the browser verification stage is **skipped and reported as skipped,
-never as green**; `web` is the front end behind `proto serve`.
+without it the web target's browser verification stage is **skipped and reported
+as skipped, never as green** — the terminal target's equivalent needs no extra
+and is never skipped; `web` is the front end behind `proto serve`.
 
 ## Commands
 
 | | |
 |---|---|
-| `proto new IDEA` | generate, boot, verify, hand back a URL |
+| `proto new IDEA` | generate, boot, verify, hand it back |
 | `proto add CHANGE` | amend the spec, regenerate, re-verify |
 | `proto up` / `down` / `logs` / `test` | the obvious things |
 | `proto spec` | what this project actually promised |
@@ -98,8 +108,14 @@ pointing at them. Every generated `compose.yml` stamps the tree's absolute path
 onto each resource as a Docker label, so those orphans stay findable by asking
 Docker — after the registry has been pruned, wiped, or never written.
 
-Useful flags on `new`: `--offline` (no API calls, see below), `--no-verify`
-(generate without booting), `--port`, `--attempts N`, `--yes`.
+`up`, `down`, `logs`, `test`, `reset` and `gc` are Docker verbs and apply to a
+`--target web` prototype. A terminal prototype has no container to start,
+detach or orphan, so those commands refuse it by name and say what to type
+instead — `make run` in the tree.
+
+Useful flags on `new`: `--target` (which medium; default `tui`), `--offline`
+(no API calls, see below), `--no-verify` (generate without booting), `--port`,
+`--attempts N`, `--yes`.
 
 ## How it works
 
@@ -107,26 +123,35 @@ Useful flags on `new`: `--offline` (no API calls, see below), `--no-verify`
       -> spec.json          typed, small, reviewed by a human
       -> the target's skeleton   copied, never generated
       -> five passes        each fed the previous pass's real source
-      -> docker compose up  observed, not assumed
+      -> started and driven  observed, not assumed
       -> repair loop        bounded, with a floor
 
 Five decisions carry most of the weight.
 
-**The stack is fixed, not chosen.** FastAPI, server-rendered Jinja, SQLAlchemy
-2.0, Postgres, and Pillow so a prototype can draw its own images instead of
-hotlinking one. No JS build step, no CDN, no migrations. A generator that picks
-a stack per idea produces N unrunnable variants and you debug all of them.
-Everything in `skeleton/web/` — the Dockerfile, the compose file,
-`app/main.py`, `app/db.py`, the stylesheet, `tests/conftest.py` — is copied
-byte for byte into every app, so it is debugged once rather than once per
-prototype. There is one such tree per *target*: `skeleton/tui/` is the same
-idea in a terminal, and which one a spec gets is `spec.target`.
+**The stack is fixed, not chosen.** Per target, and never per idea. The
+terminal target is Textual over SQLAlchemy 2.0 and one SQLite file, in one
+process. The web target is FastAPI, server-rendered Jinja, SQLAlchemy 2.0,
+Postgres, and Pillow so a prototype can draw its own images instead of
+hotlinking one. Neither has a JS build step, a CDN or migrations. A generator
+that picks a stack per idea produces N unrunnable variants and you debug all of
+them.
 
-**The model can only write five paths.** `app/models.py`, `app/routes.py`,
-`app/seed.py`, `app/templates/*.html` (except `base.html`), and
-`tests/test_smoke.py`. Everything else is refused by `files.py` before it
-reaches disk. Model output is data, not authority, and the parts of the tree
-that are known to work are the parts the model must not be able to touch.
+Everything in `skeleton/<target>/` is copied byte for byte into every app, so
+it is debugged once rather than once per prototype — the Dockerfile, the
+compose file and the stylesheet on the web side; `app/main.py`, `app/db.py`,
+`app/base.py` and the test harness on both. Which tree a spec gets is
+`spec.target`, and a target owns rather more than the tree: its pass tuple, its
+write allowlist, its verifier, and the archetype briefs written in its medium.
+
+**The model can only write a handful of paths**, and the list belongs to the
+target. On the web target: `app/models.py`, `app/routes.py`, `app/seed.py`,
+`app/templates/*.html` (except `base.html`), and `tests/test_smoke.py`. On the
+terminal target: `app/models.py`, `app/screens.py`, `app/seed.py`,
+`app/widgets.py`, `app/app.tcss` and `tests/test_smoke.py`. Everything else is
+refused by `files.py` before it reaches disk — and `files.py` holds no list of
+its own, so a second target cannot inherit the wrong one by default. Model
+output is data, not authority, and the parts of the tree that are known to work
+are the parts the model must not be able to touch.
 
 Enforcing that takes two guards. `files.py` decides what the model's *answer*
 may write, and `llm.ISOLATION` decides what the process producing that answer
@@ -135,11 +160,12 @@ and a shell by default, so without the second guard the first one is a rule
 about JSON rather than about the disk.
 
 **Tests are generated before the code they test.** The pass order is
-`schema -> smoke -> seed -> routes -> ui`. Smoke tests come second, generated
-from the spec, when no route exists yet — so they describe what was asked for
-rather than what got built. The routes pass is then handed those tests as its
-target. Tests written after the code describe whatever the code happened to
-do.
+`schema -> smoke -> seed -> routes -> ui` on the web target and
+`schema -> smoke -> seed -> screens -> ui` on the terminal one. Smoke tests come
+second, generated from the spec, when nothing they test exists yet — so they
+describe what was asked for rather than what got built, and the fourth pass is
+handed them as its target. Tests written after the code describe whatever the
+code happened to do.
 
 **Each pass reads the previous pass's real source**, not a description of it.
 A routes pass told "there is a Trip model" invents a field name; one handed
@@ -147,11 +173,16 @@ A routes pass told "there is a Trip model" invents a field name; one handed
 template referencing a context key no route passes is the single most common
 way a generated app 500s.
 
-**Nothing is handed back unobserved.** `verify.py` brings the stack up, waits
-on `/healthz` (which checks the database, so it stays red while Postgres is
-still coming up), runs the smoke suite inside the container, and captures the
-logs. On red, the repair pass gets the stage, the output, the container logs
-and every generated file, and returns a minimal patch. Three attempts.
+**Nothing is handed back unobserved.** On the web target `verify.py` brings the
+stack up, waits on `/healthz` (which checks the database, so it stays red while
+Postgres is still coming up), runs the smoke suite inside the container, and
+captures the logs — `build -> health -> tests -> browser`. On the terminal
+target `verify_tui.py` imports the tree, starts it under `App.run_test`, drives
+it, runs the smoke suite and compares the rendered screen buffer to that of an
+application with nothing in it — `import -> boot -> tests -> paint`, with no
+daemon, no port and no health race. On red, the repair pass gets the stage, the
+output, whatever the app printed and every generated file, and returns a
+minimal patch. Three attempts.
 
 Then a floor: if it cannot get to green, the tree is handed back anyway with a
 `RUNBOOK.md` saying exactly which stage is red, what the last error was, and
@@ -162,18 +193,21 @@ One guard the prompt cannot enforce: if a repair shrinks the smoke suite, the
 file is reverted. Green because there is nothing left to fail is the only
 failure mode here that nobody would notice.
 
-With the `browser` extra installed there is a further stage, and it exists
-because every other one is blind to the browser: `/healthz` returns 200 for a
-page that paints nothing, and the smoke suite runs through an in-process client
-that never executes a script tag. The browser stage loads every screen for real
-and fails a page that rendered nothing visible. Without Playwright it is skipped
-and reported as skipped — never as green.
+The last stage exists because every other one is blind to what was drawn. On
+the web target `/healthz` returns 200 for a page that paints nothing and the
+smoke suite runs through an in-process client that never executes a script tag,
+so with the `browser` extra installed there is a stage that loads every screen
+for real; without Playwright it is skipped and reported as skipped, never as
+green. The terminal target's equivalent is two strings — the app's screen
+buffer against an empty application's — so it needs no extra, is never skipped,
+and is the same check on every machine.
 
 ## The offline baseline
 
 Every pass has two implementations — a prompt and a deterministic generator in
-`baseline.py`. `--offline` runs the second one: no API calls, no key, a plain
-CRUD app.
+`baseline.py`, plus `baseline_tui.py` for the three files whose content depends
+on the medium. `--offline` runs the second one: no API calls, no key, a plain
+CRUD app in whichever medium the target names.
 
 It exists for three reasons, in increasing order of importance. It is a fast
 free path to a working skeleton. It is the worked example each prompt is
@@ -190,10 +224,13 @@ network call and a credit card stops being tested.
 ./pp test unit          # or: python -m pytest -q
 ```
 
-The generated tree is the test. `tests/test_generate.py` generates a
-two-entity parent/child app offline and runs *that app's own smoke suite*
-against SQLite in a subprocess — which exercises the generated models, routes,
-templates, seed data and form coercion without needing Postgres or Docker.
+The generated tree is the test, once per target. `tests/test_generate.py`
+generates a two-entity parent/child web app offline and runs *that app's own
+smoke suite* against SQLite in a subprocess; `tests/test_tui_target.py` does the
+same for a terminal app and then `tests/test_tui_verify.py` drives it through
+the real verifier, blank-screen check included. Both exercise the generated
+models, seed data and form coercion without needing Postgres, Docker or a
+browser.
 Docker and the API are faked (`tests/fakes.py`) so the verify and repair loops
 — the two parts most likely to be wrong and least likely to be covered by an
 end-to-end run — are tested directly.

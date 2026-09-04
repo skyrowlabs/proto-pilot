@@ -13,9 +13,11 @@ stale in the half nobody re-reads.
 
 ## What This Is
 
-`proto new "an idea"` turns one sentence into a running Dockerised web app.
-The output is something to click through this afternoon and throw away — not a
-production starting point, and the pipeline is shaped by that all the way down.
+`proto new "an idea"` turns one sentence into a running prototype. By default a
+Textual + SQLite app in your terminal; with `--target web`, a Dockerised FastAPI
++ Postgres app in a browser. The output is something to look at this afternoon
+and throw away — not a production starting point, and the pipeline is shaped by
+that all the way down.
 
 Two command-line tools live in this repo and are **not** the same thing:
 `proto` is the product (installed on PATH, `protopilot/`), `./pp` is this
@@ -45,14 +47,17 @@ One generation, end to end. Every arrow is a place something can be refused.
     │
     ▼
   the target's passes ────  web: schema ▶ smoke ▶ seed ▶ routes ▶ ui
+    │                       tui: schema ▶ smoke ▶ seed ▶ screens ▶ ui
     │                       each fed the PREVIOUS pass's real source
     │                       every write filtered through files.py, against
     │                       the running target's allowlist
     ▼
-  verify ─────────────────  compose up ▶ wait on /healthz ▶ pytest in the
-    │                       container ▶ capture logs ▶ (browser stage)
+  the target's verifier ──  web: compose up ▶ /healthz ▶ pytest in the
+    │                            container ▶ logs ▶ (browser stage)
+    │                       tui: import ▶ App.run_test ▶ pytest ▶ compare the
+    │                            screen buffer to an empty app's
     │
-    ├── green ──▶ registry.record ──▶ a URL
+    ├── green ──▶ registry.record ──▶ the target's hand-back line
     │
     └── red ────▶ repair pass ──▶ verify again (×3)
                     │
@@ -66,19 +71,22 @@ One generation, end to end. Every arrow is a place something can be refused.
 | `protopilot/cli.py` | The `proto` command: generation and prototype lifecycle | everything below |
 | `protopilot/web/` | `proto serve` — a web face on `proto new` | the same functions the CLI calls |
 | `protopilot/spec.py` | **The contract.** The only thing downstream reads about user intent | every pass |
-| `protopilot/passes/` | One module per pass; prompt, JSON Schema, and the previous pass's source | `llm.py`, `files.py` |
+| `protopilot/passes/` | One module per pass; prompt, JSON Schema, and the previous pass's source. `passes/tui/` is the terminal set | `llm.py`, `files.py` |
 | `protopilot/build.py` | Orchestration: the repair loop, the runbook floor. The pass *tuple* is the target's | `passes/`, `targets/`, `verify.py` |
-| `protopilot/files.py` | **The write guard.** Five allowed paths; everything else refused. The mechanism only — the list is the target's | `passes/` |
+| `protopilot/files.py` | **The write guard.** A handful of allowed paths; everything else refused. The mechanism only — the list is the target's | `passes/` |
 | `protopilot/llm.py` | `LLM` Protocol + three backends (api, claude-code, offline) | `anthropic`, the `claude` CLI |
-| `protopilot/baseline.py` | Deterministic offline implementation of every pass | `spec.py` |
-| `protopilot/verify.py` | Boot, health-wait, run the smoke suite, capture logs | `runner.py`, `browser.py` |
-| `protopilot/browser.py` | Loads every screen for real; fails a page that painted nothing | Playwright, optional |
+| `protopilot/baseline.py` | Deterministic offline implementation of every pass, web | `spec.py` |
+| `protopilot/baseline_tui.py` | The same, for the three files whose content is the medium's | `baseline.py`, `spec.py` |
+| `protopilot/verify.py` | **Web:** boot, health-wait, run the smoke suite, capture logs | `runner.py`, `browser.py` |
+| `protopilot/verify_tui.py` | **Terminal:** import, boot under `App.run_test`, smoke suite, blank-screen check | `runner.py`, `tui_probe.py` |
+| `protopilot/tui_probe.py` | Runs inside a generated tree as a subprocess; reports what it painted | the generated app |
+| `protopilot/browser.py` | Loads every web screen for real; fails a page that painted nothing | Playwright, optional |
 | `protopilot/runner.py` | Every subprocess, behind a Protocol so Docker can be faked | `subprocess` |
 | `protopilot/registry.py` | JSON index of generated trees — what exists, where, on which port | the filesystem |
 | `protopilot/containers.py` | **Docker as a second, independent source of truth**, via labels | `runner.py` |
 | `protopilot/render.py` | a target's skeleton ▶ a project directory, substituting `@@TOKEN@@` | `targets/`, `skeleton/` |
 | `protopilot/archetypes/` | What SHAPE a spec is: questions, screen rule, prompt fragment, baseline | `spec.py`, `baseline.py` |
-| `protopilot/targets/` | What MEDIUM it is built in: skeleton, pass tuple, write allowlist, verifier | `passes/`, `verify.py` |
+| `protopilot/targets/` | What MEDIUM it is built in: skeleton, pass tuple, repair pass, write allowlist, verifier, preflight, and the sentences the CLI prints about it | `passes/`, `verify.py`, `verify_tui.py` |
 | `protopilot/jobs.py` | In-process job store so the web front end can run work in the background | `web/` |
 | `skeleton/` | The fixed application tree copied into every generated app, one directory per target. **Not generated** | — |
 | `cli/`, `scripts/` | This repo's own gates and jobs. Never shipped to a user | — |
@@ -91,18 +99,22 @@ failure surfaces somewhere else, later, as something else.
 ### Model output passes through the write guard
 
 Every file a pass produces goes through `files.py`, which refuses anything
-outside five paths *before it reaches disk*. A pass that writes directly works
+outside the running target's allowlist *before it reaches disk*. A pass that writes directly works
 perfectly in the happy case, which is exactly why the violation is invisible:
 you only find out the day a model decides to helpfully rewrite `app/main.py` or
 the Dockerfile, and by then the tree that was known-good is not.
 
 ### The pass order is the design
 
-`schema ▶ smoke ▶ seed ▶ routes ▶ ui`. Smoke tests are generated **second**,
-from the spec, when no route exists — so they describe what was *asked for*.
-Reorder so tests come after routes and they still generate, still pass, and now
-describe whatever the code happened to do. Nothing goes red. The suite just
-stops being evidence.
+`schema ▶ smoke ▶ seed ▶ routes ▶ ui`, and `schema ▶ smoke ▶ seed ▶ screens ▶ ui`
+one medium over. Smoke tests are generated **second**, from the spec, when
+nothing they test exists yet — so they describe what was *asked for*. Reorder so
+tests come afterwards and they still generate, still pass, and now describe
+whatever the code happened to do. Nothing goes red. The suite just stops being
+evidence.
+
+The tuple is the target's; the invariant is `build.py`'s and holds for every
+target.
 
 ### The baseline is half of every pass
 

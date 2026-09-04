@@ -144,9 +144,12 @@ class Spec(BaseModel):
     #
     # Defaulted to "web", and this default is not a preference. It is the
     # answer to "what did a spec.json written before the target axis existed
-    # mean?", and it stays "web" forever for that reason -- including after
-    # `targets.DEFAULT` (what a NEW spec is born with) moves. The two constants
-    # are equal today and they are not the same decision.
+    # mean?", and it stays "web" forever for that reason.
+    #
+    # `targets.DEFAULT` -- what a NEW spec is born with -- moved to "tui" on
+    # 2026-09-04 and this did not move with it. They were equal for a day and
+    # they were never the same decision; collapsing them now would silently
+    # rebuild every pre-axis prototype in a different medium.
     target: str = "web"
     # How it should LOOK. Read by the UI pass and by nothing else -- a theme
     # that can reach routes or models is an archetype wearing the wrong name.
@@ -197,8 +200,26 @@ class Spec(BaseModel):
         return next((e for e in self.entities if e.name == name), None)
 
     def summary(self) -> str:
-        """What gets printed for the human review checkpoint."""
-        lines = [f"{self.name} ({self.slug})  ->  port {self.port}", f"  {self.purpose}"]
+        """What gets printed for the human review checkpoint.
+
+        The port appears only for a target that has one. A terminal app listens
+        on nothing, and this is the one screen a person is asked to approve --
+        so a headline reading "port 8082" over an app with no port is the tool
+        being confidently wrong at the only moment somebody could object.
+
+        The lookup is defensive because this method has to work for a spec
+        naming a target this build does not have: `proto spec` prints an
+        unknown spec rather than refusing to show it.
+        """
+        from protopilot import targets
+
+        try:
+            ported = bool(targets.for_spec(self).USES_PORT)
+        except targets.MissingTarget:
+            ported = True
+
+        headline = f"{self.name} ({self.slug})" + (f"  ->  port {self.port}" if ported else "")
+        lines = [headline, f"  {self.purpose}"]
         # Both axes, always, and never conditionally. This is the only gate in
         # the tool, and a person approving a generation has to be able to see
         # which KIND of thing it is before the tokens are spent -- a field the

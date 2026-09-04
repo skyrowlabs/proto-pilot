@@ -412,12 +412,20 @@ def add(
 
 
 def _finish(spec: Spec, ctx: PassContext, llm, target: Path, attempts: int) -> None:
+    from protopilot import targets
+
     outcome = builder.drive_to_green(spec, ctx, llm, _verifier(target, spec), attempts=attempts, log=_echo)
     if outcome.ok:
         runbook = target / "RUNBOOK.md"
         if runbook.exists():
             runbook.unlink()  # a stale runbook reads as a live problem
-        _echo(f"\n  {spec.name} is up:  http://localhost:{spec.port}")
+        # The target's sentence, not this function's. It used to be a hardcoded
+        # `http://localhost:{port}`, which is the last thing a person reads and
+        # is a link to nothing for a prototype that does not listen.
+        handoff = targets.for_spec(spec).HANDOFF.format(
+            name=spec.name, slug=spec.slug, port=spec.port, directory=target
+        )
+        _echo(f"\n  {handoff}")
         _echo(f"  {target}")
         return
 
@@ -754,11 +762,28 @@ def test(directory: str | None) -> None:
 @main.command()
 def doctor() -> None:
     """Check that proto-pilot can actually do its job here."""
+    from protopilot import targets
+
     ok = True
 
-    docker_ok, why = docker_available(SubprocessRunner())
-    _echo(f"{'ok  ' if docker_ok else 'FAIL'} docker: {why}")
-    ok &= docker_ok
+    # Per target, because "is this machine ready" stopped being one question
+    # the day a second medium existed. A missing Docker daemon is fatal for the
+    # web target and irrelevant to the terminal one, and reporting it as a flat
+    # FAIL told somebody whose default target needs nothing that they could not
+    # generate. Only the DEFAULT target's answer decides the exit code; the
+    # rest are reported with what to type instead.
+    runner = SubprocessRunner()
+    for name in targets.names():
+        ready, why = targets.get(name).preflight(runner)
+        marker = "  (default)" if name == targets.DEFAULT else ""
+        if ready:
+            _echo(f"ok   target {name}{marker}: {why}")
+        elif name == targets.DEFAULT:
+            _echo(f"FAIL target {name}{marker}: {why}")
+            ok = False
+        else:
+            _echo(f"--   target {name}: {why}")
+            _echo(f"     `proto new` still works; it builds {targets.DEFAULT} unless you say otherwise")
 
     try:
         import anthropic  # noqa: F401

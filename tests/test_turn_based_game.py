@@ -174,3 +174,87 @@ def test_the_seed_puts_the_playable_game_last(game_tree):
     finished_at = seed.index("finished=True")
     open_at = seed.index("finished=False")
     assert finished_at < open_at, "the in-progress game must be seeded last"
+
+
+# ── the same shape, in a terminal ────────────────────────────────────────
+#
+# Phase 6 of `docs/TODO/terminal-target.md`. Completing this pair was not
+# optional once `tui` became `targets.DEFAULT`: a hole in the default target is
+# `proto new` refusing its own classifier's answer, which is a worse failure
+# than any stated hole elsewhere in the matrix.
+
+
+@pytest.fixture()
+def tui_game_spec(game_spec) -> Spec:
+    game_spec.target = "tui"
+    return game_spec
+
+
+@pytest.fixture()
+def tui_game_tree(tui_game_spec, tmp_path) -> Path:
+    render_skeleton(tui_game_spec, tmp_path)
+    tui_game_spec.save(tmp_path)
+    generate(tui_game_spec, PassContext(project_dir=tmp_path), OfflineLLM(), log=lambda _: None)
+    return tmp_path
+
+
+def test_the_two_medium_neutral_generators_are_shared(tui_game_spec):
+    """`models_py` and `seed_py` are asked for under the SAME name by both
+    targets, because both are pure SQLAlchemy and neither knows whether a route
+    or a screen will read it. A second copy would drift the first time either
+    medium changed a column."""
+    from protopilot import archetypes
+
+    for kind in ("models_py", "seed_py"):
+        assert archetypes.generator(tui_game_spec, kind) is getattr(tbg, kind)
+
+
+def test_it_replaces_the_three_generators_that_are_medium_specific(tui_game_spec):
+    from protopilot import archetypes
+
+    for kind in ("tui_screens_py", "tui_smoke_py", "tui_tcss"):
+        assert archetypes.generator(tui_game_spec, kind) is not None, f"no terminal {kind} for a board game"
+
+
+def test_the_board_is_a_grid_of_buttons_not_a_table(tui_game_tree, tui_game_spec):
+    """The terminal fragment's whole instruction. A `DataTable` of squares
+    would render and would not be playable."""
+    screens = (tui_game_tree / "app" / "screens.py").read_text()
+    assert 'Grid(id="board")' in screens
+    assert 'Button(EMPTY, id=f"cell-{index}")' in screens
+
+    styles = (tui_game_tree / "app" / "app.tcss").read_text()
+    board = tbg.board_of(tui_game_spec)
+    assert f"grid-size: {board.width} {board.height}" in styles, "a Grid with no grid-size is a column"
+
+
+def test_the_generated_suite_plays_a_game_rather_than_looking_at_one(tui_game_tree):
+    suite = (tui_game_tree / "tests" / "test_smoke.py").read_text()
+    assert "async def test_playing_to_a_win_shows_the_result" in suite
+    assert "async def test_playing_a_square_changes_the_board" in suite
+    assert "pilot.click" in suite, "nothing in the suite presses a square"
+
+
+def test_the_terminal_game_passes_its_own_suite(tui_game_tree):
+    """The load-bearing one, and the second half of the archetype x target
+    matrix. No key, no Docker, no browser, no port -- the whole matrix is now
+    four baselines and every one of them runs in this suite."""
+    result = subprocess.run(  # noqa: S603
+        [sys.executable, "-m", "pytest", "-q", "--no-header", "-p", "no:cacheprovider", "tests/"],
+        cwd=str(tui_game_tree),
+        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+        capture_output=True,
+        text=True,
+        timeout=300,
+    )
+    assert result.returncode == 0, f"the generated terminal game is red:\n{result.stdout}\n{result.stderr}"
+
+
+def test_the_terminal_game_verifies_green(tui_game_tree, tui_game_spec):
+    """Through the real verifier, including the blank-screen check. A board
+    drawn as nine buttons that never got their labels would pass a suite that
+    only queried the database."""
+    from protopilot.targets import tui as tui_target
+
+    result = tui_target.verifier(tui_game_tree, tui_game_spec).verify()
+    assert result.ok, f"{result.stage}: {result.summary}\n{result.output}"
