@@ -19,7 +19,7 @@ and makes the relevant part harder to find, not easier.
 | **Shelved / parked work** | TODO/README.md             | `docs/TODO/README.md`       |
 | **Was this built before?**| todo_index.json            | `docs/todo_index.json`      |
 | **Agentic Automation** | AGENTIC_AUTOMATION.md | `docs/AGENTIC_AUTOMATION.md` |
-| **Hosted proto.pilot** | hosted.md | `docs/hosted.md` |
+| **Ideas, not scheduled** | ideas/README.md | `docs/ideas/README.md` |
 | **Why the pipeline is shaped this way** | README.md | `README.md` |
 | **Open items / what bit us** | NOTES.md | `NOTES.md` |
 | **The rules for changing anything** | AGENTS.md | `AGENTS.md` |

@@ -18,7 +18,7 @@ for the routing table — load only the documents a task needs.
 | `reports/regular/` | In-flight periodic reports, anchored to the current window |
 | `reports/releases/` | Frozen per-release editions — never edited                |
 | `reports/occasional/` | One-time deep dives and sweeps                          |
-| `research/`        | Feasibility work and decision memos                       |
+| `ideas/`           | Ideas, and what came of looking — nothing here is scheduled |
 
 ---
 
@@ -30,7 +30,6 @@ for the routing table — load only the documents a task needs.
 | [DEVELOPMENT.md](DEVELOPMENT.md)     | Setup, configuration, CI/CD, testing          |
 | [CLI.md](CLI.md)                     | CLI architecture and command reference        |
 | [AGENTIC_AUTOMATION.md](AGENTIC_AUTOMATION.md) | Scheduled self-maintenance jobs     |
-| [hosted.md](hosted.md)               | The hosted-proto.pilot idea, not scheduled    |
 
 Two documents that live outside `docs/` and are read more often than anything
 in it: [`README.md`](../README.md) is the **design document** — the five

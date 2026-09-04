@@ -366,7 +366,7 @@ Load on-demand only. Full mapping in `.github/DOCS_INDEX.md`.
 | Scheduled jobs / automation | `docs/AGENTIC_AUTOMATION.md`     |
 | The design argument        | `README.md`                      |
 | Live parking lot           | `NOTES.md`                       |
-| Hosted-service idea        | `docs/hosted.md`                 |
+| Captured ideas (not scheduled) | `docs/ideas/README.md`       |
 
 <!-- Add a row per doc as it is written. `pp check docs` fails on a doc
      registered in neither this table nor .github/DOCS_INDEX.md — an

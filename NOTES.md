@@ -210,18 +210,39 @@ is only a pointer at it).
 
 ## Ideas — not scheduled
 
-- **[Hosted proto.pilot](docs/hosted.md)** — put `proto new` behind a free public
-  page to build a corpus for training a custom model later. Captured 2026-08-28
-  as a long-term idea; would reclassify proto.pilot from an internal instrument
-  to a minor product. Read the doc before acting on any part of it.
+- **[Sketches, not scaffolds](docs/ideas/sketches-not-scaffolds.md)** — the
+  direction as of 2026-09-03. proto.pilot emits a *terminal* app you look at and
+  throw away, not a web app you could build on, and ships as a tool other
+  developers run rather than a service we host. The request was never "make me a
+  camping app" — it is "iterate to this idea and show me a prototype", and the
+  loop only closes when the tool and the artifact share a surface.
+
+  Decided as a direction, not as a plan: no phases, no acceptance criteria. It
+  becomes a `docs/TODO/` plan when someone writes them. The migration is a
+  `target` axis beside `archetype`, which turns the one real risk — that models
+  write less Textual than FastAPI, so repair costs more — into a measurement
+  rather than a bet.
+
+- **[Hosted proto.pilot](docs/ideas/hosted.md)** — **tabled 2026-09-03**,
+  superseded by the above. Put `proto new` behind a free public page to build a
+  training corpus. Kept because most of its analysis is about the pipeline
+  rather than the service and survives the decision; what is tabled is the
+  public front door and the corpus-from-strangers thesis.
 
 - **Make Claude optional — a local-model backend.** Captured 2026-08-28. Run Qwen
   (and whatever else is worth trying) on our own breeze.brain node and let `proto`
   drive it, so the pipeline is not bound to one vendor and a generation can cost
   electricity instead of API credit. This is the same internal-GPU-as-cost-play
   argument as the gpu-platform seam (`skyrow-workspace/strategy/seams/gpu-platform.md`,
-  a sibling checkout), applied to proto.pilot instead of jam.sense, and it is what would make the free
-  public tier in `docs/hosted.md` affordable at all.
+  a sibling checkout), applied to proto.pilot instead of jam.sense.
+
+  **Its best argument was tabled with the hosted page and the idea got stronger
+  anyway.** This used to be justified as what would make a free public tier
+  affordable; there is no public tier now. But a tool other developers run on
+  their own key does not need us to fund anything, so the remaining reasons are
+  the durable ones — not being bound to one vendor, and generating a corpus
+  overnight for the price of electricity. That was always the note's own claim:
+  worth doing whether or not the page ever existed.
 
   **The plumbing is nearly free.** `LLM` is a two-member Protocol — `offline: bool`
   and `structured(system, user, schema, label) -> dict`. A fourth backend is a class

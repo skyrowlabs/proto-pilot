@@ -1,9 +1,21 @@
 # Hosted proto.pilot
 
-> **Status: an idea, captured. Not a plan, not scheduled, not costed.**
-> Written 2026-08-28 to get it out of one head and into the repo. Nothing here
-> is committed to; the point is that the reasoning survives until it is worth
-> revisiting. See [notes](../NOTES.md) for what is actually being worked on.
+> **Status: TABLED 2026-09-03.** Superseded by
+> [sketches-not-scaffolds.md](sketches-not-scaffolds.md), which takes the
+> opposite route: proto.pilot ships as a tool other developers run, not as a
+> service we host.
+>
+> Kept, not deleted. Most of the analysis below survives the decision — the
+> automatic oracle, the cache-prefix argument, the three meanings of
+> "self-improving", and the reason model creation is mind.head's job — because
+> those are properties of the pipeline rather than of the service. What is
+> tabled is the public front door and the corpus-from-strangers thesis it was
+> built to serve. The successor doc says which parts it inherits.
+>
+> Read this one for the reasoning; read the successor for the decision.
+>
+> *Originally written 2026-08-28 as an idea, captured — not a plan, not
+> scheduled, not costed.*
 
 ## The thesis
 
@@ -101,7 +113,7 @@ There is a third lever that removes the bill rather than capping it: **run the
 model ourselves.** A local-model backend on a breeze.brain node — Qwen or
 whatever else measures up — turns a generation into electricity instead of API
 credit, which is the only version of this where "free and unmetered" is
-honest at any volume. It is tracked in [NOTES](../NOTES.md) as its own idea
+honest at any volume. It is tracked in [NOTES](../../NOTES.md) as its own idea
 because it is worth doing whether or not this page ever exists, and the catch is
 recorded there: every pass depends on schema-constrained output, so the serving
 runtime has to provide it.

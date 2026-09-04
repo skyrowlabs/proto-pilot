@@ -14,7 +14,7 @@ for configuration, and a doc there is a doc no index knows about.
 | Periodic reports (live / in-flight)    | `docs/reports/regular/`    |
 | Frozen per-release report editions     | `docs/reports/releases/`   |
 | One-time deep-dive reports             | `docs/reports/occasional/` |
-| Research / feasibility                 | `docs/research/`           |
+| Ideas, and what came of looking        | `docs/ideas/`              |
 | Business planning                      | `docs/business-planning/`  |
 
 ## TODO vs Implementations — Two Halves of One Lifecycle
