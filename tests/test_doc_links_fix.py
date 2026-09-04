@@ -34,7 +34,6 @@ def tree(tmp_path, monkeypatch):
     monkeypatch.setattr(links, "DOCS_DIR", tmp_path / "docs")
     monkeypatch.setattr(links, "IGNORE_FILE", tmp_path / ".validate-ignore")
     monkeypatch.setattr(links, "SCAN_ROOTS", ["docs"])
-    monkeypatch.setattr(links, "EXTRA_FILES", [])
 
     def write(name: str, body: str) -> Path:
         path = tmp_path / "docs" / name
@@ -128,3 +127,26 @@ def test_fix_is_idempotent(tree):
     assert len(links.repoint_fragments()) == 1
     assert links.repoint_fragments() == []
     assert links.scan() == ([], [])
+
+
+def test_the_scan_covers_every_markdown_file_at_the_repo_root() -> None:
+    """Recomputed from the tree, never compared against a list.
+
+    This gate scanned `docs/`, `.claude/`, `.github/` and a hand-written
+    `EXTRA_FILES = ["AGENTS.md", "CLAUDE.md", "README.md"]`. The fourth root
+    document is `NOTES.md` -- the live parking lot `README.md` tells a reader
+    to open first -- and it was not in that list, so its links were never
+    checked. Filing a plan on 2026-09-04 broke two of them and the gate printed
+    `0 broken links (at the ceiling)`.
+
+    That is this repository's own recurring class, arriving in the file that
+    enforces links: a negative result from a matcher means either the thing is
+    absent or the matcher is blind, and nothing in the output distinguishes
+    them. Asserting the *set* rather than four names is what makes a fifth root
+    document enrol by existing.
+    """
+    scanned = set(links.markdown_files())
+    root_docs = set(links.PROJECT_ROOT.glob("*.md"))
+    missing = sorted(p.name for p in root_docs - scanned)
+    assert not missing, f"root-level markdown the link gate cannot see: {missing}"
+    assert (links.PROJECT_ROOT / "NOTES.md") in scanned, "NOTES.md is the one that was missing"

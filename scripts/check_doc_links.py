@@ -44,7 +44,6 @@ BASELINE = SCRIPTS_DIR / "doc_links_baseline.json"
 IGNORE_FILE = GITHUB_DIR / "scripts" / ".validate-ignore"
 
 SCAN_ROOTS = ["docs", ".claude", ".github"]
-EXTRA_FILES = ["AGENTS.md", "CLAUDE.md", "README.md"]
 
 _LINK = re.compile(r"(?<!!)\[(?P<text>[^\]]*)\]\((?P<href>[^)\s]+)(?:\s+\"[^\"]*\")?\)")
 _HEADING = re.compile(r"^(#{1,6})\s+(?P<text>.+?)\s*$", re.MULTILINE)
@@ -78,7 +77,18 @@ def markdown_files() -> List[Path]:
     out = []
     for root in SCAN_ROOTS:
         out.extend(sorted((PROJECT_ROOT / root).rglob("*.md")))
-    out.extend(PROJECT_ROOT / name for name in EXTRA_FILES if (PROJECT_ROOT / name).exists())
+    # Every markdown file at the project root, globbed here rather than listed.
+    # It was a list of three -- AGENTS, CLAUDE, README -- and the fourth was
+    # NOTES.md, the live parking lot this repo tells you to read first. Filing
+    # a plan on 2026-09-04 broke two links in it and this gate printed
+    # "0 broken links (at the ceiling)", because a hand-maintained list cannot
+    # report what it omits. The rule this file exists to serve applies to this
+    # file: recompute, do not enumerate.
+    #
+    # Globbed in here and not at import so it follows a patched `PROJECT_ROOT`,
+    # which is what lets the tests redirect the whole tree without a constant
+    # to stub out.
+    out.extend(sorted(PROJECT_ROOT.glob("*.md")))
     return [p for p in out if "node_modules" not in p.parts]
 
 

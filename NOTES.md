@@ -43,7 +43,7 @@ is only a pointer at it).
 
 - **`proto gc` / `proto prune` / the Docker resource labels have no meaning for
   a terminal tree, and what to do about that is an open question.** Raised by
-  Phase 3 of [the terminal target](docs/TODO/terminal-target.md), which says
+  Phase 3 of [the terminal target](docs/implementations/spec/terminal-target.md), which says
   outright that this is a question and not a task, so it is recorded here rather
   than half-answered in code.
 
@@ -621,7 +621,7 @@ is only a pointer at it).
 
 - **2026-09-04 — the terminal target, all six phases, and `proto new` now
   builds one by default.** Filed at
-  [docs/TODO/terminal-target.md](docs/TODO/terminal-target.md) with per-phase
+  [docs/implementations/spec/terminal-target.md](docs/implementations/spec/terminal-target.md) with per-phase
   landed notes; the go/no-go that gated it is
   [the 2026-09-04 report](docs/reports/occasional/2026-09-04-terminal-target-go-no-go.md).
 
