@@ -1,21 +1,85 @@
 ---
 title: "Drawing Freedom"
 slug: drawing-freedom
-shelf_status: planned
+shelf_status: blocked
+blocked_on: product-decision
 priority: high
-updated: 2026-09-02
+updated: 2026-09-03
 tags: [ui, verify, skeleton, archetypes, prompts]
 summary: "Raise the visual ceiling of a generated app by ranking display options on whether the verifier can tell they worked — not on what Docker permits."
 ---
 
 # Drawing Freedom
 
-> **Status**: 🔴 Planned — designed, unreviewed
-> **Shelf-Status**: planned
+> **Status**: ⛔ Blocked — designed and unreviewed, and now **target-scoped**
+> **Shelf-Status**: blocked
+> **Blocked-On**: product-decision
 > **Priority**: High — it is the difference between output that is correct and
 > output somebody wants to look at, and the cheapest rungs are blocked by our
 > own rules rather than by anything real
 > **Queue-Order**: unset until it is `ready`
+
+## Blocked 2026-09-03 — every rung below is a *web* rung
+
+[`sketches-not-scaffolds`](../ideas/sketches-not-scaffolds.md) points the tool at
+a terminal target and makes the web one legacy. **This plan is not wrong; it is
+now scoped to a target that may stop being the default.** Every rung in the table
+below — SVG, scoped CSS, Pillow, canvas, p5, WebGL — is a browser capability, and
+Phases 2 through 6 name `app/templates/*.html`, `app/static/theme.css` and
+`PAINTED_JS`. None of that exists in a Textual app.
+
+**It is not rewritten and it should not be**, for two reasons. Phase 1 is
+measured fact about this repo that stays true either way, and the two principles
+under the rungs are the medium-independent part — see the next section. Rewriting
+would destroy the first to restate the second.
+
+The gate is a product call, not a technical one: **does the web target stay
+worth investing in?** Three answers, and the plan's fate differs:
+
+- **Web stays a supported target** → unblock as written, at a lower priority.
+- **Web becomes legacy, terminal is the default** → Phases 2–6 are legacy work.
+  The successor is the terminal version of the *question*, not of the rungs.
+- **Web is cut** → file the plan to `implementations/` as a dropped design with
+  Phase 1's measurement intact. It would still be the record of why the network
+  claim in `STACK_BRIEF` was false.
+
+`docs/TODO/terminal-target.md` Phase 1 is what settles it, and until that
+measurement exists nobody can rule here honestly.
+
+## What transfers to any target, and is the reason to keep this doc
+
+Two things in this plan are about neither Docker nor a browser, and both survive
+the pivot intact. They are the reusable half:
+
+**The axis is "can the verifier tell that it worked", not "what does the platform
+allow."** That is this tool's whole claim and it re-ranks the options on any
+medium. A terminal has its own ladder — styled text, Unicode block and braille
+graphics, sparklines, and the terminal image protocols — and the same question
+sorts it. The last row of the table below is the lesson in miniature: WebGL was
+ranked bottom not because it is hard but because `PAINTED_JS` says
+`if (!ctx) return true`, and shipping an unobservable capability reintroduces
+"worked fine, told nobody" exactly where output is hardest to eyeball.
+
+**"If it needs an offline baseline, it is an archetype. If it does not, it is a
+theme."** Medium-independent, and it will be doing more work after the pivot
+rather than less, since a target axis multiplies against the archetype one.
+
+There is one way the pivot *strengthens* this plan's own thesis, worth recording
+because it is evidence and not a preference: the terminal answers this plan's
+central question better than the browser does. `PAINTED_JS` reads pixels back to
+guess whether a canvas was drawn on; a Textual snapshot **is** the rendered
+screen. The capability that was hardest to verify on the web is close to free in
+a terminal.
+
+## What does not transfer, stated so nobody ports it by accident
+
+- **Phase 3's `simulator` archetype keeps state "in Postgres."** Postgres is an
+  open question under the pivot. The archetype idea survives; that sentence does
+  not.
+- **Phase 2's `theme.css`** has no terminal analogue as written. Textual's CSS
+  is a different language with different scoping, so the *rule* (a theme may not
+  redefine the chrome) transfers and the mechanism does not.
+- **Phases 5 and 6's vendored JavaScript** are browser-only, end to end.
 
 ## Problem
 

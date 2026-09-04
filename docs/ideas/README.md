@@ -5,7 +5,7 @@ plan lands here. Nothing in this folder is committed to, costed, or queued.
 
 | Idea | Captured | One line |
 | ---- | -------- | -------- |
-| [Sketches, not scaffolds](sketches-not-scaffolds.md) | 2026-09-03 | Emit a terminal app you learn from and throw away; ship as a tool, not a service |
+| [Sketches, not scaffolds](sketches-not-scaffolds.md) | 2026-09-03 | Emit a terminal app you learn from and throw away; ship as a tool, not a service — **plan cut: [terminal-target](../TODO/terminal-target.md)** |
 | [Hosted proto.pilot](hosted.md) — **tabled** | 2026-08-28 | Put `proto new` behind a free public page to build a training corpus |
 
 A tabled idea keeps its row. The reasoning is what the folder is for, and the
@@ -24,6 +24,14 @@ An idea, and **what came of looking at it**. Both, in one folder:
 A doc leaves this folder in one direction only: to `docs/TODO/` when someone
 decides to build it. An examined-and-rejected idea keeps its memo right here,
 because the expensive half of an investigation is what it ruled out.
+
+**A doc moves only when the whole idea becomes the plan.** When a plan is cut
+from one *slice* of an idea, the idea stays and links to it — they are not two
+copies of one thing, they are the argument and the phases, and the rule that
+governs both is that a doc lives where it changes. `sketches-not-scaffolds.md`
+is the worked case: three decisions, one of which became
+[terminal-target](../TODO/terminal-target.md) while the other two are not build
+tasks at all. Moving it would have filed a direction in the work queue.
 
 **This started as a three-way split** — idea, then `research/` once somebody
 looked, then `TODO/`. skeletor's user collapsed the first two in their template

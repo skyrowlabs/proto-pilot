@@ -1,9 +1,19 @@
 # Sketches, not scaffolds — the terminal pivot
 
-> **Status: a direction, decided. Not a plan — no phases, no acceptance criteria.**
-> Captured 2026-09-03. It supersedes [hosted.md](hosted.md), which is now tabled.
-> When someone writes the phases this becomes a `docs/TODO/` plan and leaves this
-> folder; until then nothing here is scheduled.
+> **Status: a direction, decided.** Captured 2026-09-03. It supersedes
+> [hosted.md](hosted.md), which is now tabled.
+>
+> **A plan has been cut from its first buildable slice** —
+> [`docs/TODO/terminal-target.md`](../TODO/terminal-target.md), the `target`
+> axis and the terminal target, gated on a measurement. This doc stays here and
+> holds the *argument*; the plan holds the phases and does not repeat it.
+>
+> That is a refinement of this folder's own rule, which said a doc moves to
+> `docs/TODO/` when someone decides to build it. It moves when the **whole**
+> idea becomes the plan. When a plan is cut from a **slice**, the idea stays and
+> is linked — because the two are not duplicates. One is why, one is how, and
+> the workspace rule that governs both is that a doc lives where it changes.
+> Decisions 2 and 3 here are not build tasks and have no plan to move into.
 
 ## Three decisions
 

@@ -3,7 +3,7 @@ title: "The Improvement Loop"
 slug: improvement-loop
 shelf_status: planned
 priority: high
-updated: 2026-09-01
+updated: 2026-09-03
 tags: [loop, verify, docker, agent, safety]
 summary: "Let a prototype be told to keep getting better, with a ratchet that reverts any iteration leaving it less green than it found it."
 ---
@@ -15,6 +15,50 @@ summary: "Let a prototype be told to keep getting better, with a ratchet that re
 > **Priority**: High — it is the second of the three things asked for when this
 > tool was reframed, and the only one still unbuilt
 > **Queue-Order**: unset until it is `ready`
+
+## The pivot barely touches this, and that is worth stating
+
+[`sketches-not-scaffolds`](../ideas/sketches-not-scaffolds.md) changes the output
+medium. **This plan is almost entirely medium-independent** and stays `planned`
+rather than blocked, unlike [drawing-freedom](drawing-freedom.md), whose every
+rung was a browser capability.
+
+What survives untouched: the ratchet argument, git as the revert mechanism, the
+pass machinery and write guard as the thing that changes files, every human
+control, and the whole `Dropped, and why` section.
+
+What needs one edit when a second target exists: **two of the four rails are
+named in web vocabulary.** `templates` counts `app/templates/*.html`, and
+`screens served` compares `checkable_paths(spec)` against routes that answer. A
+terminal app has screens and no routes. The *rails* are right — "did a screen
+stop existing" is the question on any medium — so this is a target-owned
+implementation behind the same names, not a redesign. The plan already says the
+rails are "a tuple in one place so a fifth is a line, not a refactor"; that
+property is what makes this cheap, and it should be honoured rather than
+special-cased.
+
+### It is not the loop the pivot asked for, and conflating them would be a mess
+
+This is the trap. The pivot's own framing is *"iterate to this idea and show me
+a prototype"*, which sounds exactly like this plan and is a **different loop**:
+
+| | This plan | The pivot's loop |
+|---|---|---|
+| Who drives | the model, unattended | a person, watching |
+| Turn length | minutes to hours | seconds |
+| What it optimises | measurable rails | what the person just said |
+| Safety mechanism | the ratchet, because nobody is looking | the person, who is looking |
+| Failure it prevents | a random walk with a commit bit | none — you see it and say so |
+
+**A ratchet is what you build when nobody is watching.** Put one in an
+interactive loop and it starts reverting changes the person asked for, because
+"make the list denser" legitimately removes a template. So the pivot's loop is
+closer to `proto add` plus a TUI than to `proto improve`, and it should not
+reuse the rails.
+
+Both are wanted. They are separate plans and the vocabulary must not merge —
+the moment `improve` grows a `--watch` flag, this plan's safety argument stops
+being true and nothing will say so.
 
 ## Problem
 
