@@ -152,6 +152,41 @@ class ClaudeLLM:
             raise LLMError(f"pass {label!r} returned invalid JSON: {exc}") from exc
 
 
+#: The flags that make this backend a *generator* rather than an agent.
+#:
+#: `claude --print` runs with its full tool set by default -- Read, Write, Bash,
+#: and the caller's working directory. So `files.py`'s guarantee, which README
+#: and AGENTS.md both state flatly ("the model can only write five paths",
+#: "model output is data, not authority"), was true of the `api` backend and
+#: false of this one: the guard authorises what the returned JSON may write and
+#: has no authority over the subprocess that returned it. Verified 2026-09-03 by
+#: asking `claude --print` to overwrite a file in the cwd, which it did, with
+#: `permission_denials: []`.
+#:
+#: Three flags rather than one, and the third is the one that is easy to miss.
+#: `--tools ""` is an allow list of nothing, which beats `--disallowed-tools`
+#: (a deny list has to name every tool, and missing one is silent). But it
+#: governs only the **built-in** registry: MCP servers survive it, and with
+#: `--tools ""` alone the model reported it still had the operator's Google
+#: Drive, Slack and Cloudflare connections. An allow list is exhaustive only
+#: over the registry it governs, and a second registry is invisible to it.
+#:
+#: Checked by asking the model what it holds rather than by trusting the flags
+#: -- `tests/test_llm_isolation.py` pins the argv, and the live check that
+#: produced this list reported exactly one tool, `StructuredOutput`.
+#:
+#: A side effect worth knowing when reading token counts: dropping the tool
+#: definitions takes the ambient system prompt from ~32k to ~3.6k cached
+#: tokens, so this is also the cheaper configuration by a wide margin.
+ISOLATION = (
+    "--tools",
+    "",
+    "--strict-mcp-config",
+    "--mcp-config",
+    '{"mcpServers":{}}',
+)
+
+
 class ClaudeCodeLLM:
     """Claude via the Claude Code CLI, billed to a subscription.
 
@@ -212,6 +247,7 @@ class ClaudeCodeLLM:
             json.dumps(schema),
             "--output-format",
             "json",
+            *ISOLATION,
         ]
         result = self._runner.run(argv, timeout=self.timeout)
         if not result.ok:

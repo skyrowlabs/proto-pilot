@@ -124,6 +124,12 @@ into every app, so it is debugged once rather than once per prototype.
 reaches disk. Model output is data, not authority, and the parts of the tree
 that are known to work are the parts the model must not be able to touch.
 
+Enforcing that takes two guards. `files.py` decides what the model's *answer*
+may write, and `llm.ISOLATION` decides what the process producing that answer
+can do — the `claude-code` backend shells out to a CLI that has a filesystem
+and a shell by default, so without the second guard the first one is a rule
+about JSON rather than about the disk.
+
 **Tests are generated before the code they test.** The pass order is
 `schema -> smoke -> seed -> routes -> ui`. Smoke tests come second, generated
 from the spec, when no route exists yet — so they describe what was asked for

@@ -87,6 +87,14 @@ deliberate decision, not an accident of implementation.
   the tree known to work are exactly the parts the model must not be able to
   touch. Widening this list is a significant design change, not a convenience
   fix.
+
+  **It takes two guards, not one, and the second was missing until
+  2026-09-04.** `files.py` authorises what the returned JSON may write; it has
+  no authority over the *process* that returned it. On the `claude-code`
+  backend that process is `claude --print`, which runs with Read, Write, Bash
+  and the caller's working directory unless told otherwise — so the guarantee
+  above held for the `api` backend and was false for the other one. The second
+  guard is `llm.ISOLATION`. A change to either half is a change to this rule.
 - **The stack is fixed, not chosen.** FastAPI, server-rendered Jinja,
   SQLAlchemy 2.0, Postgres. No JS build step, no CDN, no migrations. A
   generator that picks a stack per idea produces N unrunnable variants.
