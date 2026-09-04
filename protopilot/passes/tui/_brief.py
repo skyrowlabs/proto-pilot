@@ -12,8 +12,9 @@ Every task block below is the one the Phase 1 go/no-go actually ran. Six live
 runs, three specs, two targets, and the numbers the whole of
 `docs/TODO/terminal-target.md` stands on came out of these exact strings --
 `docs/reports/occasional/2026-09-04-terminal-target-go-no-go.md`. A rewritten
-brief would invalidate them, so this was moved out of
-`scripts/spikes/terminal_target/brief.py` rather than composed fresh.
+brief would invalidate them, so this was moved out of the spike rather than
+composed fresh -- `git show 6e02c85:scripts/spikes/terminal_target/brief.py` is
+where it came from, and the spike itself was deleted once Phase 6 was green.
 
 Three deviations from what was measured, all of them the report's own findings
 landing, and all of them narrowing what the model has to invent:

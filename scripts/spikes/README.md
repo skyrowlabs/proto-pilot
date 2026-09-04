@@ -27,7 +27,16 @@ What that buys, and what it does not:
 
 | Directory | Question it answers | Plan |
 | --- | --- | --- |
-| `terminal_target/` | Does the model generate a Textual + SQLite terminal app as reliably as it generates today's FastAPI web app? | `docs/TODO/terminal-target.md`, Phase 1 |
+| — | nothing right now | — |
+
+`terminal_target/` lived here from 2026-09-03 to 2026-09-04 and asked whether
+the model generates a Textual + SQLite terminal app as reliably as it generates
+a FastAPI web one. It does — identical repair attempts over six live runs — and
+[the report](../../docs/reports/occasional/2026-09-04-terminal-target-go-no-go.md)
+keeps the finding. The directory went when the target it gated shipped, exactly
+as the section below says it should; its prompts were **moved** into
+`protopilot/passes/tui/_brief.py` rather than deleted, because the numbers in
+that report describe those exact strings.
 
 ## Deleting one
 

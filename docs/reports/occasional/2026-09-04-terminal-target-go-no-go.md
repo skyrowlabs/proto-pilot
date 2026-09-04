@@ -196,12 +196,27 @@ produce than the trial run's were.
 
 ## Reproducing
 
+**The harness is gone.** It was deleted on 2026-09-04, once the terminal target
+it gated was green through Phase 6 — which is exactly what a spike is for, and
+what [`scripts/spikes/README.md`](../../../scripts/spikes/README.md) says
+happens to one. This section is kept rather than removed because a report that
+silently drops its method reads like an assertion.
+
+It ran as:
+
 ```bash
 .venv/bin/python scripts/spikes/terminal_target/run.py \
   --target tui --spec field_notes --backend claude-code --out tmp/phase1
 ```
 
-Records, prompts, generated trees and per-attempt stage output are under
-`tmp/phase1/<run_id>/`. `runs.jsonl` is the summary line per run. The harness is
-a spike and is expected to be deleted once the `target` axis exists; see
-[`scripts/spikes/README.md`](../../../scripts/spikes/README.md).
+at commit `6e02c85`, writing records, prompts, generated trees and per-attempt
+stage output under `tmp/phase1/<run_id>/`, one summary line per run in
+`runs.jsonl`. Recover it with `git show 6e02c85:scripts/spikes/terminal_target/`.
+
+**What the numbers above describe still ships.** The five task blocks and the
+terminal stack brief were *moved* into `protopilot/passes/tui/_brief.py`, not
+rewritten, so the per-pass costs here are about strings that are still in the
+tree. Three sentences differ, and each is a finding on this page landing: the
+brief no longer says `app.main` pushes the home screen, it names the skeleton's
+`tests/screen.py` as the text reader every one of these runs wrote wrong, and
+it says the stylesheet and widgets files already exist.
