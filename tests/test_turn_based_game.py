@@ -18,6 +18,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from scanning import scanned
 
 from protopilot import archetypes
 from protopilot.archetypes import turn_based_game as tbg
@@ -103,9 +104,16 @@ def test_extra_is_honoured_when_it_is_valid():
 
 
 def test_no_placeholder_survives(game_tree):
-    for path in game_tree.rglob("*"):
-        if path.is_file() and path.suffix in {".py", ".html", ".yml", ".css", ".md", ".txt"}:
-            assert not TOKEN_RE.search(path.read_text()), f"{path} kept a placeholder"
+    checked = scanned(
+        (
+            p
+            for p in game_tree.rglob("*")
+            if p.is_file() and p.suffix in {".py", ".html", ".yml", ".css", ".md", ".txt"}
+        ),
+        "placeholders in the generated game tree",
+    )
+    for path in checked:
+        assert not TOKEN_RE.search(path.read_text()), f"{path} kept a placeholder"
 
 
 def test_it_generates_a_board_page_and_no_form_template(game_tree):

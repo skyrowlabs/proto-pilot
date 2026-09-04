@@ -16,6 +16,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from scanning import scanned
 
 from protopilot.passes import PassContext, models, repair, routes, seed, smoke, ui
 from protopilot.spec import Screen, Spec, Theme
@@ -125,9 +126,11 @@ def test_only_the_ui_pass_reads_the_theme_in_source():
     the prompt. A pass that branched on `spec.theme` without quoting it would
     slip past it."""
     offenders = []
-    for path in sorted(Path("protopilot/passes").glob("*.py")):
-        if path.name == "ui.py":
-            continue
+    for path in scanned(
+        (p for p in sorted(Path("protopilot/passes").glob("*.py")) if p.name != "ui.py"),
+        "passes that might read spec.theme",
+        least=2,
+    ):
         if ".theme" in path.read_text():
             offenders.append(path.name)
     assert not offenders, f"these passes read spec.theme: {offenders}"

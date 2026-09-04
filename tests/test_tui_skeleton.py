@@ -25,6 +25,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from scanning import scanned
 
 from protopilot import targets
 from protopilot.render import TOKEN_RE, render_skeleton, substitutions
@@ -104,9 +105,11 @@ def test_every_token_has_a_value(spec):
 
 
 def test_the_rendered_tree_has_no_placeholders_left(tree):
-    for path in tree.rglob("*"):
-        if not path.is_file() or "__pycache__" in path.parts:
-            continue
+    checked = scanned(
+        (p for p in tree.rglob("*") if p.is_file() and "__pycache__" not in p.parts),
+        "placeholders in the rendered skeleton",
+    )
+    for path in checked:
         assert not TOKEN_RE.search(path.read_text()), f"{path} still contains a placeholder"
 
 

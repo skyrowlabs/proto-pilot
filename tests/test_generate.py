@@ -21,6 +21,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from scanning import scanned
 
 from protopilot.build import generate
 from protopilot.llm import OfflineLLM
@@ -52,13 +53,16 @@ def tree(spec, tmp_path) -> Path:
 
 
 def test_no_placeholder_survives_generation(tree):
-    for path in tree.rglob("*"):
-        if path.is_file() and path.suffix in {".py", ".html", ".yml", ".css", ".md", ".txt"}:
-            assert not TOKEN_RE.search(path.read_text()), f"{path} kept a placeholder"
+    checked = scanned(
+        (p for p in tree.rglob("*") if p.is_file() and p.suffix in {".py", ".html", ".yml", ".css", ".md", ".txt"}),
+        "placeholders in the generated tree",
+    )
+    for path in checked:
+        assert not TOKEN_RE.search(path.read_text()), f"{path} kept a placeholder"
 
 
 def test_every_python_file_parses(tree):
-    for path in tree.rglob("*.py"):
+    for path in scanned(tree.rglob("*.py"), "python files in the generated tree"):
         ast.parse(path.read_text(), str(path))
 
 

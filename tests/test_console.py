@@ -19,6 +19,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from scanning import scanned  # noqa: E402
 from textual.widgets import Input, RichLog, Static  # noqa: E402
 
 from protopilot.console import ConsoleApp  # noqa: E402
@@ -491,5 +492,10 @@ def test_nothing_in_the_console_package_is_called_tui():
     import protopilot.console as pkg
 
     root = Path(pkg.__file__).parent
-    offenders = [p.name for p in root.rglob("*") if "tui" in p.name.lower()]
+    # `scanned` is the point of this line, not decoration. The assertion below
+    # is a pure negative, so it passes over an empty set — and if the package
+    # were renamed or moved, this test would go on reporting that nothing in it
+    # is called `tui` while looking at nothing at all.
+    files = scanned(root.rglob("*"), "files in the console package", least=4)
+    offenders = [p.name for p in files if "tui" in p.name.lower()]
     assert not offenders, f"the console package must not use the target's name: {offenders}"
