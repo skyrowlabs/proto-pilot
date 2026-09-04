@@ -1,7 +1,7 @@
 ---
 title: "The proto Console"
 slug: proto-console
-shelf_status: planned
+shelf_status: in-progress
 priority: medium
 updated: 2026-09-04
 tags: [console, jobs, front-end, textual, ux]
@@ -10,8 +10,8 @@ summary: "A terminal front end for the tool itself — type the idea in one pane
 
 # The proto Console
 
-> **Status**: 🔴 Planned — designed, unreviewed
-> **Shelf-Status**: planned
+> **Status**: 🟡 In progress — Phase 1 measured and green, Phases 2-6 open
+> **Shelf-Status**: in-progress
 > **Priority**: Medium — the default target has no front end but raw stdout,
 > which is a gap the pivot opened rather than a pre-existing one
 > **Queue-Order**: unset until it is `ready`
@@ -62,26 +62,84 @@ view over `STORE`, not a rewrite of anything. **That is the whole reason it is
 Medium and not High cost**, and if Phase 1 finds it untrue the estimate is wrong
 rather than the plan.
 
-## Phase 1 — Verify the two claims this plan rests on
+## Phase 1 — Verify the two claims this plan rests on ✅
 
-Both are read out of the source, not measured. Both are cheap. Neither needs a
-line of new product code.
+Both were read out of the source, not measured. Both are now measured, on
+2026-09-04, and **the gate passes: the output is not buffered.** Phase 2 stays
+an enhancement rather than becoming a prerequisite.
 
-- [ ] `protopilot.jobs` imports and `JobStore.run()` completes with **no web
-      extra installed**. The claim is that the seam is standalone; the check is
-      an import in an environment without FastAPI
-- [ ] **`job.lines` grows *during* a run, not only at the end.** `run_generation`
-      binds `log = job.log` and calls it, so lines should appear as passes
-      complete — but `JobStore.run` also wraps the work in
-      `redirect_stdout(buffer)` and flushes that buffer in its `finally`. Anything
-      reaching the log via stdout rather than via `job.log()` therefore arrives
-      **all at once, twenty-one minutes late**. Measure which of the two paths
-      the real generation output actually takes
-- [ ] Record the split: how many lines arrive incrementally, how many at the end
-- [ ] **Gate:** if the output is mostly buffered, Phase 2 stops being an
-      enhancement and becomes a prerequisite — a pane that is empty for twenty
-      minutes and then fills is worse than the CLI it replaced, because the CLI
-      at least prints as it goes
+- [x] `protopilot.jobs` imports and `JobStore.run()` completes with **no web
+      extra installed**. Confirmed in a venv built from `pip install -e .` with
+      no extras, which resolves `fastapi`, `starlette` and `jinja2` to nothing —
+      asserted absent at the top of the check, because a claim about a bare
+      environment is worthless if the environment was not bare. Seam imports,
+      job runs, status `done`
+- [x] **`job.lines` grows during a run.** 27 of 28 lines arrive while the job is
+      still running; the 28th is the verify result, which arrives when verify
+      finishes and not via any flush
+- [x] Record the split: **the `redirect_stdout` buffer holds 0 bytes** at the
+      `finally`. Read out of the buffer directly rather than inferred from where
+      lines landed, since "no late lines appeared" and "nothing was captured"
+      are different claims. Every one of the 28 lines came through `job.log()`
+- [x] **Gate: passed.** Nothing arrives late, so a pane is never dark waiting on
+      a flush
+
+### The numbers, and the one that matters
+
+Offline generation finishes in under three seconds, which shows lines arrive
+in order but says nothing about a twenty-one minute run. So the same shipped
+`run_generation` was driven through the same `JobStore.run` with latency put
+back into `run_pass`, where a real pass spends its wall clock:
+
+| | |
+|---|---|
+| lines total | 28 |
+| arriving during the run | 27 |
+| arriving at the end | 1 (the verify result, logged) |
+| bytes in the stdout buffer | **0** |
+| **longest gap between lines** | **one pass** |
+
+The last row is the design input. A pane is never blank for the length of a
+run; it is blank for the length of *one pass*, and it already names the pass it
+is waiting on — `builder.generate` logs `pass {name}...` **before** doing the
+work, not after. Scaled to the measured 1278s `tui` run that is roughly four
+minutes between lines, with the current pass on screen throughout.
+
+### Why the pipeline is clean, in one fact
+
+`SubprocessRunner.run` passes `capture_output=True`, so verify's pytest and
+Docker calls never reach the terminal at all — their output comes back as a
+`CommandResult` and is surfaced through `log()` like everything else. There is
+exactly one `print()` left in `protopilot/` outside the web front end, in
+`tui_probe.py`, and it is a CLI entry point that no job calls. The buffer is
+empty because there is nothing to put in it.
+
+### A hazard checked while here, and cleared
+
+`redirect_stdout` rebinds `sys.stdout` for the whole **process**, not the thread
+that entered it — so the obvious worry is that a job running underneath a live
+console would capture the console's own painting and freeze the screen. It
+cannot, on two independent counts: Textual's `LinuxDriver` writes to
+`sys.__stderr__`, which is the wrong stream *and* the pristine handle, resolved
+once at construction and handed to a `WriterThread`. Verified against Textual
+8.2.8's source rather than its documentation.
+
+This does not clear Phase 5, which is about two jobs clobbering **each other**.
+It does mean the console's screen is not at risk, so Phase 5 stays where it is.
+
+### What the measuring cost, which is the reusable part
+
+The first latency injection slept inside `llm.structured`, and offline mode
+never calls it — `run_pass` branches to `module.offline()` well before the LLM.
+The run finished in the same 3.0s and reported *"27 during, 1 at end"*, which is
+the correct answer arrived at by a method that had measured nothing. It would
+have been reported as latency-in-play.
+
+**A plant that did not land is indistinguishable from a gate that works.** The
+version that stands asserts its own injection fired — `run_pass` was called five
+times, wall clock exceeded the sleep budget — before it prints a single number.
+Same shape as the `sed` that silently matched nothing during the same session's
+skeletor upgrade, twice in one afternoon, by two different roads.
 
 ## Phase 2 — A structured event beside the text
 
