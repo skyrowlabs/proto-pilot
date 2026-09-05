@@ -341,7 +341,12 @@ jobs:
   release-please:
     name: Release Please
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    # No `ui` here: this repo does not install that job (see the note above it).
+    # `ui` is deliberately absent, and this is the reason rather than an
+    # oversight: that job is the one job documented as removable, and this repo
+    # removed it. A `needs:` naming a job that is gone is not a red job — it is a
+    # `startup_failure`, with zero jobs, no logs and nothing on the commit naming
+    # the line. We pushed exactly that as `8ea7b6b`.
+    # `tests/test_workflow_job_graph.py` is what makes this checkable.
     needs: [lint, unit-tests, integration]
     runs-on: ubuntu-latest
     permissions:

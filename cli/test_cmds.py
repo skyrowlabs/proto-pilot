@@ -42,14 +42,38 @@ class Suite(NamedTuple):
     #: otherwise requires a workflow here to select every marker this file
     #: offers.
     #:
-    #: Both fields default to the answer that is safe to get wrong, which is
+    #: Both booleans default to the answer that is safe to get wrong, which is
     #: what makes them defaults rather than a question quietly skipped. Omit
     #: this one and the new suite is OBLIGED to have a job, so forgetting is a
     #: red gate naming the marker; write `scheduled=False` and you have made a
     #: claim somebody can read. The other direction — a suite CI ignores by
     #: default — is the silent hole this whole file exists to close.
     scheduled: bool = True
+    #: Required when `scheduled=False`, and one of `UNSCHEDULED`. See there for
+    #: why an exemption has to say which kind it is.
+    unscheduled: str = ""
 
+
+#: The two ways a suite can be excused from CI, which have different lifetimes
+#: — proto.pilot's distinction, and the reason the exemption is not a bare
+#: `False`.
+#:
+#: `unattended` is a fact about the suite: it cannot run without money or a
+#: person, and that stays true however many tests it gains. `empty` is a fact
+#: about the tree's *contents*, and contents change — mark one test with the
+#: marker and the row is false with no edit to it, no workflow change, and
+#: nothing red anywhere. That is the hole this file was rewritten to close,
+#: reappearing under its own exemption and therefore past the gate built to
+#: catch it.
+#:
+#: Which is why the two are spelled apart rather than commented apart: an
+#: `empty` row implies an emptiness assertion, and
+#: `tests/test_ci_runs_every_suite.py` writes it for free from this map. Nobody
+#: has to notice they needed one.
+UNSCHEDULED = {
+    "unattended": "cannot run without money or a person — true whatever tests it gains",
+    "empty": "nothing carries this marker yet — asserted, and it expires when something does",
+}
 
 #: The suites, and the whole of the table. A test file joins one by declaring
 #: the marker; nothing here is a file list.
@@ -59,32 +83,36 @@ SUITES = {
     # Costs money or needs a person. The one row CI is not expected to run, and
     # the reason that is a field rather than an `if marker != "manual"` in two
     # places, which is what it used to be.
-    "manual": Suite("never in scheduled CI — E2E, live third-party, paid APIs", scheduled=False),
+    "manual": Suite(
+        "never in scheduled CI — E2E, live third-party, paid APIs",
+        scheduled=False,
+        unscheduled="unattended",
+    ),
     # Empty in a headless tree and that is fine — an empty suite is green, and
     # the row costs nothing until something fills it. It exists as a row rather
     # than as a `--ui` overlay because what a TUI, a browser and an Electron
     # window share is not a framework, it is a failure mode: the interaction can
     # be delivered to nothing. See docs/rules/testing.md § Interaction.
     #
-    # `scheduled=False` **here**, which is a departure from the template and
-    # not a disagreement with it. Upstream ships `scheduled=True` and a CI job,
-    # because a `ui` marker with no job deletes tests from CI — we reported
-    # that, and the reasoning is right. But the obligation it creates is that
-    # this row and `.github/workflows/` agree, and there are two honest ways to
-    # satisfy it. Nothing in this repo is marked `ui`: the 36 Textual pilot
-    # tests in `tests/test_console*.py` are headless, need no display, and
+    # `scheduled=False` **here**, which is a departure from the template and not
+    # a disagreement with it. Upstream ships `scheduled=True` and a CI job,
+    # because a `ui` marker with no job deletes tests from CI — we reported that.
+    # But the obligation is that this row and `.github/workflows/` agree, and
+    # there are two honest ways. Nothing here is marked `ui`: the 36 Textual
+    # pilot tests in `tests/test_console*.py` are headless, need no display, and
     # belong on `unit`, where CI runs them today. A job for them would collect
     # nothing, one day after the Python matrix was halved to cut that same cost.
     #
-    # The reason matters more than the value, because `scheduled=False` carries
-    # two different justifications and only one of them is stable. `manual` is
-    # unscheduled because it *cannot* run unattended — money, or a person — and
-    # that stays true however many tests it gains. This row is unscheduled
-    # because the suite is **empty**, and that expires the moment anything is
-    # marked `ui`, silently, in the exact shape of the bug we reported.
-    # `tests/test_ui_suite_is_empty.py` holds it: mark one test `ui` and it goes
-    # red, naming this comment. The template's job is the fix at that point.
-    "ui": Suite("drives a user interface; needs a display, a browser, or a pilot", scheduled=False),
+    # `unscheduled="empty"` is load-bearing rather than descriptive: it is the
+    # difference between an exemption that stays true and one that expires when
+    # somebody marks a test, and naming it is what makes
+    # `test_a_suite_excused_as_empty_is_actually_empty` watch this row. We held
+    # that with a hand-written file until v0.4.4 moved it into the registry.
+    "ui": Suite(
+        "drives a user interface; needs a display, a browser, or a pilot",
+        scheduled=False,
+        unscheduled="empty",
+    ),
 }
 
 
