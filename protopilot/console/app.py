@@ -29,6 +29,7 @@ from textual.widgets import Button, Footer, Header, Input, Label, RichLog, Selec
 from protopilot import archetypes, generation, targets
 from protopilot.console.progress import fold, lines
 from protopilot.console.review import ReviewScreen
+from protopilot.console.session import PreviewSession
 from protopilot.console.theme import SKYROW
 from protopilot.jobs import STORE, JobStore
 
@@ -43,10 +44,28 @@ TICK = 0.2
 #: obvious expectation of a pane called Preview is a running app.
 NO_PREVIEW = (
     "No preview yet.\n\n"
-    "Once a terminal prototype verifies, the screen it painted is shown here -- "
-    "a picture of the generated app, not the app itself.\n\n"
-    "To use it, run the command shown when the generation finishes."
+    "Once a terminal prototype verifies, the screen it painted is shown here.\n\n"
+    "ctrl+l runs the prototype live in this pane: keys go to it, and it is "
+    "rebuilt from whatever is on disk each time you press it."
 )
+
+#: How often a live session is asked for its current frame. An app driving
+#: itself from `set_interval` has moved on between calls, so this is the
+#: preview's frame rate; a still app costs one round trip and returns the same
+#: screen. Faster than `TICK` because this is the only thing here that animates.
+LIVE_TICK = 0.1
+
+
+class PreviewPane(Static):
+    """The preview, made focusable so it can be typed into.
+
+    A `Static` cannot take focus by default, which is right for a label and
+    wrong for something you are meant to drive. Focus is what separates "the
+    idea box has my keystrokes" from "the prototype does", and it is a
+    distinction the reader can see rather than one they have to remember.
+    """
+
+    can_focus = True
 
 
 class ConsoleApp(App):
@@ -57,6 +76,7 @@ class ConsoleApp(App):
     BINDINGS = [
         ("ctrl+r", "start", "Generate"),
         ("ctrl+p", "preview", "Preview"),
+        ("ctrl+l", "live", "Run live"),
         ("ctrl+q", "quit", "Quit"),
     ]
 
@@ -92,6 +112,7 @@ class ConsoleApp(App):
         self._shown = 0
         self._last_status = ""
         self._preview = ""
+        self.session: PreviewSession | None = None
 
     # -- layout -----------------------------------------------------------
 
@@ -133,7 +154,7 @@ class ConsoleApp(App):
                     with TabPane("Output", id="tab-log"):
                         yield RichLog(id="log", wrap=True, markup=False, max_lines=5000)
                     with TabPane("Preview", id="tab-preview"):
-                        yield Static(NO_PREVIEW, id="preview")
+                        yield PreviewPane(NO_PREVIEW, id="preview")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -142,7 +163,32 @@ class ConsoleApp(App):
         self.register_theme(SKYROW)
         self.theme = SKYROW.name
         self.set_interval(TICK, self.refresh_panes)
+        # Its own timer, and faster: this one is the preview's frame rate and
+        # has nothing to do with how often a job's log is drained.
+        self.set_interval(LIVE_TICK, self.refresh_live)
         self.query_one("#idea", Input).focus()
+
+    def refresh_live(self) -> None:
+        """One frame from the running prototype, if there is one."""
+        session = self.session
+        if session is None:
+            return
+        if not self.query("#preview"):
+            return
+        pane = self.query_one("#preview", PreviewPane)
+        if not session.alive:
+            if session.error:
+                pane.update(f"{session.error}\n\nctrl+l to rebuild and try again.")
+                self.session = None
+            return
+        session.tick()
+        if session.frame:
+            body = session.frame
+            if session.error:
+                # A key that raised is a finding about the generated app, not a
+                # reason to blank the screen it was raised from.
+                body = f"{session.frame}\n\n! {session.error}"
+            pane.update(body)
 
     # -- running ----------------------------------------------------------
 
@@ -300,6 +346,61 @@ class ConsoleApp(App):
             rows.append(f"{marks.get(job.status, '·')} {idea}{here}")
         return "\n".join(rows)
 
+    # -- the live preview -------------------------------------------------
+
+    def action_live(self) -> None:
+        """Run the generated prototype in the pane, or rebuild it if it is
+        already running.
+
+        **Restart is the refresh.** There is no "reload" that is cheaper or
+        more truthful: the app is a process holding its own state, and what a
+        reader means by "show me the current one" is the tree as it is on disk
+        now. Pressing this again after editing generated code, or after
+        `proto add`, shows the change.
+        """
+        job = self.job
+        directory = job.project_dir if job else ""
+        if not directory or not Path(directory).is_dir():
+            self.set_status("nothing generated yet to run")
+            return
+
+        self.query_one("#views", TabbedContent).active = "tab-preview"
+        self.set_status(f"starting {Path(directory).name}...")
+        session = self.session or PreviewSession(Path(directory))
+        session.project_dir = Path(directory)
+        self.session = session
+        session.start()
+        # Focused, because a preview you have to click before it takes a key
+        # reads as one that ignores keys.
+        self.query_one("#preview", PreviewPane).focus()
+
+    def on_key(self, event) -> None:
+        """Forward keystrokes to a live prototype, when one has focus.
+
+        **`ctrl+`-anything is never forwarded**, and that is the whole of the
+        rule. The console's own bindings all live there, so the reader keeps a
+        way out — to quit, to switch tabs, to rebuild — that no generated app
+        can capture by binding it first. Everything else belongs to the app
+        being previewed, because a preview that swallows `q` is not showing you
+        the thing you asked to see.
+        """
+        session = self.session
+        if session is None or not session.alive:
+            return
+        if not isinstance(self.focused, PreviewPane):
+            return
+        if event.key.startswith("ctrl+"):
+            return
+        event.stop()
+        event.prevent_default()
+        session.press(event.key)
+
+    def on_unmount(self) -> None:
+        """A subprocess outliving the console is a prototype nobody can see and
+        nobody can stop."""
+        if self.session is not None:
+            self.session.stop()
+
     def action_preview(self) -> None:
         """Toggle between the log and the generated app's screen."""
         views = self.query_one("#views", TabbedContent)
@@ -344,7 +445,12 @@ class ConsoleApp(App):
         self.query_one("#progress", Static).update(text or "starting...")
         self.query_one("#jobs", Static).update(self.recent() or "nothing yet")
 
-        if progress.screen and progress.screen != self._preview:
+        # A live session outranks the screenshot: it is the same app, now, with
+        # its own state, and drawing the still one over it would replace what
+        # the reader is driving with a picture of how it started.
+        if self.session is not None and self.session.alive:
+            pass
+        elif progress.screen and progress.screen != self._preview:
             self._preview = progress.screen
             self.query_one("#preview", Static).update(progress.screen)
             # Switched to once, on arrival. Not on every tick: a reader who

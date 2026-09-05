@@ -373,10 +373,39 @@ lists, reviews and refuses — and a `jobs.py` whose capture is per-job, which
 
 ## Dropped, and why
 
-**Embedding the running prototype in a pane.** The obvious next thought, and a
-different project: two Textual `App`s cannot share one process because
-`App.run()` owns the terminal, so it means a PTY and a terminal-emulator widget
-Textual does not ship. Live interaction is still its own plan.
+**Embedding the running prototype in a pane — dropped, then done.** The
+reasoning here was sound and the conclusion was wrong, which is worth leaving
+visible: two Textual `App`s genuinely cannot share one process, because
+`App.run()` owns the terminal. What that rules out is running the prototype
+*in* the console's process. It does not rule out running it in **another** one.
+
+`protopilot/tui_stream.py` boots the generated app under `App.run_test` — which
+composites to a buffer instead of to a terminal — holds it open, and answers a
+newline-delimited JSON protocol: send a key, get the frame it produced; ask for
+a frame, get the current one. `ctrl+l` in the console starts it, forwards
+keystrokes, and polls at 10Hz, so an app driving itself from `set_interval`
+animates. No PTY, no terminal-emulator widget, and the isolation the probe was
+built for is kept — a `compose()` that raises ends that process and is
+reported, rather than taking the console down.
+
+**The mistake was reasoning from the obstacle to the verdict.** "Two apps
+cannot share a process" is true and was treated as "a live preview needs a
+terminal emulator", which does not follow. The thing that made it cheap was
+already in the tree and had been for a week: `tui_probe.py` renders a generated
+app to a string without a terminal, because that is how the terminal target
+verifies at all. A second process was the only missing piece.
+
+What it is not: a terminal emulator. It cannot show a program that writes
+escape sequences itself, only a Textual app that composites — which is every
+tree this target generates.
+
+`ctrl+`-chords are never forwarded, so the reader keeps a way out no generated
+app can bind away. That guard turned out to govern less than it looked like:
+a **bound** chord never reaches `on_key`, because Textual dispatches bindings
+first, so `ctrl+p` stays with the console with or without it. What the guard
+actually covers is every ctrl chord the console has *not* bound — which is the
+set that matters, since a future binding is drawn from it. The test asserted on
+`ctrl+p` first and stayed green with the guard deleted.
 
 **The screenshot half shipped**, on 2026-09-04, the first time somebody
 generated a prototype and asked where it was — which is the question this

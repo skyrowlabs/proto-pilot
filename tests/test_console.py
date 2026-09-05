@@ -23,6 +23,7 @@ from scanning import scanned  # noqa: E402
 from textual.widgets import Input, RichLog, Static, TabbedContent  # noqa: E402
 
 from protopilot.console import ConsoleApp  # noqa: E402
+from protopilot.console.session import PreviewSession  # noqa: E402
 from protopilot.jobs import JobStore  # noqa: E402
 
 pytestmark = pytest.mark.unit
@@ -423,6 +424,127 @@ async def test_a_second_run_returns_to_the_log_and_drops_the_old_preview(tmp_pat
             pilot, lambda: views.active == "tab-log", ticks=200
         ), "the second run left the first run's screenshot on screen"
         assert "FIRST-SCREEN" not in widget_text(helper, app, "#preview")
+
+
+# -- the live preview -----------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_the_prototype_runs_live_in_the_pane_and_takes_keys(tmp_path, helper):
+    """The real thing, end to end: generate, run it, drive it.
+
+    Not a screenshot. `ctrl+l` boots the generated app in its own process under
+    `App.run_test` — which composites to a buffer instead of to a terminal, and
+    is the way around two Textual apps being unable to share one — and the
+    console draws the frames it sends back.
+
+    The key assertion is the last one. A pane that shows *a* frame proves the
+    pipe works; a pane whose frame **changes because of a keystroke** proves it
+    is the running app and not a picture of one.
+    """
+    app = console(tmp_path, backend="offline")
+    async with app.run_test(size=SIZE) as pilot:
+        await type_idea(pilot, "a simple pong simulator")
+        await pilot.click("#start")
+        await approve(pilot)
+        assert await until(pilot, lambda: not app.busy, ticks=900), log_text(app)
+        job = app.job
+        assert job is not None, "no job was created"
+        assert job.status == "done", job.error
+
+        await pilot.press("ctrl+l")
+        assert await until(
+            pilot, lambda: bool(app.session and app.session.ready), ticks=600
+        ), f"the live session never produced a frame: {getattr(app.session, 'error', 'no session')}"
+        session = app.session
+        assert session is not None
+        home = session.frame
+        assert len(home) > 200, f"the frame is too small to be a rendered app: {home!r}"
+        assert await until(pilot, lambda: home[:40] in widget_text(helper, app, "#preview"), ticks=200)
+
+        # `1` is the key the generated home screen offers for its first list.
+        # Driving it is what distinguishes a live app from a screenshot.
+        app.query_one("#preview").focus()
+        await pilot.press("1")
+        assert await until(
+            pilot, lambda: session.frame != home, ticks=400
+        ), "the keystroke reached nothing: the frame is unchanged"
+        assert not session.error, session.error
+
+
+@pytest.mark.asyncio
+async def test_control_keys_stay_with_the_console(tmp_path, helper):
+    """The reader keeps a way out that no generated app can bind away.
+
+    Every console binding is a `ctrl+` chord and none of them are forwarded, so
+    a prototype that binds `q` — or `escape`, or `tab` — gets those and never
+    gets the keys that quit, switch tabs or rebuild.
+
+    **`ctrl+a`, not `ctrl+p`**, and the difference is the whole test. A *bound*
+    chord never reaches `on_key` at all: Textual dispatches it to the binding
+    first, so `ctrl+p` stays with the console whether the guard exists or not.
+    Asserting on it looks like a test of the guard and is a test of Textual —
+    removing the guard entirely left this green. What the guard actually governs
+    is every ctrl chord the console has *not* bound, which is the set that
+    matters, because it is the one a future binding is drawn from.
+    """
+    sent = []
+
+    class FakeSession(PreviewSession):
+        """Records keystrokes instead of running anything.
+
+        A subclass rather than a duck: `ConsoleApp.session` is typed, and a
+        loose stand-in would be the one place a type checker cannot see that
+        the console and its session still agree on a shape.
+        """
+
+        def __init__(self):
+            self.ready = True
+            self.frame = "A FRAME"
+            self.error = ""
+
+        @property
+        def alive(self) -> bool:
+            return True
+
+        def press(self, key):
+            sent.append(key)
+
+        def tick(self):
+            pass
+
+        def stop(self):
+            pass
+
+        def start(self):
+            pass
+
+    app = console(tmp_path, runner=lambda *a, **k: None)
+    async with app.run_test(size=SIZE) as pilot:
+        app.session = FakeSession()
+        app.query_one("#views", TabbedContent).active = "tab-preview"
+        app.query_one("#preview").focus()
+        await pilot.pause()
+
+        await pilot.press("q")
+        await pilot.press("escape")
+        await pilot.press("ctrl+a")  # unbound here, and reserved anyway
+        await pilot.press("ctrl+p")  # bound; never reaches `on_key`
+        await pilot.pause()
+
+        assert "q" in sent and "escape" in sent, f"ordinary keys did not reach the app: {sent}"
+        assert not any(k.startswith("ctrl+") for k in sent), f"a ctrl chord was forwarded: {sent}"
+        app.session = None
+
+
+@pytest.mark.asyncio
+async def test_running_live_with_nothing_generated_says_so(tmp_path, helper):
+    app = console(tmp_path, runner=lambda *a, **k: None)
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.press("ctrl+l")
+        await pilot.pause()
+        assert app.session is None
+        assert "nothing generated" in widget_text(helper, app, "#status")
 
 
 # -- the floor ------------------------------------------------------------
