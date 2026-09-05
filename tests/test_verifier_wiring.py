@@ -325,3 +325,62 @@ def test_an_injected_factory_still_wins(tmp_path, monkeypatch):
 
     assert not runner.ran("docker", "compose", "up"), "the default verifier ran alongside the injected one"
     assert job.url.endswith(str(Spec.load(Path(job.project_dir)).port))
+
+
+# ── what the verifier knows, and whether anything asks it ────────────────
+
+
+def test_the_generated_apps_screen_reaches_the_event_channel(tmp_path, monkeypatch):
+    """The seam between the terminal verifier and the console's preview pane.
+
+    Every console-side test of the preview injects the event by hand, which
+    proves the *pane* works and says nothing about whether anything ever emits
+    one. This is the half that was untested: `generation.build` holds the
+    verifier so it can ask for the screen the probe already composited, and a
+    refactor that passed `make_verifier()` inline again would silently stop
+    emitting with no test anywhere going red.
+
+    Found by planting the emit away and discovering the check aimed at a test
+    file that did not exist — a plant that did not land, one level up.
+    """
+    from protopilot import generation
+    from protopilot.jobs import JobStore
+
+    monkeypatch.setenv("PROTOPILOT_REGISTRY", str(tmp_path / "projects.json"))
+
+    job = JobStore().create("a simple pong simulator")
+    spec = generation.assemble(job, backend="offline", target="tui")
+    generation.build(job, tmp_path, spec, backend="offline")
+
+    previews = [e for e in job.events if e["kind"] == "preview"]
+    assert previews, f"no preview was emitted; kinds were {[e['kind'] for e in job.events]}"
+    screen = previews[0]["screen"]
+    assert len(screen) > 200, f"the screen is too small to be a rendered app: {screen!r}"
+    assert spec.name.split()[0] in screen, "the preview does not show this app's own screen"
+    assert previews[0]["target"] == "tui"
+
+
+def test_a_target_whose_verifier_has_no_screen_emits_no_preview(tmp_path, monkeypatch):
+    """`getattr`, deliberately. The web verifier has no `last_probe` and must
+    not need one — a field added to every target so that one of them can be
+    asked is the shape this avoids."""
+    from fakes import FakeVerifier
+
+    from protopilot import generation
+    from protopilot.jobs import JobStore
+    from protopilot.verify import VerifyResult
+
+    monkeypatch.setenv("PROTOPILOT_REGISTRY", str(tmp_path / "projects.json"))
+
+    job = JobStore().create("a simple pong simulator")
+    spec = generation.assemble(job, backend="offline", target="tui")
+    generation.build(
+        job,
+        tmp_path,
+        spec,
+        backend="offline",
+        verifier_factory=lambda: FakeVerifier([VerifyResult(ok=True, stage="tests", summary="green")]),
+    )
+
+    assert not [e for e in job.events if e["kind"] == "preview"]
+    assert [e for e in job.events if e["kind"] == "finished"], "the run did not finish at all"

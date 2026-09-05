@@ -54,6 +54,11 @@ class Progress:
     attempts: int = 0
     project_dir: str = ""
     run_hint: str = ""
+    #: The generated app's own screen, as the verifier saw it paint. A picture
+    #: of the result rather than of the process -- everything else here
+    #: describes the *build*, and this is the only field that describes what
+    #: was built.
+    screen: str = ""
 
     @property
     def done_passes(self) -> int:
@@ -98,6 +103,8 @@ def fold(events: list[dict]) -> Progress:
             p.rejected += 1
         elif kind == "exhausted":
             p.stage = str(event.get("stage", "")) or p.stage
+        elif kind == "preview":
+            p.screen = str(event.get("screen", ""))
         elif kind == "finished":
             p.finished = True
             p.ok = bool(event.get("ok"))

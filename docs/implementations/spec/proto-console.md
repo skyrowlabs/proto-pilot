@@ -376,8 +376,36 @@ lists, reviews and refuses — and a `jobs.py` whose capture is per-job, which
 **Embedding the running prototype in a pane.** The obvious next thought, and a
 different project: two Textual `App`s cannot share one process because
 `App.run()` owns the terminal, so it means a PTY and a terminal-emulator widget
-Textual does not ship. `tui_probe.py` can already mirror a *screenshot* cheaply,
-which is a Phase 3 nicety if wanted. Live interaction is its own plan.
+Textual does not ship. Live interaction is still its own plan.
+
+**The screenshot half shipped**, on 2026-09-04, the first time somebody
+generated a prototype and asked where it was — which is the question this
+section predicted and answered with "a Phase 3 nicety if wanted". It was
+wanted, and it was nearly free: the terminal verifier already boots the app
+under `App.run_test` and composites its screen to decide whether it painted at
+all, then threw that away the moment it returned a verdict. `generation.build`
+now holds the verifier rather than passing `make_verifier()` inline, asks it for
+`last_probe["buffer"]`, and emits a `preview` event; the console shows it in a
+second tab beside the log and comes forward once, on arrival.
+
+`getattr`, so a target whose verifier has no screen emits nothing — a field
+added to every target so that one of them can be asked is the shape this
+avoids.
+
+Two things worth keeping from building it. **A stale screenshot is worse than
+none**, because it is a picture of something that is not what is being
+generated: resetting the guard without clearing the widget left the previous
+idea's screen sitting in the pane, and the test for the *second* run caught it.
+And the tab comes forward **once**, not per tick — a reader who tabs back to the
+log to re-read a repair must stay there, which is the same bug as the status
+line that rewrote itself over its own message.
+
+The emit itself had no test until a plant pointed at a file that did not exist
+and reported "no tests ran" as if it were a result. Every console-side test
+injected the event by hand, which proves the pane works and says nothing about
+whether anything emits one. `test_the_generated_apps_screen_reaches_the_event_channel`
+covers that seam now, and goes red both when the emit is removed and when the
+verifier handle is passed inline again.
 
 **Replacing the CLI.** `proto new` is the scriptable path and what CI runs. A
 front end that is the only way in is a tool you cannot automate.

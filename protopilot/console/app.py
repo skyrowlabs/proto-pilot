@@ -24,7 +24,7 @@ from pathlib import Path
 
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.widgets import Button, Footer, Header, Input, Label, RichLog, Select, Static
+from textual.widgets import Button, Footer, Header, Input, Label, RichLog, Select, Static, TabbedContent, TabPane
 
 from protopilot import archetypes, generation, targets
 from protopilot.console.progress import fold, lines
@@ -37,13 +37,27 @@ from protopilot.jobs import STORE, JobStore
 #: lists are append-only and nothing is lost between ticks.
 TICK = 0.2
 
+#: Shown before a run has produced a screen, and again at the start of the
+#: next one. Says what this pane is for and what it cannot do, because the
+#: obvious expectation of a pane called Preview is a running app.
+NO_PREVIEW = (
+    "No preview yet.\n\n"
+    "Once a terminal prototype verifies, the screen it painted is shown here -- "
+    "a picture of the generated app, not the app itself.\n\n"
+    "To use it, run the command shown when the generation finishes."
+)
+
 
 class ConsoleApp(App):
     """Two panes over one job store."""
 
     CSS_PATH = "console.tcss"
     TITLE = "proto.pilot"
-    BINDINGS = [("ctrl+r", "start", "Generate"), ("ctrl+q", "quit", "Quit")]
+    BINDINGS = [
+        ("ctrl+r", "start", "Generate"),
+        ("ctrl+p", "preview", "Preview"),
+        ("ctrl+q", "quit", "Quit"),
+    ]
 
     def __init__(
         self,
@@ -76,6 +90,7 @@ class ConsoleApp(App):
         self.phase = "idle"
         self._shown = 0
         self._last_status = ""
+        self._preview = ""
 
     # -- layout -----------------------------------------------------------
 
@@ -108,7 +123,16 @@ class ConsoleApp(App):
             with Vertical(id="output-pane"):
                 with VerticalScroll(id="progress-scroll"):
                     yield Static("Nothing running.", id="progress")
-                yield RichLog(id="log", wrap=True, markup=False, max_lines=5000)
+                # Two tabs rather than a third region. Everything above
+                # describes the *build*; the preview is the only thing that
+                # shows what was built, and the two want the same space at
+                # different moments -- the log while it runs, the screen once
+                # it is green.
+                with TabbedContent(id="views"):
+                    with TabPane("Output", id="tab-log"):
+                        yield RichLog(id="log", wrap=True, markup=False, max_lines=5000)
+                    with TabPane("Preview", id="tab-preview"):
+                        yield Static(NO_PREVIEW, id="preview")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -157,7 +181,14 @@ class ConsoleApp(App):
         self.target = target
         self._shown = 0
         self._last_status = job.status
+        self._preview = ""
         self.query_one("#log", RichLog).clear()
+        self.query_one("#views", TabbedContent).active = "tab-log"
+        # The widget too, not only the guard. Resetting `_preview` alone
+        # switched the tab back and left the previous idea's screenshot sitting
+        # in it -- a picture of something that is not what is being generated,
+        # which is worse than no picture.
+        self.query_one("#preview", Static).update(NO_PREVIEW)
 
         if self._run is not None:
             # An injected whole-run path: no spec to review, so no checkpoint.
@@ -264,6 +295,11 @@ class ConsoleApp(App):
             rows.append(f"{marks.get(job.status, '·')} {idea}{here}")
         return "\n".join(rows)
 
+    def action_preview(self) -> None:
+        """Toggle between the log and the generated app's screen."""
+        views = self.query_one("#views", TabbedContent)
+        views.active = "tab-log" if views.active == "tab-preview" else "tab-preview"
+
     def set_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
 
@@ -291,9 +327,19 @@ class ConsoleApp(App):
             log.write(line)
         self._shown = len(job.lines)
 
-        text = "\n".join(lines(fold(job.events)))
+        progress = fold(job.events)
+        text = "\n".join(lines(progress))
         self.query_one("#progress", Static).update(text or "starting...")
         self.query_one("#jobs", Static).update(self.recent() or "nothing yet")
+
+        if progress.screen and progress.screen != self._preview:
+            self._preview = progress.screen
+            self.query_one("#preview", Static).update(progress.screen)
+            # Switched to once, on arrival. Not on every tick: a reader who
+            # tabbed back to the log to read a repair would be yanked away
+            # again 200ms later, which is the same class of bug as the status
+            # line that rewrote itself over its own message.
+            self.query_one("#views", TabbedContent).active = "tab-preview"
 
         # **On transitions only.** This used to write the status line every
         # tick, which silently ate anything else that line had to say: the

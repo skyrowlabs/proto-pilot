@@ -147,6 +147,32 @@ def test_a_rejected_repair_is_counted_separately_from_an_applied_one():
     assert "1 rejected" in "\n".join(lines(p))
 
 
+def test_the_preview_carries_the_generated_apps_own_screen():
+    """The only field here that describes what was **built** rather than how.
+
+    Everything else in `Progress` is about the build — which pass, which
+    attempt, what was patched. The screen is the result, and it exists because
+    the terminal verifier already boots the app and composites it to decide
+    whether it painted; without this it was thrown away the moment the verdict
+    was returned.
+    """
+    painted = "┌── Pong ──┐\n│  ●       │\n└──────────┘"
+    p = fold([PLAN, {"kind": "preview", "screen": painted, "target": "tui"}])
+    assert p.screen == painted
+
+    # And it is not rendered into the progress text: that region is a summary
+    # of the build, and a screenshot pasted into it would push everything the
+    # summary is for off the top.
+    assert painted not in "\n".join(lines(p))
+
+
+def test_a_run_with_no_preview_leaves_the_field_empty():
+    """A target whose verifier has no screen to show emits no `preview` event,
+    rather than every target growing a field so that one of them can be
+    asked."""
+    assert fold([PLAN, {"kind": "verify_passed", "attempt": 1, "summary": "green"}]).screen == ""
+
+
 # -- rendering ------------------------------------------------------------
 
 

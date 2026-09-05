@@ -20,7 +20,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scanning import scanned  # noqa: E402
-from textual.widgets import Input, RichLog, Static  # noqa: E402
+from textual.widgets import Input, RichLog, Static, TabbedContent  # noqa: E402
 
 from protopilot.console import ConsoleApp  # noqa: E402
 from protopilot.jobs import JobStore  # noqa: E402
@@ -338,6 +338,91 @@ async def test_a_second_generation_is_refused_by_name_not_interleaved(tmp_path, 
             assert "one at a time" in widget_text(helper, app, "#status")
     finally:
         released.set()
+
+
+# -- the preview ----------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_the_generated_apps_screen_is_shown_when_it_verifies(tmp_path, helper):
+    """The answer to "show me the thing, not the build log".
+
+    Not live interaction — two Textual apps cannot share one process, because
+    `App.run()` owns the terminal. This is the screen the verifier already
+    composited to decide the app painted at all, which makes it free.
+    """
+    painted = "PONG-SCREEN-CONTENTS"
+
+    def with_preview(job, workspace, **kw):
+        job.event("plan", passes=["schema"])
+        job.event("pass_done", name="schema", index=1, of=1, files=["app/models.py"])
+        job.event("verify_passed", attempt=1, summary="green")
+        job.event("preview", screen=painted, target="tui")
+        job.event("finished", ok=True, attempts=1, project_dir=str(workspace), run_hint="")
+
+    app = console(tmp_path, runner=with_preview)
+    async with app.run_test(size=SIZE) as pilot:
+        await type_idea(pilot, "a simple pong simulator")
+        await pilot.click("#start")
+        assert await until(pilot, lambda: painted in widget_text(helper, app, "#preview"), ticks=200), widget_text(
+            helper, app, "#preview"
+        )
+        assert (
+            app.query_one("#views", TabbedContent).active == "tab-preview"
+        ), "the preview arrived but the pane never came forward"
+
+
+@pytest.mark.asyncio
+async def test_the_preview_does_not_yank_the_reader_back_on_every_tick(tmp_path, helper):
+    """Switched to once, on arrival.
+
+    A reader who tabs back to the log — to re-read a repair, or the stage a
+    verify failed at — must stay there. Doing this per tick is the same bug as
+    the status line that rewrote itself over its own message, 200ms later and
+    for the same reason.
+    """
+
+    def with_preview(job, workspace, **kw):
+        job.event("preview", screen="SCREEN", target="tui")
+        job.event("finished", ok=True, attempts=1, project_dir=str(workspace), run_hint="")
+
+    app = console(tmp_path, runner=with_preview)
+    async with app.run_test(size=SIZE) as pilot:
+        await type_idea(pilot)
+        await pilot.click("#start")
+        views = app.query_one("#views", TabbedContent)
+        assert await until(pilot, lambda: views.active == "tab-preview", ticks=200)
+
+        views.active = "tab-log"
+        await pilot.pause()
+        for _ in range(6):  # several ticks, deliberately
+            await pilot.pause(0.25)
+        assert views.active == "tab-log", "the console switched the reader away from the log"
+
+
+@pytest.mark.asyncio
+async def test_a_second_run_returns_to_the_log_and_drops_the_old_preview(tmp_path, helper):
+    """A stale screenshot of the previous idea is worse than none: it is a
+    picture of something that is not what is being generated."""
+
+    def once(job, workspace, **kw):
+        if job.idea == "the first idea":
+            job.event("preview", screen="FIRST-SCREEN", target="tui")
+        job.event("finished", ok=True, attempts=1, project_dir=str(workspace), run_hint="")
+
+    app = console(tmp_path, runner=once)
+    async with app.run_test(size=SIZE) as pilot:
+        await type_idea(pilot, "the first idea")
+        await pilot.click("#start")
+        views = app.query_one("#views", TabbedContent)
+        assert await until(pilot, lambda: views.active == "tab-preview", ticks=200)
+
+        await type_idea(pilot, "the second idea")
+        await pilot.press("ctrl+r")
+        assert await until(
+            pilot, lambda: views.active == "tab-log", ticks=200
+        ), "the second run left the first run's screenshot on screen"
+        assert "FIRST-SCREEN" not in widget_text(helper, app, "#preview")
 
 
 # -- the floor ------------------------------------------------------------

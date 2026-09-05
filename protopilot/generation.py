@@ -97,7 +97,20 @@ def build(
 
     log("verify...")
     make_verifier = verifier_factory or (lambda: targets.for_spec(spec).verifier(tree, spec, SubprocessRunner()))
-    outcome = builder.drive_to_green(spec, ctx, llm, make_verifier(), attempts=attempts, log=log, emit=job.event)
+    # Held rather than passed inline, so what it learned can be asked for
+    # afterwards. The terminal verifier boots the generated app under
+    # `App.run_test` and keeps the composited screen it painted -- which is a
+    # picture of the thing that was just built, already paid for, and otherwise
+    # thrown away the moment the verdict is returned.
+    verifier = make_verifier()
+    outcome = builder.drive_to_green(spec, ctx, llm, verifier, attempts=attempts, log=log, emit=job.event)
+
+    # `getattr`, because this is the terminal verifier's and no other's. A
+    # target whose verifier has no screen to show simply emits nothing, rather
+    # than every target growing a field so that one of them can be asked.
+    screen = (getattr(verifier, "last_probe", None) or {}).get("buffer", "")
+    if screen:
+        job.event("preview", screen=screen, target=spec.target)
 
     registry.record(slug=spec.slug, name=spec.name, path=tree, port=spec.port, idea=job.idea)
     # A URL for a target that has one. `job.url` used to be set unconditionally,
