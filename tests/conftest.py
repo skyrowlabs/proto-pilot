@@ -142,3 +142,29 @@ def helper():
     finally:
         sys.dont_write_bytecode = previous
     return module
+
+
+# ── nothing here touches the operator's real state ───────────────────────
+
+
+@pytest.fixture(autouse=True)
+def isolated_registry(tmp_path, monkeypatch):
+    """Point `PROTOPILOT_REGISTRY` at a throwaway file for **every** test.
+
+    Any test that runs a real generation calls `registry.record`, which writes
+    to the operator's own registry unless told otherwise. `proto ls` on this
+    machine had 129 entries pointing at `/tmp/pytest-of-*/...` before this
+    existed — one per generation any suite had ever run, each one a directory
+    pytest deleted seconds later.
+
+    **Autouse and here, rather than per-file.** `test_verifier_wiring.py` had
+    exactly this fixture already and it worked, which is precisely the problem:
+    a protection that each new test file has to remember is one that the next
+    file forgets, and the failure is invisible from inside the suite — every
+    test passes, and the damage is to a file outside the repository that
+    nothing checks.
+
+    The same shape as the scan guards in `tests/scanning.py`: put it where it
+    cannot be omitted rather than where it has to be repeated.
+    """
+    monkeypatch.setenv("PROTOPILOT_REGISTRY", str(tmp_path / "registry" / "projects.json"))

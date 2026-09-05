@@ -163,5 +163,13 @@ def lines(p: Progress) -> list[str]:
         out.append("")
         out.append(f"green in {p.attempts} attempt(s)" if p.ok else f"red at {p.stage or 'unknown'} — see RUNBOOK.md")
         if p.project_dir:
-            out.append(p.run_hint.format(directory=p.project_dir) if p.run_hint else p.project_dir)
+            # The directory on its own line, always, and the command under it.
+            # These used to be one line -- `cd <path> && make run` -- which is
+            # the thing you type and NOT the thing you look for on disk, and it
+            # wraps at exactly the point where the path becomes unreadable.
+            # Somebody who had just generated a prototype could not find it.
+            out.append("")
+            out.append(p.project_dir)
+            if p.run_hint:
+                out.append(p.run_hint.format(directory=p.project_dir))
     return out

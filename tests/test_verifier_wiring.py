@@ -205,12 +205,6 @@ def test_the_cli_verifier_asks_the_registry_rather_than_naming_a_class(tmp_path)
 # ── the front end's default, which nothing had ever run ──────────────────
 
 
-@pytest.fixture(autouse=True)
-def isolated_registry(tmp_path, monkeypatch):
-    """`run_generation` records every tree it makes. Never in the real one."""
-    monkeypatch.setenv("PROTOPILOT_REGISTRY", str(tmp_path / "projects.json"))
-
-
 def test_the_front_end_verifies_through_the_target_when_nothing_is_injected(tmp_path, monkeypatch):
     """The lambda in `web/app.py` that no test had ever executed.
 

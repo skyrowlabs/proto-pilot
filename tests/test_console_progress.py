@@ -176,6 +176,32 @@ def test_a_run_with_no_preview_leaves_the_field_empty():
 # -- rendering ------------------------------------------------------------
 
 
+def test_the_directory_is_on_a_line_of_its_own():
+    """Somebody who had just generated a prototype could not find it.
+
+    The path and the run command used to share one line — `cd <path> && make
+    run` — which is the thing you *type* and not the thing you *look for*, and
+    it wraps at exactly the point where the path stops being readable. So the
+    directory gets its own line, unadorned, and the command follows it.
+    """
+    directory = "/home/someone/work/proto-pilot/prototypes/pong_simulator"
+    rendered = lines(
+        fold(
+            [
+                {
+                    "kind": "finished",
+                    "ok": True,
+                    "attempts": 1,
+                    "project_dir": directory,
+                    "run_hint": "cd {directory} && make run",
+                }
+            ]
+        )
+    )
+    assert directory in rendered, f"the path is not on a line by itself: {rendered}"
+    assert f"cd {directory} && make run" in rendered, "the command to run it is gone"
+
+
 def test_the_run_hint_is_filled_in_with_the_real_directory():
     """`RUN_HINT` is a template the target owns. A view that printed it raw
     would show a person `cd {directory} && make run` and expect them to guess."""

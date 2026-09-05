@@ -547,6 +547,61 @@ async def test_running_live_with_nothing_generated_says_so(tmp_path, helper):
         assert "nothing generated" in widget_text(helper, app, "#status")
 
 
+# -- getting the path back out --------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_the_path_is_copyable_because_a_tui_cannot_be_selected(tmp_path, helper):
+    """A terminal UI captures the mouse, so select-and-drag does not work — and
+    the tree's path is the one string from a run that is needed *outside* the
+    console."""
+    copied = []
+    app = console(tmp_path, runner=lambda job, workspace, **kw: setattr(job, "project_dir", str(workspace / "tree")))
+    app.copy_to_clipboard = copied.append  # type: ignore[method-assign]
+    async with app.run_test(size=SIZE) as pilot:
+        await type_idea(pilot, "a simple pong simulator")
+        await pilot.click("#start")
+        assert await until(pilot, lambda: not app.busy, ticks=300)
+
+        await pilot.press("ctrl+y")
+        await pilot.pause()
+        assert copied == [str(tmp_path / "tree")], copied
+        assert "copied" in widget_text(helper, app, "#status")
+
+
+@pytest.mark.asyncio
+async def test_the_status_line_fits_the_pane_it_lives_in(tmp_path, helper):
+    """34 columns, and an absolute path is comfortably longer.
+
+    The finished message used to be `finished — <absolute path>`, which clipped
+    into something that could be neither read nor retyped. This is the
+    assertion that would have caught it: the message has to fit where it is
+    put, and the path belongs in the wide pane instead.
+    """
+    deep = tmp_path / "a" / "fairly" / "deeply" / "nested" / "workspace"
+    app = console(deep, runner=lambda job, workspace, **kw: setattr(job, "project_dir", str(workspace / "tree")))
+    async with app.run_test(size=SIZE) as pilot:
+        await type_idea(pilot)
+        await pilot.click("#start")
+        assert await until(pilot, lambda: "finished" in widget_text(helper, app, "#status"), ticks=300)
+
+        width = app.query_one("#input-pane").size.width
+        for line in widget_text(helper, app, "#status").splitlines():
+            assert len(line) <= width, f"{len(line)} chars in a {width}-column pane: {line!r}"
+
+
+@pytest.mark.asyncio
+async def test_copying_with_nothing_generated_says_so(tmp_path, helper):
+    copied = []
+    app = console(tmp_path, runner=lambda *a, **k: None)
+    app.copy_to_clipboard = copied.append  # type: ignore[method-assign]
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.press("ctrl+y")
+        await pilot.pause()
+        assert not copied
+        assert "nothing generated" in widget_text(helper, app, "#status")
+
+
 # -- the floor ------------------------------------------------------------
 
 

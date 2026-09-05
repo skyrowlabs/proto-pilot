@@ -77,6 +77,7 @@ class ConsoleApp(App):
         ("ctrl+r", "start", "Generate"),
         ("ctrl+p", "preview", "Preview"),
         ("ctrl+l", "live", "Run live"),
+        ("ctrl+y", "copy_path", "Copy path"),
         ("ctrl+q", "quit", "Quit"),
     ]
 
@@ -401,6 +402,24 @@ class ConsoleApp(App):
         if self.session is not None:
             self.session.stop()
 
+    def action_copy_path(self) -> None:
+        """Put the generated tree's path on the clipboard.
+
+        A terminal UI captures the mouse, so the usual answer -- select it and
+        drag -- does not work, and the path is the one string from a run that a
+        person needs *outside* the console. Textual copies over OSC 52, which
+        the terminal forwards, so this works over ssh as well.
+        """
+        job = self.job
+        directory = job.project_dir if job else ""
+        if not directory:
+            self.set_status("nothing generated yet")
+            return
+        self.copy_to_clipboard(directory)
+        # Named, and not just "copied": a clipboard write that silently went to
+        # the wrong tree is indistinguishable from one that worked.
+        self.set_status(f"copied {Path(directory).name}")
+
     def action_preview(self) -> None:
         """Toggle between the log and the generated app's screen."""
         views = self.query_one("#views", TabbedContent)
@@ -478,12 +497,23 @@ class ConsoleApp(App):
             # busy forever.
             self.phase = "idle"
             self.set_status(f"failed: {job.error}")
+            self.query_one("#progress-scroll", VerticalScroll).scroll_end(animate=False)
         elif self.phase == "assembling":
             # Intake finished. This is the checkpoint, and it is opened from
             # here because a screen must be mounted on the app's event loop.
             self.open_review()
         else:
-            self.set_status(f"finished — {job.project_dir}" if job.project_dir else "finished")
+            # **Short on purpose, and measured.** This pane is 34 columns wide
+            # and 29 after its padding; an absolute path is comfortably longer,
+            # so putting one here clipped it into something that could be
+            # neither read nor retyped. The path belongs in the wide pane on
+            # the right, where it is; what belongs here is how to get hold of
+            # it -- on two lines, because the one-line version was 33.
+            self.set_status("finished\nctrl+y copies the path" if job.project_dir else "finished")
+            # The path and the run command are the last lines of a region that
+            # scrolls, so on a short terminal they finish below the fold --
+            # written, correct, and invisible.
+            self.query_one("#progress-scroll", VerticalScroll).scroll_end(animate=False)
             self.phase = "idle"
 
 
