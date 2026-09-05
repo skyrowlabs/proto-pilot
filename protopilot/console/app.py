@@ -77,6 +77,12 @@ class ConsoleApp(App):
     TITLE = "proto.pilot"
     BINDINGS = [
         ("ctrl+r", "start", "Generate"),
+        # Priority for the same reason the resize chords are: `Input` binds
+        # `ctrl+e` for end-of-line and a focused widget beats an app binding,
+        # so this did nothing whenever any text box had focus -- which is
+        # always, since the change box is one. `end` still goes to the end of
+        # a line; nothing else here reaches the iterate loop.
+        Binding("ctrl+e", "apply_change", "Apply change", priority=True),
         ("ctrl+p", "preview", "Preview"),
         ("ctrl+l", "live", "Run live"),
         ("ctrl+y", "copy_path", "Copy path"),
@@ -122,6 +128,7 @@ class ConsoleApp(App):
         self._run = runner
         self._assemble = generation.assemble
         self._build = generation.build
+        self._amend = generation.amend
         self.review = review and runner is None
         self.job = None
         self.spec = None
@@ -158,6 +165,17 @@ class ConsoleApp(App):
                 )
                 yield Button("Generate", variant="primary", id="start")
                 yield Static("", id="status")
+
+                # The iterate loop. Under its own heading naming the prototype
+                # being changed, because "apply this change" is meaningless
+                # without "to what" -- and the failure it prevents is the one
+                # that made this exist: refining an idea by generating a fourth
+                # tree beside three abandoned ones.
+                yield Label("Change", id="change-label")
+                yield Static("nothing loaded", id="loaded")
+                yield Input(placeholder="add a score counter", id="change")
+                yield Button("Apply change", id="apply")
+
                 yield Label("Recent")
                 yield Static("nothing yet", id="jobs")
             yield Splitter("#input-pane", axis="width", minimum=24, maximum=90, id="split-panes")
@@ -306,6 +324,57 @@ class ConsoleApp(App):
         spec = self._assemble(job, backend=self.backend, target=target)
         self._build(job, self.workspace, spec, backend=self.backend, demo=self.demo)
 
+    # -- iterating on what is already there -------------------------------
+
+    def action_apply_change(self) -> None:
+        """Change the loaded prototype rather than generating another one.
+
+        The whole point: a person refining an idea wants the thing they have to
+        become the thing they meant. Generating afresh from a longer sentence
+        throws away everything the last run got right and costs the full
+        twenty-one minutes to find out whether the new sentence was better.
+
+        The change runs on the **same job**, so the transcript is continuous —
+        one prototype, its history in one log — and there is no review
+        checkpoint, because the spec being amended is one that was already
+        approved and the change itself is the approval.
+        """
+        if self.busy:
+            self.set_status("still working\none at a time for now")
+            return
+        directory = self.loaded
+        if not directory:
+            self.set_status("nothing loaded\ngenerate something first")
+            return
+        change = self.query_one("#change", Input).value.strip()
+        if not change:
+            self.set_status("say what to change")
+            return
+
+        job = self.job
+        if job is None:
+            return
+        self.phase = "building"
+        self._last_status = "pending"
+        self._preview = ""
+        self.set_status(f"changing {Path(directory).name}")
+        self.query_one("#change", Input).value = ""
+        self.store.run(
+            job,
+            lambda j: self._amend(j, Path(directory), change, backend=self.backend, demo=self.demo),
+        )
+
+    @property
+    def loaded(self) -> str:
+        """The prototype a change would be applied to, or "".
+
+        Read from the job rather than kept as a second field: `project_dir` is
+        set by the runner when a tree is actually written, so this cannot claim
+        a prototype that a declined review or a failed intake never made.
+        """
+        job = self.job
+        return job.project_dir if job and job.project_dir else ""
+
     # -- the checkpoint ---------------------------------------------------
 
     def open_review(self) -> None:
@@ -347,10 +416,14 @@ class ConsoleApp(App):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "start":
             self.action_start()
+        elif event.button.id == "apply":
+            self.action_apply_change()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         if event.input.id in ("idea", "direction"):
             self.action_start()
+        elif event.input.id == "change":
+            self.action_apply_change()
 
     @property
     def busy(self) -> bool:
@@ -512,6 +585,10 @@ class ConsoleApp(App):
         text = "\n".join(lines(progress))
         self.query_one("#progress", Static).update(text or "starting...")
         self.query_one("#jobs", Static).update(self.recent() or "nothing yet")
+        loaded = self.loaded
+        self.query_one("#loaded", Static).update(
+            f"{progress.name or Path(loaded).name}\n{Path(loaded).name}" if loaded else "nothing loaded"
+        )
 
         # A live session outranks the screenshot: it is the same app, now, with
         # its own state, and drawing the still one over it would replace what

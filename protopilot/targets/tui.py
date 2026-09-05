@@ -179,3 +179,25 @@ def verifier(project_dir: Path, spec: Spec, runner=None) -> Verifies:
     `verify_tui.py` about the seam the web factory does not have.
     """
     return TuiVerifier(project_dir, runner=runner or SubprocessRunner())
+
+
+def reset_state(project_dir: Path, runner=None) -> str:
+    """Drop this tree's saved data. Returns what it did, for the log.
+
+    The terminal counterpart of the web target's `docker compose down -v`, and
+    the reason is identical: an amend can retype a column and there are no
+    migrations, so data written under the old models has to go.
+
+    What differs is only where the data lives. Here it is SQLite files under
+    `.dbs/`, which `TuiVerifier` creates one of per boot — so this is a
+    directory removal and wants no daemon, no runner and no network. `runner`
+    is accepted and ignored, because the signature is the contract the caller
+    calls through and a target that needed one would break it by asking.
+    """
+    import shutil
+
+    dbs = Path(project_dir) / ".dbs"
+    if not dbs.is_dir():
+        return "no saved data to drop"
+    shutil.rmtree(dbs, ignore_errors=True)
+    return "dropped the saved database"

@@ -131,3 +131,23 @@ def verifier(project_dir: Path, spec: Spec, runner=None) -> Verifies:
     same Protocol; that is the whole of what `drive_to_green` needs.
     """
     return Verifier(project_dir, spec.port, runner or SubprocessRunner(), screens=checkable_paths(spec))
+
+
+def reset_state(project_dir: Path, runner=None) -> str:
+    """Drop this tree's saved data. Returns what it did, for the log.
+
+    Called before an amend, and the reason is the same one `proto add` has
+    carried since it existed: a change request can add or retype a column, and
+    there are no migrations, so the old data is dropped rather than silently
+    kept and left disagreeing with the models it is about to be read through.
+
+    **This is the target's answer and not the amend's.** Both amend paths used
+    to run `docker compose down -v` unconditionally, which is correct here and
+    meaningless for a tree with no compose file — it is the seventh thing that
+    was hardcoded somewhere and turned out to be true only of Docker. The
+    volume is what holds the data here; somewhere else it is a file.
+    """
+    from protopilot.runner import SubprocessRunner
+
+    (runner or SubprocessRunner()).run(["docker", "compose", "down", "-v"], cwd=project_dir, timeout=120.0)
+    return "dropped the database volume"

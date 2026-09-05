@@ -42,6 +42,13 @@ Screen {
     color: $text-muted;
 }
 
+/* The prototype a change applies to. Its name is the accent's second job in
+   this app: the review border says "decide", this says "this is the one". */
+#loaded {
+    color: $primary;
+    text-style: bold;
+}
+
 #jobs {
     color: $text-muted;
 }

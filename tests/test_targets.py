@@ -81,6 +81,12 @@ def test_every_target_declares_the_whole_contract():
             assert hasattr(module, attr), f"target {name!r} does not declare {attr}"
         assert callable(module.verifier), f"target {name!r} has no verifier()"
         assert callable(module.preflight), f"target {name!r} has no preflight()"
+        # The seventh thing that was hardcoded and turned out to be true only
+        # of Docker: both amend paths ran `docker compose down -v` before
+        # regenerating, which is correct for a tree with a volume and
+        # meaningless for one whose data is a SQLite file. Where the data lives
+        # is the medium's business, so the medium answers.
+        assert callable(module.reset_state), f"target {name!r} has no reset_state()"
         assert module.SKELETON_DIR.is_dir(), f"target {name!r} points at a skeleton that is not there"
         assert module.CODE_PASSES, f"target {name!r} has no passes"
 

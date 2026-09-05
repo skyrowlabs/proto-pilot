@@ -131,6 +131,79 @@ def build(
     )
 
 
+def amend(
+    job,
+    project_dir: Path,
+    change: str,
+    backend: str | None = None,
+    demo: bool = True,
+    attempts: int = 3,
+    verifier_factory=None,
+) -> None:
+    """Apply a change to an **existing** prototype, in place.
+
+    The counterpart of `build`, and the reason the console has an iterate loop
+    rather than a second Generate button: a person refining an idea wants the
+    thing they have to become the thing they meant, not a fourth tree beside
+    three abandoned ones. Same tree, same slug, same directory.
+
+    Saved data is dropped first, and **the target decides how** — a volume here,
+    a SQLite file there. That call used to be a hardcoded
+    `docker compose down -v` in both amend paths, which is right for one medium
+    and a no-op for the other. The reason is the same either way: a change can
+    add or retype a column, there are no migrations, and data written under the
+    old models would be read through new ones.
+
+    Needs a model. The offline baseline generates from a spec and cannot read a
+    sentence about what to change, so this says so rather than quietly
+    regenerating the same tree.
+    """
+    from protopilot.spec import Spec
+
+    llm = build_llm(backend=backend)
+    log = job.log
+    if llm.offline:
+        raise RuntimeError("changing a prototype needs the model; the baseline cannot read a change")
+
+    tree = Path(project_dir)
+    spec = Spec.load(tree)
+    target = targets.for_spec(spec)
+
+    log(f"changing {spec.name}...")
+    job.event("amending", name=spec.name, slug=spec.slug, change=change, project_dir=str(tree))
+    log(f"  {target.reset_state(tree)}")
+
+    updated = builder.amend_spec(spec, change, llm)
+    log(updated.summary())
+    updated.save(tree)
+    job.event("spec", name=updated.name, slug=updated.slug, target=updated.target, archetype=job.archetype or "")
+
+    ctx = PassContext(project_dir=tree, change=change)
+    builder.generate(updated, ctx, llm, log=log, hide_tests=demo, emit=job.event)
+
+    log("verify...")
+    make_verifier = verifier_factory or (lambda: targets.for_spec(updated).verifier(tree, updated, SubprocessRunner()))
+    verifier = make_verifier()
+    outcome = builder.drive_to_green(updated, ctx, llm, verifier, attempts=attempts, log=log, emit=job.event)
+
+    job.project_dir = str(tree)
+    job.port = updated.port
+    job.url = f"http://localhost:{updated.port}" if targets.for_spec(updated).USES_PORT else ""
+    screen = (getattr(verifier, "last_probe", None) or {}).get("buffer", "")
+    if screen:
+        job.event("preview", screen=screen, target=updated.target)
+    if not outcome.ok:
+        stage = outcome.result.stage if outcome.result else "unknown"
+        log(f"red at {stage}; the tree is at {tree}")
+    job.event(
+        "finished",
+        ok=outcome.ok,
+        attempts=outcome.attempts,
+        project_dir=str(tree),
+        run_hint=targets.for_spec(updated).RUN_HINT,
+    )
+
+
 def run_generation(
     job,
     workspace: Path,
