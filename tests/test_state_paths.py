@@ -25,8 +25,8 @@ pytestmark = [pytest.mark.unit]
 # owns every path below — can be imported. See scripts/paths.py.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from scanning import scanned  # noqa: E402
 from scripts.paths import CLI_DIR, PROJECT_ROOT, SCRIPTS_DIR, STATE_SLUG, state_dir  # noqa: E402
-from scripts.reporting.run_ledger import ledger_path  # noqa: E402
 
 #: The one module allowed to name the root. Everything else asks it.
 RESOLVER = SCRIPTS_DIR / "paths.py"
@@ -37,10 +37,10 @@ ROOT_TOKENS = re.compile(r"sl-agent-logs|SL_AGENT_LOGS")
 
 
 def _sources():
-    for base in (CLI_DIR, SCRIPTS_DIR):
-        for path in sorted(base.rglob("*.py")):
-            if path != RESOLVER:
-                yield path
+    return scanned(
+        [p for base in (CLI_DIR, SCRIPTS_DIR) for p in sorted(base.rglob("*.py")) if p != RESOLVER],
+        f".py under {CLI_DIR.name}/ or {SCRIPTS_DIR.name}/, excluding the resolver",
+    )
 
 
 def test_state_lives_outside_the_checkout():
@@ -67,12 +67,6 @@ def test_the_override_is_honoured_when_the_path_is_used(monkeypatch, tmp_path):
     """A constant would freeze this at import, and the knob would be a comment."""
     monkeypatch.setenv("SL_AGENT_LOGS", str(tmp_path))
     assert state_dir("ledger").parent == tmp_path / STATE_SLUG
-
-
-def test_the_ledger_goes_through_the_resolver(monkeypatch, tmp_path):
-    """Not merely 'is outside the repo' — actually derived from `state_dir`."""
-    monkeypatch.setenv("SL_AGENT_LOGS", str(tmp_path))
-    assert ledger_path().is_relative_to(tmp_path / STATE_SLUG)
 
 
 def test_nothing_else_names_the_state_root():

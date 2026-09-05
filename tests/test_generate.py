@@ -21,12 +21,12 @@ import sys
 from pathlib import Path
 
 import pytest
-from scanning import scanned
 
 from protopilot.build import generate
 from protopilot.llm import OfflineLLM
 from protopilot.passes import PassContext
 from protopilot.render import TOKEN_RE, render_skeleton
+from scanning import scanned
 
 # Host-side: no key, no Docker daemon, no network. The offline baseline is
 # what makes the whole pipeline testable under one marker.
@@ -54,7 +54,9 @@ def tree(spec, tmp_path) -> Path:
 
 def test_no_placeholder_survives_generation(tree):
     checked = scanned(
-        (p for p in tree.rglob("*") if p.is_file() and p.suffix in {".py", ".html", ".yml", ".css", ".md", ".txt"}),
+        sorted(
+            p for p in tree.rglob("*") if p.is_file() and p.suffix in {".py", ".html", ".yml", ".css", ".md", ".txt"}
+        ),
         "placeholders in the generated tree",
     )
     for path in checked:
@@ -62,7 +64,7 @@ def test_no_placeholder_survives_generation(tree):
 
 
 def test_every_python_file_parses(tree):
-    for path in scanned(tree.rglob("*.py"), "python files in the generated tree"):
+    for path in scanned(sorted(tree.rglob("*.py")), "python files in the generated tree"):
         ast.parse(path.read_text(), str(path))
 
 

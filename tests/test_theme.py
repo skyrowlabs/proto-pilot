@@ -16,10 +16,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from scanning import scanned
 
 from protopilot.passes import PassContext, models, repair, routes, seed, smoke, ui
 from protopilot.spec import Screen, Spec, Theme
+from scanning import scanned
 
 # Host-side: no key, no Docker daemon, no network. The offline baseline is
 # what makes the whole pipeline testable under one marker.
@@ -127,7 +127,7 @@ def test_only_the_ui_pass_reads_the_theme_in_source():
     slip past it."""
     offenders = []
     for path in scanned(
-        (p for p in sorted(Path("protopilot/passes").glob("*.py")) if p.name != "ui.py"),
+        [p for p in sorted(Path("protopilot/passes").glob("*.py")) if p.name != "ui.py"],
         "passes that might read spec.theme",
         least=2,
     ):

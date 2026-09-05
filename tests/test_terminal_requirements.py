@@ -44,9 +44,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from scanning import scanned  # noqa: E402
-
 from protopilot import targets  # noqa: E402
+from scanning import scanned  # noqa: E402
 
 pytestmark = pytest.mark.unit
 

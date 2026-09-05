@@ -1,48 +1,59 @@
-"""One idiom for "this check actually looked at something".
+"""Enumerate, and refuse to enumerate nothing.
 
-A test that enumerates a tree and asserts a **negative** — no file kept a
-placeholder, no module outside the owner names the constant — is a tautology
-over an empty set. It passes when the thing it guards is absent, and it passes
-when the *enumeration* is absent, and nothing in the output distinguishes the
-two. Renaming a directory disarms it silently, which is the failure mode these
-checks exist to prevent, arriving inside the check.
+Every check in this suite that scans the tree is a **negative** assertion — no
+test file lacks a marker, no source outside the resolver names the state root,
+no documented command is missing. A negative over an empty set is a tautology,
+and nothing in a pass distinguishes *the thing did not happen* from *nobody
+looked*. That is the `filesAnalyzed` lesson this repository states for pyright
+and for its lint gates.
 
-Two of this repository's suites already knew that — `test_cli_smoke.py` has
-`test_the_walk_found_commands`, `test_docs_name_real_commands.py` has
-`test_the_scan_finds_the_docs` — and eight other places did not. The rule was
-held, not applied; skeletor found the same distribution in their tree on the
-same day and named the settling question, which is not *does a guard exist* but
-**does it still pass with the enumeration emptied**.
+## Why a wrapper rather than a companion test
 
-A helper rather than a companion test per site, because a companion test is a
-second thing to remember and the sites that lacked one are the evidence that it
-gets forgotten. Wrapping the enumeration puts the guard where it cannot be
-omitted without also removing the loop.
+The convention was a companion — `test_the_walk_found_commands` beside the walk.
+It works and it is omissible, and two shipped suites here were found scanning
+with no companion at all: `test_marker_coverage` passed 2/2 and
+`test_state_paths` 5/5 with their enumerations forced empty. proto.pilot ran the
+same sweep and found **seven** unguarded sites in their tree, including one
+written the day before.
+
+Seven is what forgetting looks like, so the guard moved to where it cannot be
+forgotten without also deleting the loop. Theirs, and the argument is better than
+the helper: a convention you must remember to apply is a registry with no
+enforcement, which is the thing Rule 2 of this repository exists to prevent.
+
+## Why `least`
+
+A filter tested against one item is unobservable: with a single candidate,
+"everything" and "the one match" are the same set, so a check that is supposed
+to *select* passes whether it selects or not. That was already here as a
+hand-written `len(COMMANDS) >= 5`; `least` is that threshold with a name and a
+reason attached, so the next scan gets it without anybody rediscovering why.
+
+Raise it above 1 wherever the scan feeds a filter, and say why at the call site.
 """
 
 from __future__ import annotations
 
-from typing import Iterable, List, TypeVar
+from typing import Sized, TypeVar
 
-T = TypeVar("T")
+#: Bound to `Sized`, and returned unchanged, so a scan keeps the type it had. A
+#: mapping of `path → where it was found` must not come back as a list of keys
+#: merely to be counted, and a caller's annotation must stay true.
+#:
+#: The first version accepted any iterable and materialised it, which reads as
+#: convenience and is not: a generator that must be consumed to be measured is
+#: a scan the caller cannot iterate twice, and pyright caught the fallout —
+#: `invocations() -> dict` returning `Collection`. Requiring something sized is
+#: the smaller contract and the honest one; every caller here already passes a
+#: list or a dict.
+C = TypeVar("C", bound=Sized)
 
 
-def scanned(items: Iterable[T], what: str, *, least: int = 1) -> List[T]:
-    """Materialise an enumeration, refusing an empty one.
-
-    `what` names the thing being looked for, because the failure this catches
-    reads as "the check found nothing wrong" and has to be made to read as
-    "the check looked at nothing".
-
-    `least` is for the cases where one item cannot discriminate — a filter
-    tested against a single file is unobservable, since "everything" and "the
-    one match" are the same set. A fixture that cannot tell the fix from the
-    bug is not a fixture, it is a demonstration.
-    """
-    out = list(items)
-    assert len(out) >= least, (
-        f"nothing to check: the scan for {what} found {len(out)} item(s), "
-        f"needed at least {least}. The assertions below would have passed over "
-        f"an empty set — which is not a green result, it is an absent one."
+def scanned(items: C, what: str, least: int = 1) -> C:
+    """`items`, refused if the scan is too small to prove anything."""
+    assert len(items) >= least, (
+        f"found {len(items)} {what}, expected at least {least} — the scan matched too little "
+        f"to assert anything. Every check over this set is a negative, so an empty or "
+        f"near-empty scan passes them all while looking at nothing."
     )
-    return out
+    return items

@@ -36,7 +36,6 @@ import sys
 from pathlib import Path
 
 import pytest
-from scanning import scanned
 
 from protopilot import targets
 from protopilot.build import generate
@@ -46,6 +45,7 @@ from protopilot.passes import PassContext, run_pass
 from protopilot.passes.tui import _brief
 from protopilot.render import TOKEN_RE, render_skeleton
 from protopilot.spec import Spec
+from scanning import scanned
 from tests.fakes import FakeLLM
 
 # Host-side: no key, no Docker daemon, no browser, no port. That this whole
@@ -388,7 +388,7 @@ def test_a_stylesheet_gets_a_stylesheet_comment():
 
 def test_no_placeholder_survives_generation(tree):
     checked = scanned(
-        (p for p in tree.rglob("*") if p.is_file() and p.suffix in {".py", ".tcss", ".md", ".txt", ".ini"}),
+        sorted(p for p in tree.rglob("*") if p.is_file() and p.suffix in {".py", ".tcss", ".md", ".txt", ".ini"}),
         "placeholders in the generated tree",
     )
     for path in checked:
@@ -396,7 +396,7 @@ def test_no_placeholder_survives_generation(tree):
 
 
 def test_every_python_file_parses(tree):
-    for path in scanned(tree.rglob("*.py"), "python files in the generated tree"):
+    for path in scanned(sorted(tree.rglob("*.py")), "python files in the generated tree"):
         ast.parse(path.read_text(), str(path))
 
 

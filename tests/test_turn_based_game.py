@@ -18,7 +18,6 @@ import sys
 from pathlib import Path
 
 import pytest
-from scanning import scanned
 
 from protopilot import archetypes
 from protopilot.archetypes import turn_based_game as tbg
@@ -27,6 +26,7 @@ from protopilot.llm import OfflineLLM
 from protopilot.passes import PassContext
 from protopilot.render import TOKEN_RE, render_skeleton
 from protopilot.spec import Screen, Spec, checkable_paths
+from scanning import scanned
 
 # Host-side: no key, no Docker daemon, no network. The offline baseline is
 # what makes the whole pipeline testable under one marker.
@@ -105,7 +105,7 @@ def test_extra_is_honoured_when_it_is_valid():
 
 def test_no_placeholder_survives(game_tree):
     checked = scanned(
-        (
+        sorted(
             p
             for p in game_tree.rglob("*")
             if p.is_file() and p.suffix in {".py", ".html", ".yml", ".css", ".md", ".txt"}

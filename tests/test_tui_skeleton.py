@@ -25,10 +25,10 @@ import sys
 from pathlib import Path
 
 import pytest
-from scanning import scanned
 
 from protopilot import targets
 from protopilot.render import TOKEN_RE, render_skeleton, substitutions
+from scanning import scanned
 
 # Host-side: no key, no Docker daemon, no browser, no network. That this suite
 # needs none of them is half of what the terminal target is for.
@@ -106,7 +106,7 @@ def test_every_token_has_a_value(spec):
 
 def test_the_rendered_tree_has_no_placeholders_left(tree):
     checked = scanned(
-        (p for p in tree.rglob("*") if p.is_file() and "__pycache__" not in p.parts),
+        sorted(p for p in tree.rglob("*") if p.is_file() and "__pycache__" not in p.parts),
         "placeholders in the rendered skeleton",
     )
     for path in checked:
