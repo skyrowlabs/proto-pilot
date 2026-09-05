@@ -29,6 +29,7 @@ from textual.widgets import Button, Footer, Header, Input, Label, RichLog, Selec
 from protopilot import archetypes, generation, targets
 from protopilot.console.progress import fold, lines
 from protopilot.console.review import ReviewScreen
+from protopilot.console.theme import SKYROW
 from protopilot.jobs import STORE, JobStore
 
 #: How often the panes re-read the job. A generation is a minutes-long
@@ -136,6 +137,10 @@ class ConsoleApp(App):
         yield Footer()
 
     def on_mount(self) -> None:
+        # Registered and selected here rather than via a class attribute,
+        # because a theme has to exist before it can be named.
+        self.register_theme(SKYROW)
+        self.theme = SKYROW.name
         self.set_interval(TICK, self.refresh_panes)
         self.query_one("#idea", Input).focus()
 
@@ -314,13 +319,20 @@ class ConsoleApp(App):
         job = self.job
         if job is None:
             return
-        # A timer callback can outlive the screen it draws to: `set_interval`
-        # keeps firing while the app tears down, and the widgets are gone by
-        # then. `query_one` raises `NoMatches` there, from a background tick,
-        # where the traceback is attributed to nothing the reader did. Asking
-        # whether the pane exists is cheaper than explaining that.
-        panes = self.query("#log")
-        if not panes:
+        # **Every widget this method touches, checked before any of it runs.**
+        # A timer callback sees the tree in two states it must survive: partly
+        # mounted, because `TabbedContent` brings its panes up asynchronously
+        # and the first ticks land in the middle of that; and partly gone,
+        # because `set_interval` keeps firing while the app tears down. Either
+        # way `query_one` raises `NoMatches` from a background tick, where the
+        # traceback is attributed to nothing the reader did.
+        #
+        # Checking one id was enough until the log moved inside a tab, and then
+        # it was not: `#log` mounted first and `#progress` was reached a line
+        # later, in the same frame, before it existed. A guard that names fewer
+        # widgets than the body uses is a guard with a window in it.
+        needed = ("#log", "#progress", "#jobs", "#preview", "#views")
+        if any(not self.query(name) for name in needed):
             return
         log = self.query_one("#log", RichLog)
         for line in job.lines[self._shown :]:

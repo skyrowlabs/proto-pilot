@@ -1,12 +1,25 @@
-/* The console's own styling. Nothing here is shared with a generated tree's
-   `app.tcss` -- that one belongs to the terminal target and is written by the
-   `ui` pass. Two files named for the same technology, owned by different
-   things, which is the collision the `console` name exists to avoid. */
+/* The console's own styling, over the `skyrow` theme in `theme.py`.
+
+   Nothing here is shared with a generated tree's `app.tcss` — that one belongs
+   to the terminal target and is written by the `ui` pass. Two files named for
+   the same technology, owned by different things, which is the collision the
+   `console` name exists to avoid.
+
+   Every colour is a theme token, never a literal. The palette is transcribed
+   from `skyrowlabs.com` in one place and a hex code here would be a second,
+   silently disagreeing copy of it. */
+
+Screen {
+    background: $background;
+}
 
 #panes {
     height: 1fr;
 }
 
+/* The site's chrome is hairlines on a near-black ground — borders that
+   separate without drawing attention. `$panel` is the third surface tier,
+   which is what a one-shade-lighter rule looks like in a terminal. */
 #input-pane {
     width: 34;
     padding: 1 2;
@@ -16,6 +29,7 @@
 #input-pane Label {
     margin-top: 1;
     color: $text-muted;
+    text-style: bold;
 }
 
 #input-pane Button {
@@ -25,6 +39,10 @@
 
 #status {
     margin-top: 1;
+    color: $text-muted;
+}
+
+#jobs {
     color: $text-muted;
 }
 
@@ -41,10 +59,23 @@
     border-bottom: solid $panel;
 }
 
-#log {
+#views {
     height: 1fr;
 }
 
+#log {
+    height: 1fr;
+    background: $surface;
+}
+
+/* The generated app's own screen. On `$background` rather than `$surface`, so
+   what is shown reads as a picture of another program rather than as more of
+   this one's furniture. */
+#preview {
+    height: 1fr;
+    padding: 1;
+    background: $background;
+}
 
 /* The review checkpoint. Bounded rather than natural-height: the modal holds a
    spec summary, which is as long as the spec, and an unbounded one pushes the
@@ -56,6 +87,9 @@ ReviewScreen {
     background: $background 60%;
 }
 
+/* The one place the product accent is spent. The site uses its per-product
+   colour on a single ring per card and nowhere else; here that is the border
+   of the one screen that stops and asks. */
 #review {
     width: 72;
     max-width: 90%;
@@ -68,6 +102,7 @@ ReviewScreen {
 
 #review-title {
     text-style: bold;
+    color: $primary;
     margin-bottom: 1;
 }
 
