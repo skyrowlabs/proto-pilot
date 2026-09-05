@@ -100,6 +100,14 @@ NARRATIVE = (TODO_DIR, IMPL_DIR, DOCS_DIR / "reports")
 #:
 #:     EXPLORE_DIR = PROJECT_ROOT / "explore"
 #:     NARRATIVE += (EXPLORE_DIR,)
+#:
+#: **Keep a blank line between your block and the template's**, and audit it per
+#: line rather than per block. The unit of collision is the line: stash.flow's
+#: five-line explanation sat hard against the constant above and conflicted
+#: anyway, and mind.head's was a single `#:` separator, which cost exactly the
+#: same. proto.pilot's landed clean on one blank line — and nothing recorded
+#: that the line was load-bearing, so a whitespace tidy-up would have brought
+#: the conflict back looking like housekeeping.
 
 #: `NOTES.md` is proto.pilot's local extension to the set above. It is this
 #: repo's parking lot: it records what was tried and what it was called at the
@@ -141,13 +149,22 @@ REQUIREMENTS = SCRIPTS_DIR / "requirements.txt"
 TMP_DIR = PROJECT_ROOT / "tmp"
 
 # ── State: the record, outside the checkout ──────────────────────────────────
-#: The workspace-wide root for the agentic record — transcripts, ledgers,
-#: per-job memory, the payloads agent stages read. Deliberately **not** under
-#: `PROJECT_ROOT`, and that is the whole point: it outlives any one checkout, is
-#: shared by every worktree of this repo, and cannot be reached by
-#: `git clean -fdx`. See `~/skyrow.labs/sl-agent-logs/README.md`.
-STATE_ROOT_ENV = "SL_AGENT_LOGS"
-STATE_ROOT_DEFAULT = Path.home() / "skyrow.labs" / "sl-agent-logs"
+#: The root for the agentic record — transcripts, ledgers, per-job memory, the
+#: payloads agent stages read. Deliberately **not** under `PROJECT_ROOT`, and
+#: that is the whole point: it outlives any one checkout, is shared by every
+#: worktree of this repo, and cannot be reached by `git clean -fdx`.
+#:
+#: The default is a shared root with `STATE_SLUG` below it, not a private one,
+#: so several projects on a machine land side by side and a retention sweep has
+#: one directory to walk. `~/.local/state` because that is where a state file
+#: that is neither cache nor config belongs on a Linux box, and `agent-logs`
+#: because the name has to be distinctive enough for `test_state_paths.py` to
+#: recognise a second definition of it.
+#:
+#: Point it somewhere else with the environment variable — one root shared by
+#: every project you run, or a scratch path in a test.
+STATE_ROOT_ENV = "PP_STATE_ROOT"
+STATE_ROOT_DEFAULT = Path.home() / ".local" / "state" / "agent-logs"
 
 #: This project's directory under that root. Written in rather than taken from
 #: `PROJECT_ROOT.name`, because a **linked worktree's directory is not the
