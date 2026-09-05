@@ -136,12 +136,29 @@ jobs:
   # Ungated by full_suite: the host-side suite is minutes, and it is the check
   # most likely to catch the thing a docs-only detector got wrong.
   unit-tests:
+    # Two versions, and which two is the whole point.
+    #
     # `pyproject.toml` says `requires-python = ">=3.11"`, and on a single-version
     # job that is a belief rather than a check. The floor of this list is the
-    # version the metadata is allowed to claim.
+    # version the metadata is allowed to claim, and it is the one most likely to
+    # break unnoticed, because nobody develops on it. The ceiling is where new
+    # breakage arrives. `tests/test_python_support.py` holds the floor half of
+    # that to `pyproject.toml`, so this list and the metadata cannot drift.
+    #
+    # The interior (3.12, 3.13) was dropped on 2026-09-04 after measuring what it
+    # had returned. Nothing in this repo branches on `sys.version_info`, so the
+    # interior is interpolation between two tested ends -- and the record agreed:
+    # of eight failures on `develop` in the preceding window, four were a single
+    # red version, and all four were the same timing-sensitive console tests
+    # failing on whichever job lost the race. Not one was a version
+    # incompatibility. A matrix over a flaky suite is a flake amplifier, and
+    # four jobs bought exposure rather than signal.
+    #
+    # This is a claim about *this* repo, not a general rule. Add a version back
+    # the moment something here starts branching on the interpreter.
     #
     # `fail-fast: false` because the useful answer is *which* version broke.
-    # Cancelling the rest on the first red turns four data points into one.
+    # Cancelling the other on the first red turns two data points into one.
     name: Unit Tests (host-side) ${{ matrix.python }}
     needs: gate
     if: needs.gate.outputs.docs_only != 'true'
@@ -149,7 +166,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ['3.11', '3.12', '3.13', '3.14']
+        python: ['3.11', '3.14']
     env:
       # Under this flag an env-gate skip becomes a FAILURE. CI guarantees the
       # environment, so a skip here means the harness broke — and a harness that

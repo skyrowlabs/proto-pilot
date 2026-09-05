@@ -637,6 +637,33 @@ is only a pointer at it).
 
 ## Resolved
 
+- **2026-09-04 — the CI matrix went 3.11–3.14 → 3.11 + 3.14, measured rather
+  than argued.** The question was whether four versions were worth maintaining.
+  The record answered it: of eight failures on `develop` in the preceding window,
+  four were a *single* red version, which is what a matrix is supposed to look
+  like when it is earning its keep — but all four were the same timing-sensitive
+  `test_console.py` races failing on whichever job lost, on a different version
+  each time, and not one was a version incompatibility. Nothing in this repo
+  branches on `sys.version_info`, so the interior was interpolation between two
+  tested ends. Floor and ceiling kept: the floor is the only evidence for
+  `requires-python = ">=3.11"`, and the ceiling is where new breakage arrives.
+
+  The half worth keeping is the second change, not the first. The floor's
+  rationale had been a *comment* in `ci.yml` since 2026-08-30 — "the floor of
+  this list is the version the metadata is allowed to claim" — and with four
+  entries that was slack enough to be hard to get wrong. With two, the floor job
+  *is* the evidence, so `tests/test_python_support.py` now holds it to
+  `pyproject.toml` and fails in both directions: raise the metadata and CI is
+  proving something narrower than the claim; drop the floor from the matrix and
+  the claim has lost its evidence. Three planted defects, three reds, plus a
+  control (reordering the matrix) that stays green because the versions are
+  compared numerically and not as strings — `"3.9" > "3.14"` is exactly the bug
+  a floor check written the obvious way would have.
+
+  **Trimming a matrix is a decision about one repo, not a general rule.** This
+  one is safe to trim precisely because it has no version-conditional code; the
+  note in `ci.yml` says to add a version back the moment that stops being true.
+
 - **2026-09-04 — skeletor `v0.2.11` → `v0.3.6`, and the merged test that could
   not pass here.** Eight files: `scripts/yaml_text.py` and its two new suites,
   the `pp worktree drop` live-hold guard, `tree_lock.holders(root=...)`, and the
