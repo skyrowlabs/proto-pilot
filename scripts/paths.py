@@ -72,28 +72,53 @@ RELEASES_DIR = DOCS_DIR / "reports" / "releases"
 #: It lives here, and not in the checks, because **the roles are the part a
 #: generator cannot know.** A scaffold ships `docs/TODO/` and can enumerate it;
 #: it cannot know that your repository froze its concept work in `explore/`.
-#: Extending this tuple is a one-line change to a file you own; the alternative
-#: was every adopter editing a shipped test, which is a divergence the upgrade's
-#: three-way merge then carries forever. stash.flow named the rule after their
-#: `explore/` — 19 of their 44 tracked documents — reddened a gate that had no
-#: role exclusion at all.
+#: The alternative was every adopter editing a shipped test, which is a
+#: divergence the upgrade's three-way merge then carries forever. stash.flow
+#: named the rule after their `explore/` — 19 of their 44 tracked documents —
+#: reddened a gate that had no role exclusion at all.
 #:
 #: `reports` is taken at its parent so the regular, release and occasional
 #: editions are covered without naming three constants.
-#: `NOTES.md` is proto.pilot's local extension to the set above, and the reason
-#: this tuple lives in a file we own. It is this repo's parking lot: it records
-#: what was tried and what it was called at the time, so naming a file that has
-#: since gone is the document doing its job. Three of its citations are dead
-#: today -- two tests it says outright were deleted, and one path belonging to a
-#: sibling repo entirely.
+NARRATIVE = (TODO_DIR, IMPL_DIR, DOCS_DIR / "reports")
+
+
+#: **Add your own stages below, as an append. Do not edit the tuple above.**
 #:
-#: A file rather than a directory, which the prefix match above already handles:
+#: This used to read "extending this tuple is a one-line change to a file you
+#: own", which was true about permission and wrong about merging. stash.flow
+#: measured both spellings of the identical intent against the identical
+#: upstream change, and so did this repository, with `git merge-file` against a
+#: pristine render:
+#:
+#:     NARRATIVE = (TODO_DIR, IMPL_DIR, DOCS_DIR / "reports", EXPLORE_DIR)   CONFLICT
+#:     NARRATIVE += (EXPLORE_DIR,)                                           clean
+#:
+#: **The discriminator is line disjointness, not permission.** Being invited to
+#: edit a line changes nothing about what git does when upstream edits it too,
+#: and every future change to the tuple above collides with an adopter who put
+#: their stage inside it. An append is a different line and always will be.
+#:
+#:     EXPLORE_DIR = PROJECT_ROOT / "explore"
+#:     NARRATIVE += (EXPLORE_DIR,)
+
+#: `NOTES.md` is proto.pilot's local extension to the set above. It is this
+#: repo's parking lot: it records what was tried and what it was called at the
+#: time, so naming a file that has since gone is the document doing its job.
+#: Three of its citations are dead today -- two tests it says outright were
+#: deleted, and one path belonging to a sibling repo entirely.
+#:
+#: **Appended, not spliced into the tuple.** It went in as a fourth element on
+#: 2026-09-05 because that read as the obvious one-line change, and the reason
+#: that was wrong arrived one tag later in the comment above: being invited to
+#: edit a line says nothing about what git does when upstream edits it too.
+#: The tuple has changed upstream twice already. Spliced, this file conflicts
+#: on every one of those; appended, it is a different line and always will be.
+#:
+#: A file rather than a directory, which the prefix match handles unchanged:
 #: `reference_docs` compares `str(path.relative_to(PROJECT_ROOT))`, and
-#: `"NOTES.md".startswith("NOTES.md")` is true. No code change was needed to
-#: enrol it -- the earlier version of this exemption lived as a second constant
-#: inside the shipped test, and carrying that divergence is what the upgrade's
-#: three-way merge kept charging us for.
-NARRATIVE = (TODO_DIR, IMPL_DIR, DOCS_DIR / "reports", PROJECT_ROOT / "NOTES.md")
+#: `"NOTES.md".startswith("NOTES.md")` is true.
+NOTES_FILE = PROJECT_ROOT / "NOTES.md"
+NARRATIVE += (NOTES_FILE,)
 
 # ── Code and configuration ───────────────────────────────────────────────────
 CLI_DIR = PROJECT_ROOT / "cli"
@@ -114,7 +139,6 @@ REQUIREMENTS = SCRIPTS_DIR / "requirements.txt"
 #: whose lifetime is a run rather than a commit, and which nothing will want
 #: next week. The record of what ran is **not** here; see `state_dir` below.
 TMP_DIR = PROJECT_ROOT / "tmp"
-
 
 # ── State: the record, outside the checkout ──────────────────────────────────
 #: The workspace-wide root for the agentic record — transcripts, ledgers,
