@@ -314,11 +314,34 @@ jobs:
             exit "$status"
           fi
 
+  # ── UI ──────────────────────────────────────────────────────────────────
+  # The job that makes the `ui` marker safe to use. Without it, marking a test
+  # `ui` DELETES it from CI: the unit job selects `-m unit` and deselects it, no
+  # other job selects it, and every check stays green over a smaller set. That
+  # shipped, and proto.pilot found it holding 36 tests that match the marker's
+  # own description word for word.
+  #
+  # `cli/test_cmds.py` is where the obligation is written down and
+  # There is deliberately no `ui` job here, and `cli/test_cmds.py` carries the
+  # matching `scheduled=False`. The template ships this job because a `ui`
+  # marker with no job deletes tests from CI — proto.pilot reported that — but
+  # the obligation is to make the row and the workflows agree, not to run an
+  # empty suite. Nothing here is marked `ui`: the 36 Textual pilot tests in
+  # `tests/test_console*.py` are headless, need no display, and belong on
+  # `unit`, where CI actually runs them.
+  #
+  # So this job would collect zero tests at the cost of a checkout and an
+  # install, one day after the matrix above was halved to cut exactly that.
+  # `tests/test_ui_suite_is_empty.py` is what keeps the claim honest: the row
+  # is unscheduled *because the suite is empty*, and that reason expires the
+  # moment anything is marked `ui`. Add this job back at that point — the
+  # template's version is in skeletor's `template/core/.github/workflows/ci.yml`.
+
   # ── Release automation ──────────────────────────────────────────────────
   release-please:
     name: Release Please
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [lint, unit-tests, integration]
+    needs: [lint, unit-tests, integration, ui]
     runs-on: ubuntu-latest
     permissions:
       contents: write
