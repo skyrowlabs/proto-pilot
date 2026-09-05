@@ -496,16 +496,26 @@ async def test_control_keys_stay_with_the_console(tmp_path, helper):
         A subclass rather than a duck: `ConsoleApp.session` is typed, and a
         loose stand-in would be the one place a type checker cannot see that
         the console and its session still agree on a shape.
+
+        The cost of that choice, paid once already: a stand-in has to keep up
+        with the real class. Adding `resize` to `PreviewSession` broke this
+        with an `AttributeError` rather than a type error — which is the right
+        way round, since the alternative was a duck that went on passing while
+        the console called something it did not have.
         """
 
         def __init__(self):
             self.ready = True
             self.frame = "A FRAME"
             self.error = ""
+            self.size = None
 
         @property
         def alive(self) -> bool:
             return True
+
+        def resize(self, width, height):
+            self.size = (width, height)
 
         def press(self, key):
             sent.append(key)

@@ -46,6 +46,10 @@ class PreviewSession:
         self.error = ""
         self.frames = 0
         self.ready = False
+        #: What the app is currently rendered at. `None` until the first
+        #: resize, so the opening frame is the stream's own default and
+        #: comparable with the verifier's.
+        self.size: tuple[int, int] | None = None
         self._proc: subprocess.Popen | None = None
         self._lock = threading.Lock()
 
@@ -67,6 +71,7 @@ class PreviewSession:
         self.error = ""
         self.frames = 0
         self.ready = False
+        self.size = None
         try:
             self._proc = subprocess.Popen(  # noqa: S603 -- argv is ours, never the model's
                 [self.python, str(self.stream)],
@@ -104,6 +109,19 @@ class PreviewSession:
 
     def press(self, key: str) -> None:
         self._request({"key": key})
+
+    def resize(self, width: int, height: int) -> None:
+        """Render the app at this size from now on.
+
+        The console calls this when its preview pane changes shape, so the
+        prototype lays itself out for the space it is being shown in. Without
+        it the app renders at a fixed size and the pane scrolls a picture of a
+        terminal that is not the one in front of anybody.
+        """
+        if (width, height) == self.size:
+            return
+        self.size = (width, height)
+        self._request({"resize": [width, height]})
 
     def tick(self) -> None:
         """Ask for the current frame.

@@ -22,8 +22,8 @@ Screen {
    which is what a one-shade-lighter rule looks like in a terminal. */
 #input-pane {
     width: 34;
+    min-width: 24;
     padding: 1 2;
-    border-right: solid $panel;
 }
 
 #input-pane Label {
@@ -54,9 +54,12 @@ Screen {
 /* Sized rather than 1fr: the progress region is a fixed, scannable summary and
    the log is the part that grows. A progress pane that expands with the run
    pushes the log off screen exactly when there is most of it. */
+/* A starting height, not a fixed one — `#split-rows` under it sets cells from
+   here on. The border moved onto the splitter, which is now the visible line
+   between the two and is the thing you grab. */
 #progress-scroll {
     height: 40%;
-    border-bottom: solid $panel;
+    min-height: 3;
 }
 
 #views {
@@ -70,10 +73,32 @@ Screen {
 
 /* The generated app's own screen. On `$background` rather than `$surface`, so
    what is shown reads as a picture of another program rather than as more of
-   this one's furniture. */
-#preview {
+   this one's furniture.
+
+   `auto auto`: a live session is resized to this container so it normally
+   fits, but the still screenshot is rendered at the verifier's fixed 100x30
+   and a very small pane gets a floored frame. Both want scrollbars, and
+   neither wants one when it fits. */
+#preview-scroll {
     height: 1fr;
-    padding: 1;
+    overflow: auto auto;
+    background: $background;
+}
+
+/* No padding: a frame is a picture of a terminal, and a terminal has no
+   margin. An inset one reads as a widget with a screenshot in it rather than
+   as the screen itself, and it also lies about the width the app was told to
+   lay out for. */
+/* `text-wrap: nowrap` is what makes the horizontal scrollbar possible at all.
+   A frame is a picture of a terminal: every line is exactly as wide as it was
+   rendered, and wrapping a 100-column line into a 70-column pane does not make
+   it fit, it makes it wrong — rows shift down and the picture stops being one.
+   Without this the container never overflows sideways, so it never offers a
+   way to see the right-hand side. */
+#preview {
+    width: auto;
+    height: auto;
+    text-wrap: nowrap;
     background: $background;
 }
 

@@ -23,13 +23,15 @@ from __future__ import annotations
 from pathlib import Path
 
 from textual.app import App, ComposeResult
-from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.binding import Binding
+from textual.containers import Horizontal, ScrollableContainer, Vertical, VerticalScroll
 from textual.widgets import Button, Footer, Header, Input, Label, RichLog, Select, Static, TabbedContent, TabPane
 
 from protopilot import archetypes, generation, targets
 from protopilot.console.progress import fold, lines
 from protopilot.console.review import ReviewScreen
 from protopilot.console.session import PreviewSession
+from protopilot.console.splitter import Splitter
 from protopilot.console.theme import SKYROW
 from protopilot.jobs import STORE, JobStore
 
@@ -78,6 +80,21 @@ class ConsoleApp(App):
         ("ctrl+p", "preview", "Preview"),
         ("ctrl+l", "live", "Run live"),
         ("ctrl+y", "copy_path", "Copy path"),
+        # Both roads to the same place: a terminal with mouse reporting off,
+        # or a multiplexer that eats drags, still resizes.
+        #
+        # **`priority=True`, and it is a trade rather than a detail.** `Input`
+        # binds `ctrl+left`/`ctrl+right` for word movement and a focused widget
+        # beats an app binding, so without this these did nothing at all
+        # whenever the idea box had focus -- which is on startup and after
+        # every run. A layout control that only works when nothing is focused
+        # is not a layout control. What it costs is word-jumping inside a
+        # single-line input, which the arrow keys still do one character at a
+        # time; what it buys is a resize that works wherever you are.
+        Binding("ctrl+left", "narrow", "Narrower", priority=True),
+        Binding("ctrl+right", "widen", "Wider", priority=True),
+        Binding("ctrl+up", "shorter", "Shorter", priority=True),
+        Binding("ctrl+down", "taller", "Taller", priority=True),
         ("ctrl+q", "quit", "Quit"),
     ]
 
@@ -143,9 +160,11 @@ class ConsoleApp(App):
                 yield Static("", id="status")
                 yield Label("Recent")
                 yield Static("nothing yet", id="jobs")
+            yield Splitter("#input-pane", axis="width", minimum=24, maximum=90, id="split-panes")
             with Vertical(id="output-pane"):
                 with VerticalScroll(id="progress-scroll"):
                     yield Static("Nothing running.", id="progress")
+                yield Splitter("#progress-scroll", axis="height", minimum=3, maximum=60, id="split-rows")
                 # Two tabs rather than a third region. Everything above
                 # describes the *build*; the preview is the only thing that
                 # shows what was built, and the two want the same space at
@@ -155,7 +174,17 @@ class ConsoleApp(App):
                     with TabPane("Output", id="tab-log"):
                         yield RichLog(id="log", wrap=True, markup=False, max_lines=5000)
                     with TabPane("Preview", id="tab-preview"):
-                        yield PreviewPane(NO_PREVIEW, id="preview")
+                        # Scrollable in **both** directions. A live session is
+                        # resized to this pane so it usually fits exactly, but
+                        # two cases do not: the still screenshot, which the
+                        # verifier renders at a fixed 100x30 and which is not
+                        # ours to re-render; and a pane smaller than an app can
+                        # lay out in, where the stream floors the size and
+                        # sends a frame bigger than the space. Scrolling a
+                        # frame that does not fit is honest; silently cropping
+                        # one is not.
+                        with ScrollableContainer(id="preview-scroll"):
+                            yield PreviewPane(NO_PREVIEW, id="preview")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -177,6 +206,12 @@ class ConsoleApp(App):
         if not self.query("#preview"):
             return
         pane = self.query_one("#preview", PreviewPane)
+        # Ask for the app to be laid out at the size it is being shown at.
+        # Cheap and idempotent: the session drops a resize to the size it is
+        # already at, so this is a comparison per tick and nothing more.
+        region = self.query_one("#preview-scroll").content_size
+        if region.width and region.height:
+            session.resize(region.width, region.height)
         if not session.alive:
             if session.error:
                 pane.update(f"{session.error}\n\nctrl+l to rebuild and try again.")
@@ -401,6 +436,20 @@ class ConsoleApp(App):
         nobody can stop."""
         if self.session is not None:
             self.session.stop()
+
+    # -- resizing ---------------------------------------------------------
+
+    def action_narrow(self) -> None:
+        self.query_one("#split-panes", Splitter).nudge(-4)
+
+    def action_widen(self) -> None:
+        self.query_one("#split-panes", Splitter).nudge(4)
+
+    def action_shorter(self) -> None:
+        self.query_one("#split-rows", Splitter).nudge(-2)
+
+    def action_taller(self) -> None:
+        self.query_one("#split-rows", Splitter).nudge(2)
 
     def action_copy_path(self) -> None:
         """Put the generated tree's path on the clipboard.

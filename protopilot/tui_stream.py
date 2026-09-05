@@ -32,7 +32,9 @@ Newline-delimited JSON both ways, because a frame is multi-line text and a
 line-oriented pipe is the one thing both ends already agree on.
 
 Requests (stdin):   {"key": "left"}   {"frame": true}   {"quit": true}
-Replies  (stdout):  {"frame": "...", "n": 3}   {"error": "...", "fatal": true}
+                    {"resize": [width, height]}
+Replies  (stdout):  {"frame": "...", "n": 3, "size": [w, h]}
+                    {"error": "...", "fatal": true}
 
 **Frames go to the real stdout, captured before the app can touch it**, and
 `sys.stdout` is pointed at stderr for the app's own lifetime. Generated code
@@ -52,11 +54,20 @@ import traceback
 from pathlib import Path
 from typing import Any
 
-#: The same size the probe renders at, so a frame here and a frame there are
-#: comparable. Wide enough that a table with a few columns is not truncated
-#: into nothing, which would read as a blank screen for a reason that is the
-#: harness's fault.
+#: The size the first frame is rendered at, matching `tui_probe.py` so that
+#: frame and the verifier's are comparable. Wide enough that a table with a few
+#: columns is not truncated into nothing, which would read as a blank screen
+#: for a reason that is the harness's fault.
+#:
+#: Only the **starting** size: the console resizes this to whatever its preview
+#: pane actually is, so the app lays itself out for the space it is being shown
+#: in rather than being rendered at one size and scrolled at another.
 SIZE = (100, 30)
+
+#: Below this an app has no room to lay out and every frame is truncation.
+#: A pane smaller than this gets a frame it must scroll, which is honest --
+#: better than a screen that is technically the right size and unreadable.
+MIN_SIZE = (40, 12)
 
 #: Captured before anything else can rebind it. See the module docstring.
 _OUT = sys.stdout
@@ -128,12 +139,19 @@ async def serve() -> None:
                 break
 
             key = request.get("key")
+            size = request.get("resize")
             try:
+                if size:
+                    width, height = max(int(size[0]), MIN_SIZE[0]), max(int(size[1]), MIN_SIZE[1])
+                    await pilot.resize_terminal(width, height)
+                    # Twice: a resize re-lays-out, and anything the new
+                    # geometry schedules runs on the pass after that.
+                    await pilot.pause()
                 if key:
                     await pilot.press(key)
                 await pilot.pause()
                 frames += 1
-                send({"frame": buffer(app), "n": frames})
+                send({"frame": buffer(app), "n": frames, "size": list(app.size)})
             except Exception as exc:  # noqa: BLE001 -- reporting it IS the job
                 # A key that raises is a real finding about the generated app,
                 # not a reason to stop: the next key may well work, and a
