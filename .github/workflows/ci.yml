@@ -341,7 +341,8 @@ jobs:
   release-please:
     name: Release Please
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [lint, unit-tests, integration, ui]
+    # No `ui` here: this repo does not install that job (see the note above it).
+    needs: [lint, unit-tests, integration]
     runs-on: ubuntu-latest
     permissions:
       contents: write
