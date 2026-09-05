@@ -73,28 +73,9 @@ pytestmark = [pytest.mark.unit]
 # every path below — can be imported. See scripts/paths.py.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from scripts.paths import DOCS_DIR, IMPL_DIR, PROJECT_ROOT, TODO_DIR  # noqa: E402
+from repo_files import reference_docs, tracked  # noqa: E402
 
-#: Lifecycle stages whose job is to narrate what happened, so a since-removed
-#: name is correct usage in them. `docs/rules/docs.md` defines the lifecycle;
-#: the directories come from `scripts.paths`, which owns them. `reports` is
-#: taken at its parent so the regular, release and occasional editions are all
-#: covered without naming three constants.
-NARRATIVE = (TODO_DIR, IMPL_DIR, DOCS_DIR / "reports")
-
-#: Local addition to the template's set, and the only thing kept from this
-#: file's own earlier version. `NOTES.md` is proto.pilot's parking lot -- it
-#: records what was tried and what it was called at the time -- so naming a
-#: symbol that has since gone is the file doing its job. A file rather than a
-#: directory, hence matched separately.
-#:
-#: It exempts nothing today: enrolling `NOTES.md` finds zero dead references as
-#: of writing. That is worth saying, because an exclusion nobody can see the
-#: effect of is indistinguishable from one hiding a failure. This one is
-#: scoping by role, the same basis as the three directories above, not an
-#: allowlist entry -- and this repo's own rule is that a gate needing allowlist
-#: entries to ship is describing the wrong shape.
-NARRATIVE_FILES = ("NOTES.md",)
+from scripts.paths import PROJECT_ROOT  # noqa: E402
 
 #: A backticked call. The parentheses are the whole signal — they are what
 #: separates a code reference from a word that happens to sit in a code span.
@@ -108,24 +89,10 @@ def _git(*args: str, root: Path = PROJECT_ROOT) -> str:
     return subprocess.run(["git", *args], cwd=str(root), capture_output=True, text=True, check=True).stdout
 
 
-def _tracked(pattern: str, root: Path = PROJECT_ROOT) -> list[Path]:
-    """Tracked files only. An untracked scratch file is not this repo's claim."""
-    return [root / line for line in _git("ls-files", pattern, root=root).splitlines() if line.strip()]
-
-
-def reference_docs(root: Path = PROJECT_ROOT) -> list[Path]:
-    narrative = tuple(str(d.relative_to(PROJECT_ROOT)) for d in NARRATIVE)
-    return [
-        p
-        for p in _tracked("*.md", root=root)
-        if not str(p.relative_to(root)).startswith(narrative) and str(p.relative_to(root)) not in NARRATIVE_FILES
-    ]
-
-
 def defined_now(root: Path = PROJECT_ROOT) -> set[str]:
     """Every callable this repo currently defines."""
     names: set[str] = set()
-    for path in _tracked("*.py", root=root):
+    for path in tracked("*.py", root=root):
         names.update(DEFINITION.findall(path.read_text(encoding="utf-8", errors="replace")))
     return names
 

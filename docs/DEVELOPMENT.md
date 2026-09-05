@@ -16,14 +16,34 @@ on line one and reads as user error. This file named it anyway until 2026-09-03,
 in its own first code block, which is the worst place in the repo to name a
 command that is not there.
 
-The last three lines install two things that are easy to miss because they live
-outside version control:
+Two of those lines install things that are easy to miss because they live outside
+version control:
 
 - **Git hooks** (`pre-commit install --install-hooks`) — the commit-msg format
   check and the lint gates.
 - **The `regen-docs` merge driver** — its definition lives in `.git/config`,
-  which is not tracked, so a fresh clone has `.gitattributes` pointing at a
-  driver that does not exist. Verify with `pp check merge-drivers`.
+  which is not tracked, so **every clone after the first installs it by hand**.
+  That is the third line above; there is no step that does it for you. Verify
+  with `pp check merge-drivers`, which checks and never installs.
+
+The block above is static text, and so are the install blocks in `README.md` and
+`AGENTS.md`. They were generated from one source when this repository was
+scaffolded, which is **not** a standing guarantee — a guarantee implemented by
+rendering is spent at the moment of rendering, and the generator is not here.
+
+What holds them together now is `tests/test_setup_blocks_agree.py`, which ratchets
+on how many leading lines the install blocks agree on and fails when that number
+drops. It enrols a block by looking for an install command in it, not by naming
+documents, and **this file's block is deliberately not enrolled**: the rewrite
+above moved the venv line out of it, so what is left are the steps that come
+after the install. Two documents are measured here, not the three that test's
+prose assumes. A shared step drifting between them is caught; a step drifting
+between them and this file is not, so change all three by hand.
+
+That last claim is present-tense about a mechanism, which is what the paragraph
+before it says to distrust. It is honest for the one reason the warning turns on:
+the test ships beside this file and runs in the same `pp check pre-push`, with no
+rendering step between the claim and its enforcement.
 
 ## Configuration
 

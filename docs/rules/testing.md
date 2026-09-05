@@ -122,8 +122,9 @@ swallows input turns the whole suite into a coin flip that always lands green.
 
 Every fixture that creates a record owns its deletion. A cleanup that runs at *startup* is
 not a teardown — it hides the leak for exactly as long as it takes to become someone else's
-problem. Use the fixtures in `tests/fixtures.py`; never construct records against a live
-session by hand.
+problem. Put shared setup in a `yield` fixture in `tests/conftest.py`, where the teardown
+sits in the same function as the creation; never construct records against a live session
+by hand.
 
 ## Budgets Are Ratchets — Update Them in the Same Commit
 
@@ -135,6 +136,23 @@ Two counts are pinned so they can only move deliberately:
 Adding a legitimate skip → raise the budget **in the same commit** and justify it in the
 body. Removing skips, or raising coverage meaningfully → lower/raise the baseline in the same
 commit to lock the gain in. A ratchet is not a target: never chase the number.
+
+Both read a report pytest writes, so **both fail when that report is missing** rather than
+warning and passing. A ratchet with nothing to read has not passed, it has not run, and the
+two are indistinguishable from a green step. Run them the way CI does:
+
+```bash
+python -m pytest tests/ -m unit -q --junitxml=tmp/junit.xml
+python scripts/check_skip_budget.py --suite unit
+```
+
+Each suite is checked against **its own** report. A skip count belongs to the run that
+produced it, and `count_skips` sums a whole file — so one report covering two markers
+charges the second suite's skips to the first and names the wrong one while doing it.
+Coverage is the opposite and stays combined: a line rate is a whole-tree measure.
+
+`tests/test_ci_ratchet_inputs.py` holds the workflows to the same rule, because the version
+of this that shipped was a job running the ratchet and never writing the file.
 
 ## Before You Commit
 

@@ -29,8 +29,13 @@ python -m venv .venv && .venv/bin/pip install -r scripts/requirements.txt
 ./pp check health     # can this checkout generate? (runs `proto doctor`)
 ```
 
-These are rendered from the same source as the README's Setup block, and every
-one of them exists. An earlier version of this file opened with `./pp setup`
+**Every one of them exists** — that is the claim this paragraph is making, and it
+is the one worth checking. The install lines came from the same source as the
+README's Setup block when this repository was scaffolded, and what keeps them in
+step now is `tests/test_setup_blocks_agree.py` rather than the generator, which
+left. The three lines after them belong to this file alone and are not compared
+with anything. An
+earlier version of this file opened with `./pp setup`
 and `./pp service up`, which the CLI has never implemented — and `setup`
 could not be implemented, because the CLI cannot run until the install it would
 be performing has already put `click` in the venv. A quick start that fails on

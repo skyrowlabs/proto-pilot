@@ -138,7 +138,7 @@ nothing distinguishes "true" from "true here".
 A sixteenth thing is target-owned and does *not* live on the module: the
 **archetype prompt fragments**, which are written per medium (`archetypes.brief_for()`
 says "in the same browser" and "inline SVG") and live beside the passes, in
-`passes/_shared.py` and `passes/tui/_brief.py`.
+`protopilot/passes/_shared.py` and `protopilot/passes/tui/_brief.py`.
 
 ### Two defaults, and they answer different questions
 
@@ -188,7 +188,7 @@ reports on a pipeline nobody is using. Both halves, same commit.
 
 ### The stack brief is a cache prefix
 
-`passes/_shared.py` is byte-identical across every pass and every repair
+`protopilot/passes/_shared.py` is byte-identical across every pass and every repair
 attempt, deliberately, so it stays a prompt-cache prefix. Personalising it per
 pass costs nothing visible and multiplies the bill. Nothing fails; it just gets
 expensive quietly.
