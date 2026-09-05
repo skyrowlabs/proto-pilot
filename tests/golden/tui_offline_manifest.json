@@ -1,7 +1,7 @@
 {
   ".gitignore": "8a409c977fb33ac6c67876269dd3c15195b11a1ed7fdf45aef92bd93f1234654",
   ".protopilot/spec.json": "ea505fcdf1aa14972afc7d9952fc913511cb4a13522cb1ba1d7391347a3fa254",
-  "Makefile": "47e1673be966904eed2db9148cdcccf034d883ac77b76f9a9dc3cb38bcfcacc0",
+  "Makefile": "5aec5429cbd386eec75eb990ffe52662ea51a30d606b7be5619c9dd145c4986e",
   "README.md": "6963d2528230a97a58bc189bb8fd81ce59e2fe6bd661e1a1eddb1b1caf8b0957",
   "app/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "app/app.tcss": "462278477d0cf2aaa8bee8b4afacfbd124f5cd1d41c83cbcc56ace61de69083a",
@@ -13,7 +13,7 @@
   "app/seed.py": "89350b0669e30bc0805a833586db2ec0fd13ea4da45db5c6dcdbbed5c661d52e",
   "app/widgets.py": "0fde18ce66bee8dadb8b3bfb358e06d3f25711b514571ed8519abf7f435a690d",
   "pytest.ini": "1b21f32aaa57fd64bb9ac2fa48a1406d0039742c5fae6a90e31877ec88352dee",
-  "requirements.txt": "c838db3781aca1eeefd82e6088ec1de9e8ca331cd349793a451821cbd8101380",
+  "requirements.txt": "fbe88e7abee84ce648db968f6621a8ace7f633a7eaed0d7f59d4b6ca04904807",
   "tests/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "tests/conftest.py": "9f5b57ac15baa08198babaabd2a38b7fb3978c7f772aa94881d62168220c74f0",
   "tests/screen.py": "bb79f494d7cbaa2b437e318c9b51ce280dc79a84a81833a98a326507d4cadfdd",
