@@ -24,7 +24,7 @@ look optional to anybody not using that tool.
 ```bash
 python -m venv .venv && .venv/bin/pip install -r scripts/requirements.txt
 .venv/bin/pre-commit install --install-hooks
-./pp check pre-push   # everything CI blocks on; green on a fresh tree
+./pp check pre-push   # every host-runnable CI gate; green on a fresh tree
 ./pp test unit        # the fast suite
 ./pp check health     # can this checkout generate? (runs `proto doctor`)
 ```
@@ -343,7 +343,10 @@ Transcripts, ledgers, per-job memory and the payloads agent stages read live und
 
 Where that resolves to is `scripts/paths.py`'s answer and is deliberately not written
 here: a path in this file is a second definition, and this rule is the one forbidding
-those. Run `python -c "from scripts.paths import state_dir; print(state_dir())"`.
+those. Run `python -c "from scripts.paths import state_root; print(state_root())"` —
+`state_root()` rather than `state_dir()` because it reports **which** of the override
+and the default answered, and a path alone cannot. When a run writes somewhere
+unexpected that is usually the whole question, and a bare path leaves you to guess it.
 
 Reach it with `state_dir()` from `scripts/paths.py`. **Never a literal path, and never
 a second definition of one.** The second is the one that looks fine in review: split

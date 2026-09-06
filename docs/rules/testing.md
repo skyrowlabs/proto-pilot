@@ -158,7 +158,7 @@ of this that shipped was a job running the ratchet and never writing the file.
 
 ```bash
 pp test unit            # the fast suite — must be green
-pp check pre-push       # everything CI runs, locally
+pp check pre-push       # every CI gate that runs without the stack
 ```
 
 All tests must pass. Never commit half-working code.

@@ -305,9 +305,17 @@ inventions — they are one shared shell, debugged once.
 ```bash
 python -m venv .venv && .venv/bin/pip install -r scripts/requirements.txt
 .venv/bin/pre-commit install --install-hooks
-./pp check pre-push      # everything CI blocks on
+./pp check pre-push      # every CI gate this host can run
 ./pp test unit           # the fast suite
 ```
+
+`check pre-push` is not quite everything CI blocks on, and the gap is named
+rather than implied: the **integration suite** needs the stack up, so it runs on
+CI only. `tests/test_pre_push_covers_ci.py` recomputes both sets — the gates in
+`ci.yml` and the gates in `pp check pre-push` — and fails when one appears in
+neither, so this sentence cannot quietly go stale. It said "everything" until
+2026-09-06, when it was measurably false: two gates CI blocks on and this host
+runs fine were missing from the bundle, and the word stopped anyone looking.
 
 [`AGENTS.md`](AGENTS.md) is the rules — read it before changing anything.
 [`docs/README.md`](docs/README.md) indexes the rest;
