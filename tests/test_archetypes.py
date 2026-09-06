@@ -73,12 +73,28 @@ def test_a_spec_written_before_archetypes_existed_still_loads(tmp_path):
 
 
 def test_the_shipped_kitten_chess_spec_still_loads():
-    """A real artifact from before this change, not a fixture of one."""
+    """A real artifact from before this change, not a fixture of one.
+
+    It lives under `tests/artifacts/` and is tracked. It used to be read from
+    `prototypes/kitten_chess/`, which `.gitignore` excludes, so it was present
+    on the author's machine and in no CI checkout ever -- the test passed here
+    and skipped there, permanently, and the skip budget could not see it
+    because the CI step read no junit report until skeletor v0.6.2 gave it one.
+    A test that only ever skips in CI is not a CI test.
+
+    Still a real artifact and not a fixture: this is the byte-identical spec
+    `proto new` wrote on 2026-08-28, copied rather than authored. That is the
+    whole point of it -- a hand-written spec would agree with today's model by
+    construction, which is what makes an old one worth keeping.
+    """
     from pathlib import Path
 
-    tree = Path(__file__).resolve().parents[1] / "prototypes" / "kitten_chess"
-    if not (tree / ".protopilot" / "spec.json").exists():
-        pytest.skip("kitten_chess prototype is not present in this checkout")
+    tree = Path(__file__).resolve().parent / "artifacts" / "kitten_chess"
+    assert (tree / ".protopilot" / "spec.json").exists(), (
+        f"the tracked kitten_chess artifact is missing from {tree} -- it is committed, "
+        "so this is a deletion rather than an environment difference, and skipping "
+        "here would hide exactly what this test exists to catch."
+    )
     assert Spec.load(tree).archetype == "crud"
 
 
