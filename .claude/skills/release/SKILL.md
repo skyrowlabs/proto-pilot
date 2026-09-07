@@ -71,7 +71,13 @@ Once the tag lands:
 
 ```bash
 pp docs freeze-release --tag <tag>   # archive editions, re-anchor regular/, rebuild the index
-git switch develop && git merge --no-ff main   # back-merge the release commit
+```
+
+Then back-merge, so `develop` carries the release commit and the next
+release PR does not re-propose it:
+
+```bash
+git switch develop && git merge --no-ff main
 ```
 
 Report: tag, what shipped, where the frozen editions went, and anything left
