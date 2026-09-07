@@ -390,19 +390,24 @@ jobs:
     # name anywhere. That is a fact about the ACCOUNT, not about this file —
     # re-check it before renaming again.
     #
-    # **This list is a hand-edit and the manifest disagrees with it.**
-    # `.skeletor.json` records `--python-ceiling 3.11`, so the template's own
-    # render of this file is a ONE-leg matrix; the second leg exists because
-    # this block was edited, which is why the hunk conflicts on every upgrade
-    # that touches it. v0.20.0 shipped the route out:
+    # **This list is not a hand-edit any more; the manifest says it.**
+    # `.skeletor.json` records `--python-ceiling 3.14`, so the template's own
+    # render of this file produces exactly these two legs and this block no
+    # longer diverges from it. It used to: the second leg was an edit here
+    # while the record said one leg, which is why the hunk conflicted on every
+    # upgrade that moved it. Closed with v0.20.0's route, in its own pass:
     #
-    #     skeletor-upgrade . --set-arg python-ceiling=3.14 --dry-run
+    #     skeletor-upgrade . --set-arg python-ceiling=3.14
     #
-    # Not taken in the same commit as the upgrade, deliberately: it amends the
-    # recorded argument set, and one concern per commit is this repository's
-    # own rule. The template's paragraph here is NOT carried, because its
-    # premise — *a scaffold that says nothing gets one leg* — is not this
-    # tree's. This tree said something, in the wrong place.
+    # The `ci.yml` merge was a NO-OP — nothing in this file changed, because
+    # the tree already looked the way the amended record renders. That is the
+    # shape worth recognising: the divergence was closed by making the record
+    # true rather than by changing the workflow.
+    #
+    # Change the versions by changing the recorded argument, not by editing the
+    # list below. The template's own paragraph here is still NOT carried: its
+    # premise is *a scaffold that says nothing gets one leg*, and this tree said
+    # something — it just said it in the wrong file until now.
     name: pytest ${{ matrix.python }}
     needs: gate
     if: needs.gate.outputs.docs_only != 'true'
