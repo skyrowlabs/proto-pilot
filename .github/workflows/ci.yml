@@ -389,6 +389,20 @@ jobs:
     # and this repository declares no rulesets, so no context is required by
     # name anywhere. That is a fact about the ACCOUNT, not about this file —
     # re-check it before renaming again.
+    #
+    # **This list is a hand-edit and the manifest disagrees with it.**
+    # `.skeletor.json` records `--python-ceiling 3.11`, so the template's own
+    # render of this file is a ONE-leg matrix; the second leg exists because
+    # this block was edited, which is why the hunk conflicts on every upgrade
+    # that touches it. v0.20.0 shipped the route out:
+    #
+    #     skeletor-upgrade . --set-arg python-ceiling=3.14 --dry-run
+    #
+    # Not taken in the same commit as the upgrade, deliberately: it amends the
+    # recorded argument set, and one concern per commit is this repository's
+    # own rule. The template's paragraph here is NOT carried, because its
+    # premise — *a scaffold that says nothing gets one leg* — is not this
+    # tree's. This tree said something, in the wrong place.
     name: pytest ${{ matrix.python }}
     needs: gate
     if: needs.gate.outputs.docs_only != 'true'
