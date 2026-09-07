@@ -390,24 +390,26 @@ jobs:
     # name anywhere. That is a fact about the ACCOUNT, not about this file —
     # re-check it before renaming again.
     #
-    # **This list is not a hand-edit any more; the manifest says it.**
-    # `.skeletor.json` records `--python-ceiling 3.14`, so the template's own
-    # render of this file produces exactly these two legs and this block no
-    # longer diverges from it. It used to: the second leg was an edit here
-    # while the record said one leg, which is why the hunk conflicted on every
-    # upgrade that moved it. Closed with v0.20.0's route, in its own pass:
+    # **Change this list by changing the recorded argument, not by editing it
+    # here.** `.skeletor.json`'s `--python-ceiling` is what the template renders
+    # this matrix from, so an edit in this file is a divergence: the render
+    # keeps producing the recorded shape and the hunk conflicts on every upgrade
+    # that moves it. The route, which needs its own clean pass because it
+    # records nothing unless the whole run applies:
     #
-    #     skeletor-upgrade . --set-arg python-ceiling=3.14
+    #     skeletor-upgrade . --set-arg python-ceiling=<version> --dry-run
     #
-    # The `ci.yml` merge was a NO-OP — nothing in this file changed, because
-    # the tree already looked the way the amended record renders. That is the
-    # shape worth recognising: the divergence was closed by making the record
-    # true rather than by changing the workflow.
+    # This block WAS such a divergence until 2026-09-06, and closing it changed
+    # nothing in this file — the merge was a no-op and only `.skeletor.json`
+    # moved, because the tree already looked the way the amended record renders.
+    # **The record was the wrong artefact, not the workflow**, which is worth
+    # knowing because the operator's instinct is to fix the file that runs.
     #
-    # Change the versions by changing the recorded argument, not by editing the
-    # list below. The template's own paragraph here is still NOT carried: its
-    # premise is *a scaffold that says nothing gets one leg*, and this tree said
-    # something — it just said it in the wrong file until now.
+    # No version number is spelled above on purpose. The values live one file
+    # over and in the list below, and a third copy here would be a cached answer
+    # to a question `git show HEAD:.skeletor.json` answers. The template's own
+    # paragraph is still NOT carried: its premise is *a scaffold that says
+    # nothing gets one leg*, and this tree said something.
     name: pytest ${{ matrix.python }}
     needs: gate
     if: needs.gate.outputs.docs_only != 'true'
