@@ -370,7 +370,19 @@ jobs:
     #
     # `fail-fast: false` because the useful answer is *which* version broke.
     # Cancelling the other on the first red turns two data points into one.
-    name: Unit Tests (host-side) ${{ matrix.python }}
+    #
+    # The interpreter is in the NAME on purpose, and the cost is real: a
+    # required status context is named, not discovered, so changing this string
+    # costs anybody with branch protection an edit and a window where the old
+    # context never reports. A matrix whose legs share a name is one you cannot
+    # require individually, which is the whole point of running two.
+    #
+    # Renamed from `Unit Tests (host-side)` at skeletor v0.18.0. Free here and
+    # measured rather than assumed: neither `main` nor `develop` is protected
+    # and this repository declares no rulesets, so no context is required by
+    # name anywhere. That is a fact about the ACCOUNT, not about this file —
+    # re-check it before renaming again.
+    name: pytest ${{ matrix.python }}
     needs: gate
     if: needs.gate.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
