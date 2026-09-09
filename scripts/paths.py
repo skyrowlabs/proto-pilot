@@ -80,7 +80,26 @@ RELEASES_DIR = DOCS_DIR / "reports" / "releases"
 #:
 #: `reports` is taken at its parent so the regular, release and occasional
 #: editions are covered without naming three constants.
-NARRATIVE = (TODO_DIR, IMPL_DIR, DOCS_DIR / "reports")
+#:
+#: `research` is here for exactly the reason `reports` is, and its absence was
+#: an oversight rather than a decision. stash.flow filed 17 documents of concept
+#: work into the folder `docs/rules/docs.md` tells them to use, and watched
+#: `test_docs_name_real_paths` redden on one of them for citing a path that is
+#: *supposed* to be dead. That folder's own description is the whole argument:
+#: it holds "a thing that is **not a plan**", where "rejected ideas keep their
+#: memo rather than being deleted" — and a memo about what was ruled out names
+#: the code it ruled out.
+#:
+#: `docs/business-planning/` is the other folder in that table and is
+#: deliberately NOT here, stated so its absence is a decision somebody can
+#: disagree with rather than the same oversight one folder over. It is not a
+#: stage of the *document* lifecycle — nothing moves into or out of it — and
+#: market or pricing work does not cite the tree. An adopter who keeps
+#: code-shaped proposals there should append it, which is what the block below
+#: is for. `tests/test_narrative_covers_lifecycle_folders.py` holds that
+#: partition, so a folder added to the table later cannot be silently
+#: unclassified the way this one was.
+NARRATIVE = (TODO_DIR, IMPL_DIR, DOCS_DIR / "reports", DOCS_DIR / "research")
 
 
 #: **Add your own stages below, as an append. Do not edit the tuple above.**
@@ -129,8 +148,68 @@ NARRATIVE = (TODO_DIR, IMPL_DIR, DOCS_DIR / "reports")
 NOTES_FILE = PROJECT_ROOT / "NOTES.md"
 NARRATIVE += (NOTES_FILE,)
 
+#: `docs/ideas/` is this tree's name for the template's `docs/research/`, and the
+#: rename is recorded once, in `docs/rules/docs.md`'s lifecycle table. The tuple
+#: above still names `research`, which does not exist here — so without this line
+#: the folder holding "a thing that is **not a plan**" has no role at all.
+#:
+#: **The rename is what made the gap, and it stayed invisible for six days.**
+#: `NARRATIVE` is excluded by every resolve-check because naming a file it intends
+#: to create is what a narrative document exists to do. `docs/ideas/hosted.md` is
+#: tabled and cites what it ruled out; it has simply not yet cited a path dead
+#: enough to redden anything. skeletor added `research` to the tuple in this
+#: series after stash.flow filed 17 documents where the table said to and watched
+#: a resolve-check fire — the upstream fix reaches every adopter that kept the
+#: template's name, and silently misses this one.
+#:
+#: Which is the renaming tax stated generally, and worth keeping because this
+#: tree will rename something else: **a rename recorded in prose is invisible to
+#: every constant that spells the old name.** The table is the authority for
+#: where a human files; it is not an instrument, and no gate reads it as one.
+#: `tests/test_narrative_covers_lifecycle_folders.py` is what closes that — it
+#: reads the published table and demands a role per row, so the next rename
+#: fails here instead of being discovered by a document.
+IDEAS_DIR = DOCS_DIR / "ideas"
+NARRATIVE += (IDEAS_DIR,)
+
 # ── Code and configuration ───────────────────────────────────────────────────
-CLI_DIR = PROJECT_ROOT / "cli"
+
+
+#: The shell's package, written here by the scaffolder.
+#:
+#: It ships as `cli/` and `--shell-package` renames it, because `cli` is the
+#: most collided-with package name in a python monorepo and a shell that cannot
+#: move out of the way costs an adopter a rename mid-flight.
+#:
+#: ## This was discovered by walking for `__main__.py`, and that shipped broken
+#:
+#: The first version took the one root directory containing a `__main__.py` and
+#: raised when there was not exactly one. Its comment named the ambiguous case
+#: and treated it as unreachable. It is the **ordinary** case: `__main__.py` is
+#: what `python -m` needs, so any adopter whose own product is a `python -m`
+#: CLI has a second one — and the failure was not a wrong answer but a dead
+#: tree, since this module is imported by the CLI, every gate and the suite's
+#: collection. sky.boss upgraded, lost the whole toolchain, and reverted.
+#:
+#: The record beats the inference, which is their sentence: an inference that
+#: can be ambiguous must not outrank a record that cannot. The record is here
+#: rather than in `.skeletor.json` because that file is a **supported
+#: deletion** (see `SCAFFOLD_MANIFEST` below) and because reading its arg list
+#: would make this a second reader of the generator's format. A rendered
+#: literal is written by the same render that created the directory and
+#: survives both.
+#:
+#: ## Why it was not simply substituted the first time
+#:
+#: Because a placeholder cannot go in an *import statement* — `from <token>.x
+#: import y` does not parse, and this template's python is read with `ast`.
+#: That is true, and it was carried to every construct instead of the one it
+#: was proven about. It was never true of a string constant. Nothing imports
+#: through this name: the package finds its own command groups via `__name__`
+#: and `__path__`, `__main__.py` imports relatively, and `tests/shell.py` goes
+#: through `importlib`.
+SHELL_PACKAGE = "cli"
+CLI_DIR = PROJECT_ROOT / SHELL_PACKAGE
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
 TESTS_DIR = PROJECT_ROOT / "tests"
 GITHUB_DIR = PROJECT_ROOT / ".github"

@@ -22,6 +22,68 @@ from .helpers import PROJECT_ROOT, detail, fail, git, item, line, ok, run
 # Bootstrap only: `scripts/` is not a package on the path for a CLI module.
 sys.path.insert(0, str(PROJECT_ROOT))
 from scripts import tree_lock  # noqa: E402
+from scripts.paths import REQUIREMENTS  # noqa: E402
+
+
+def _venv_inputs(root: Path) -> dict:
+    """`{repo-relative path: bytes}` for everything the host venv is built from.
+
+    Anchored on `scripts.paths.REQUIREMENTS` — the file that module declares as
+    *the host toolchain this tree installs* — and then follows `-r` includes, so
+    an adopter who splits their requirements is covered without a registry and
+    without this function being edited.
+
+    **It is deliberately not a glob**, and jam.sense is why. `git ls-files
+    "*requirements*.txt"` was the first version: correct in a scaffold, where the
+    tree has one Python environment, and wrong in a multi-service repository,
+    where six of their ten tracked requirements files describe *container images*
+    and resolve nowhere near the host venv. Digesting those means a dependency
+    bump to a service — most weeks — declines the link forever, for a reason with
+    nothing to do with the environment being borrowed. A scaffold cannot exhibit
+    that shape, so nothing here could have found it.
+
+    **The limit, and it is the opposite error to the one above.** This covers the
+    declared file and `-r` includes, and nothing else. In a scaffold that is
+    complete — `setup_commands()` builds the venv with exactly one
+    `pip install -r scripts/requirements.txt`, and the README, `AGENTS.md` and
+    `docs/DEVELOPMENT.md` all say so. An adopter whose setup grows a second kind
+    of input, `.venv/bin/pip install -e .` being the likely one, has made
+    `pyproject.toml` a host-venv input that this does not see — and a set that is
+    too narrow **links** where it should decline, which is the quiet direction.
+    Too wide declines loudly and gets fixed; too narrow borrows the wrong
+    environment and says nothing. Extend `_venv_inputs` when the setup block
+    grows, not when a new requirements file appears.
+    """
+    seen: dict = {}
+    pending = [root / REQUIREMENTS.relative_to(PROJECT_ROOT)]
+    while pending:
+        path = pending.pop()
+        try:
+            key = path.resolve().relative_to(root.resolve()).as_posix()
+        except ValueError:
+            continue  # a `-r` reaching outside the tree is not this tree's input
+        if key in seen or not path.is_file():
+            continue
+        seen[key] = path.read_bytes()
+        for entry in seen[key].decode("utf-8", "replace").splitlines():
+            stripped = entry.strip()
+            if stripped.startswith("-r "):
+                pending.append(path.parent / stripped[3:].strip())
+    return seen
+
+
+def _requirements_agree(target: Path) -> bool:
+    """Does `target` install the same host toolchain as the primary?
+
+    Compared by content rather than by mtime or by branch name: the question is
+    whether the primary's installed packages are the right ones for this
+    checkout, and only the requirements text answers it.
+
+    A file present on one side and absent on the other counts as a difference,
+    which is the safe direction — a new requirements file is exactly the change
+    that makes a borrowed environment wrong.
+    """
+    return _venv_inputs(PROJECT_ROOT) == _venv_inputs(target)
 
 
 @click.group()
@@ -53,6 +115,42 @@ def new(path: str, branch: str, base: str) -> None:
     if env.exists():
         shutil.copy2(env, target / ".env")
         item("copied .env")
+
+    # The .venv is the same class of untracked-but-required, and its absence is
+    # louder than a skip: `pyrightconfig.json` pins the interpreter with
+    # `venvPath: "."`, which pyright resolves **relative to the config file** —
+    # so in a worktree it points at a directory that does not exist, pyright
+    # prints one line about it and falls back to whatever python is on PATH.
+    # Measured on a scaffold of this template: 0 errors in the primary and 27 in
+    # a fresh worktree, same commit, same pyright, every one of them `click`
+    # resolving to Unknown. It reads as a broken branch rather than a missing
+    # directory. Reported by jam.sense, who found it in four checkouts of five.
+    #
+    # Linked rather than built, and guarded rather than warned about. The first
+    # version of this said "rebuild it here if this branch changes requirements",
+    # which puts the one case that is silently wrong on the user to notice — and
+    # the branch most likely to change requirements is the branch somebody cut a
+    # worktree for. jam.sense already did this for `node_modules`, digesting
+    # `package-lock.json` on both sides; this is that step for Python, and the
+    # asymmetry is the finding: they had the pattern and had never applied it to
+    # Python, and this template had the command that creates the exposure and not
+    # the pattern.
+    #
+    # Declining by name beats linking quietly, and the asymmetry is what makes it
+    # safe: a missing .venv makes pyright print `venv .venv subdirectory not
+    # found in venv path <this tree>` on the line above its errors, which is the
+    # thread back to this decision. A silently borrowed environment for the wrong
+    # requirements prints nothing at all, and under `reportMissingImports: none`
+    # a package it should have had simply stops constraining anything.
+    venv = PROJECT_ROOT / ".venv"
+    if venv.is_dir() and not (target / ".venv").exists():
+        if _requirements_agree(target):
+            (target / ".venv").symlink_to(venv.resolve())
+            item("linked .venv (the primary's)")
+        else:
+            item("did NOT link .venv — this branch's requirements differ from the primary's")
+            detail("  python3 -m venv .venv && .venv/bin/pip install -r scripts/requirements.txt")
+
     (target / "tmp").mkdir(exist_ok=True)
 
     ok(f"worktree at {target} on branch '{branch}'")

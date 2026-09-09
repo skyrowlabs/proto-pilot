@@ -25,14 +25,16 @@ TESTS_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = TESTS_DIR.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from cli.test_cmds import SUITES  # noqa: E402
+from tests.shell import module  # noqa: E402
+
+SUITES = module("test_cmds").SUITES
 
 
 def declared_markers() -> set:
     """The marker vocabulary, read from the config pytest itself reads.
 
     It was a literal here, which made a fourth home for one list: this set,
-    `tests/pytest.ini`, `pyproject.toml`, and `SUITES` in `cli/test_cmds.py`.
+    `tests/pytest.ini`, `pyproject.toml`, and `SUITES` in the shell's `test_cmds.py`.
     Nothing checked them, and `tests/pytest.ini` carries the instruction *"keep
     the two in sync"* — the shape this shell's own history says loses.
 
@@ -52,7 +54,7 @@ _MARKER = re.compile(r"pytest\.mark\.(?P<name>\w+)")
 
 def _test_files():
     return scanned(
-        sorted(p for p in TESTS_DIR.rglob("test_*.py") if "__pycache__" not in p.parts),
+        sorted(p for p in TESTS_DIR.rglob("test_*.py") if "__pycache__" not in p.relative_to(TESTS_DIR).parts),
         f"test_*.py under {TESTS_DIR}",
     )
 
