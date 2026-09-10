@@ -111,3 +111,63 @@ def test_pyright_has_something_to_analyse() -> None:
         + "\n  ".join(empty)
         + "\n\npyright would report 0 errors over 0 files and `pp check lint` would pass."
     )
+
+
+def test_no_pyright_caller_resolves_its_interpreter_from_path() -> None:
+    """No caller may take its interpreter from `PATH`. One place may satisfy this.
+
+    Either the **config** pins — `venvPath` + `venv`, or `pythonPath` — or
+    **every** caller passes `--pythonpath`. Stated as a disjunction because a
+    tree that genuinely pins at every call site is correct, and a gate that
+    forbids a working arrangement is one somebody deletes.
+
+    `reportMissingImports` is `none`, so an interpreter without this tree's
+    packages raises no import error at all: the packages become `Unknown` and
+    cascade into errors in files the commit never touched. The root cause is the
+    suppressed one, so what you see is a pile of plausible consequences reading
+    as a broken tree rather than a broken environment. skeletor measured a
+    scaffold of this template on 2026-09-07, same pyright and same project file,
+    differing only in which interpreter `PATH` offered first: **27 errors**
+    unpinned, **0** pinned, every one of the 27 `click` resolving to `Unknown`.
+
+    ## Why this is here rather than arriving with the template
+
+    The template ships this in a file this tree deletes on purpose — its other
+    half duplicates `test_pyright_has_something_to_analyse` above. At the
+    v0.24.0 upgrade that deletion was re-examined and held, on the finding that
+    the interpreter half was already covered by the pre-flight wrapper. **That
+    finding was wrong**, and the pre-flight is exactly why it looked right:
+    `scripts/lint_pyright_gate.py::resolve_interpreter` prefers the config's
+    venv and *falls through to `PATH`* when nothing pins, so its tests assert
+    the resolution order rather than that this repository pins. Deleting
+    `venvPath` and `venv` from `pyrightconfig.json` left all 725 unit tests
+    green — measured on 2026-09-10, which is how this hole was found rather
+    than argued.
+
+    The general form is worth more than the fix: **a mechanism that centralises
+    a decision is not a mechanism that makes it.** The wrapper made interpreter
+    resolution uniform, legible and fail-closed, and none of that is the same as
+    requiring the pin — but it reads as the same when you are looking for
+    coverage rather than for the assertion.
+    """
+    from tests.test_pyright_gate_preflight import _present_callers
+
+    config = PROJECT_ROOT / "pyrightconfig.json"
+    if not config.exists():
+        pytest.skip("no pyrightconfig.json")
+
+    # JSONC: the file carries `//` line comments on purpose, so strip them.
+    raw = re.sub(r"^\s*//.*$", "", config.read_text(encoding="utf-8"), flags=re.MULTILINE)
+    parsed = json.loads(raw)
+    if parsed.get("pythonPath") or (parsed.get("venvPath") and parsed.get("venv")):
+        return
+
+    # The caller set has an owner; this does not define a second one.
+    unpinned = sorted(name for name, text in _present_callers().items() if "--pythonpath" not in text)
+    assert not unpinned, (
+        "pyrightconfig.json pins no interpreter and these callers do not pass "
+        f"--pythonpath: {unpinned}\n"
+        "Restore `venvPath` + `venv` in pyrightconfig.json, or pass --pythonpath at every "
+        "call site. Unpinned, pyright checks whatever python PATH offered first and reports "
+        "the fallout as errors in files your commit never touched."
+    )

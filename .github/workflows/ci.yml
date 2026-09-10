@@ -40,14 +40,20 @@ name: CI
 # sentence said "draft PRs run the gate job alone" for five releases while the
 # script returned `docsOnly: false` for a draft, which runs two more.
 #
-# **Four other copies of the corrected sentence are still wrong**, and they are
-# not ours to fix: `AGENTS.md` Rule 8, `.github/CONTRIBUTING.md`,
-# `pr-draft-discipline.yml`'s bot comment, and the event table inside
-# `docs-only.cjs` itself, which contradicts its own `if (pr.draft)` 120 lines
-# below. Each is byte-identical to skeletor's template, so a local edit would
-# be a permanent conflict against prose skeletor is actively revising — the
-# correction above arrived in v0.24.0. Reported upstream 2026-09-09; delete
-# this note when an upgrade brings their sweep.
+# **Correcting it here corrected one of five homes.** The same claim was in
+# `AGENTS.md`, `.github/CONTRIBUTING.md`, the comment the draft-discipline
+# workflow posts onto contributors' pull requests — and, worst, in a summary
+# table inside `docs-only.cjs` itself, 119 lines from the code it summarised, in
+# the file this paragraph names as the single source. A statement is not fixed
+# when the authority is fixed: the copies do not know they are copies, and the
+# one in the authority's own comment is the one a reader trusts most.
+#
+# Found here, reported upstream, and swept template-side in v0.25.0 — which is
+# why this tree carries no local fix for it. The template's own version of this
+# paragraph says proto.pilot swept all five; we deliberately swept none, because
+# all five were byte-identical to the template and a local edit to prose the
+# generator is actively revising is a permanent conflict. Naming the copies and
+# declining to touch them was the whole contribution.
 
 on:
   pull_request:

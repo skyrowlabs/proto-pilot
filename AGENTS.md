@@ -269,7 +269,9 @@ merge.
 
 `gh pr create --draft`. Mark it ready only when you believe it is green.
 
-The expensive CI jobs are gated on draft status: a draft PR runs the cheap gate job alone.
+The expensive CI jobs are gated on draft status: a draft PR carrying code runs `node`,
+`unit-tests` and the gate, and skips `lint`, `integration` and `ui`. (A docs-only PR runs the
+gate alone whether it is draft or ready — that is the other rule, and it decides first.)
 Nothing is un-gated by this — GitHub blocks merging a draft regardless, and marking it ready
 fires `ready_for_review`, which runs the full set before it can merge.
 
@@ -468,4 +470,6 @@ Load on-demand only. Full mapping in `.github/DOCS_INDEX.md`.
 
 `feat` / `fix` / `perf` / `docs` / `refactor` / `chore` / `ci` / `test` / `build`
 
-> `docs:` for `docs/**` changes only — never `feat:`. Release Please owns `CHANGELOG.md`.
+> `docs:` for hand-written prose wherever it lives — this file and `README.md`
+> included — never `feat:`. The path is the hint, not the test; `docs/rules/commits.md`
+> holds the rule. Release Please owns `CHANGELOG.md`.

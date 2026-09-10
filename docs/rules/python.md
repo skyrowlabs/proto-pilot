@@ -46,15 +46,20 @@ Pyright resolves its interpreter from `PATH` and does **not** read a virtualenv 
 `.venv/bin/pyright` is a wrapper and changes nothing. `pyrightconfig.json` therefore pins it
 with `venvPath` + `venv`, which is the one place that reaches every caller — the pre-commit
 hook is `language: node` with `pass_filenames: false` and cannot pass a per-machine path.
-`tests/test_pyright_gate_preflight.py` holds that rule here, in a stronger form than the
-disjunction the template states: rather than *the config pins **or** every caller passes
-`--pythonpath`*, every commit-time caller must route through the pre-flight wrapper, and
-`test_the_config_venv_outranks_path` asserts this exact pair beats `PATH`. The template
-splits the rule across a second scope file as well; that one is deliberately absent here,
-because its scope half is
-`tests/test_lint_tool_parity.py::test_pyright_has_something_to_analyse` under another name.
-CI pins its dependency set in `.github/pyright-deps.txt`; keep that a
+The unit suite holds that rule: the config pins, **or** every caller passes
+`--pythonpath`. CI pins its dependency set in `.github/pyright-deps.txt`; keep that a
 superset of the unit-test job's installs.
+
+**That sentence was false here for a day, and the reason generalises.** The template ships
+the assertion in a scope file this tree deletes on purpose — its other half duplicates
+`test_pyright_has_something_to_analyse`. The v0.24.0 upgrade re-examined the deletion and
+held it, on the finding that the pre-flight wrapper covered the interpreter half. It does
+not: the wrapper prefers this pin and *falls through to `PATH`* when nothing pins, so its
+tests assert the resolution order rather than that this repository pins. Deleting the pin
+left all 725 unit tests green. **Centralising a decision is not making it** — and a
+centralised mechanism is the most convincing possible place to stop looking for the
+assertion. Re-derived beside the include-scope check, which is where this tree keeps its
+pyright rulings.
 
 **`--pythonpath` does not override the pin, and the two are not interchangeable.** Measured
 on pyright 1.1.411: with `venvPath` + `venv` resolving, passing a deliberately
@@ -100,7 +105,7 @@ could not run is not a gate that passed.
 CI does not call it and should not: that job installs `.github/pyright-deps.txt` onto the
 runner's interpreter with no `.venv` in the checkout, so it answers every interpreter
 question already, and a wrapper there would add a moving part to the one caller that never
-had the problem. `tests/test_pyright_gate_preflight.py` holds the routing, the fail-closed
+had the problem. The unit suite holds the routing, the fail-closed
 behaviour, and that every sentinel stays reachable from `.github/pyright-deps.txt` — a
 sentinel outside it would block a commit on a correctly provisioned runner.
 
