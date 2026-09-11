@@ -99,11 +99,14 @@ Full rules: [`docs/rules/testing.md`](rules/testing.md).
 
 | Event                          | What runs                              | ~min |
 | ------------------------------ | -------------------------------------- | ---- |
-| Draft PR                       | `CI Gate` alone                        | ~1   |
+| Draft PR, docs-only            | `CI Gate` alone                        | ~1   |
+| Draft PR carrying code         | `CI Gate` + `Node` + `pytest`          | ~5   |
 | Ready PR → `develop`, docs-only | `CI Gate` alone               | ~1   |
 | Ready PR → `develop`, code      | `CI Gate` + `Node` + `pytest` | ~5   |
+| Ready PR → `main`, docs-only | `CI Gate` alone            | ~1   |
+| Ready PR → `main`, code      | **everything**             | full |
 | Ready PR opened by Dependabot  | **everything** — deliberately exempt   | full |
-| Push to `main`   | **everything** + Release Please        | full |
+| Push to `develop` or `main` | **everything**, and Release Please on `main` | full |
 
 Three things about this table are load-bearing:
 

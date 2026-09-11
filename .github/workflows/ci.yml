@@ -44,22 +44,38 @@ name: CI
 # `AGENTS.md`, `.github/CONTRIBUTING.md`, the comment the draft-discipline
 # workflow posts onto contributors' pull requests — and, worst, in a summary
 # table inside `docs-only.cjs` itself, 119 lines from the code it summarised, in
-# the file this paragraph names as the single source. A statement is not fixed
-# when the authority is fixed: the copies do not know they are copies, and the
-# one in the authority's own comment is the one a reader trusts most.
+# the file this paragraph names as the single source. proto.pilot found all four
+# survivors from an adopted tree and deliberately did NOT fix them there — a
+# prose divergence in a file the template is actively revising is a permanent
+# conflict — so they reported them and the sweep was made upstream, here.
 #
-# Found here, reported upstream, and swept template-side in v0.25.0 — which is
-# why this tree carries no local fix for it. The template's own version of this
-# paragraph says proto.pilot swept all five; we deliberately swept none, because
-# all five were byte-identical to the template and a local edit to prose the
-# generator is actively revising is a permanent conflict. Naming the copies and
-# declining to touch them was the whole contribution.
+# That sentence read "proto.pilot swept all five from an adopted tree" for one
+# release. They swept none; their report says so in as many words. It is a
+# fabricated credit, in template prose, about the tree that found the bug, and
+# it shipped to every adopter — which is worse than the drift this paragraph is
+# about, because a copy at least started out true. Do not attribute an act to a
+# reporter without the sentence in their report that says they performed it.
+#
+# A statement is not fixed when the authority is fixed: the copies do not know
+# they are copies, and the one in the authority's own comment is the one a
+# reader trusts most.
 
 on:
   pull_request:
-    # `ready_for_review` is LOAD-BEARING. Remove it and the gated jobs never
-    # re-run when a PR flips out of draft — they stay `skipped`, which branch
-    # protection ACCEPTS, and the PR merges having run nothing.
+    # `ready_for_review` is LOAD-BEARING, and it is load-bearing exactly where
+    # the verdict CHANGES on that transition. Remove it and the gated jobs never
+    # re-evaluate when a PR flips out of draft — they stay `skipped`, which
+    # branch protection ACCEPTS.
+    #
+    # Where the verdict changes is a pull request into main, and
+    # therefore every pull request in a tree whose base and release branch are
+    # the same. This comment used to say the PR would otherwise merge "having
+    # run nothing", full stop, and that is false for the ordinary case in a
+    # two-branch tree: `.github/scripts/docs-only.cjs` returns the same verdict
+    # for a draft carrying code and for a ready code change into
+    # develop, so nothing escalates and the statuses already standing
+    # are correct. mind.head found it; the repository's own verdict table had
+    # the two rows side by side and identical.
     # tests/test_ci_draft_gate.py fails if it disappears.
     types: [opened, synchronize, reopened, ready_for_review]
     branches: [develop, main]
