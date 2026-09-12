@@ -102,8 +102,8 @@ RELEASES_DIR = DOCS_DIR / "reports" / "releases"
 #: unclassified the way this one was.
 NARRATIVE = (TODO_DIR, IMPL_DIR, DOCS_DIR / "reports", DOCS_DIR / "research")
 
-
-#: **Add your own stages below, as an append. Do not edit the tuple above.**
+#: **Add your own stages as an append, in the `Your own lifecycle folders`
+#: region at the end of this section. Do not edit the tuple above.**
 #:
 #: This used to read "extending this tuple is a one-line change to a file you
 #: own", which was true about permission and wrong about merging. stash.flow
@@ -253,12 +253,40 @@ PRESENT_TENSE = {
 # So the cost is one conflict in one tree, once, and it is **inherent rather
 # than a placement mistake**: that tree's append occupies exactly this position,
 # and a marker whose entire purpose is to hold this position cannot arrive
-# without landing on it. Choosing a different anchor moves the collision onto a
-# different spelling rather than removing it — measured across five offsets.
+# without landing on it.
 #
-# An append that merged cleanly when this line arrived ended up **below** it, so
-# it is already in the region and needs no moving. That was measured too, in both
-# the one-blank and two-blank spellings.
+# ## Where your existing append lands is NOT guaranteed — check it
+#
+# This used to say an append that merged cleanly ended up below the marker, so it
+# was already in the region and needed no moving. **That is false, and it was
+# generalised from one synthetic case.** git orders the two additions at a shared
+# anchor rather than colliding on them, and which side yours lands on depends on
+# where exactly your append sits. dream.doll merged cleanly and landed **above**;
+# mind.head found the same from a tree that conflicted.
+#
+# The bad outcome is silent, which is why it earns a check rather than a sentence.
+# An append above the marker keeps the pre-region behaviour — a clean first merge
+# and a conflict on the next re-run — while the release notes say you are covered,
+# so it is paid for later as a conflict that looks new.
+# `tests/test_narrative_covers_lifecycle_folders.py` asserts your appends are
+# below this line, making placement a question your own suite answers rather than
+# a claim you are asked to believe. dream.doll's remedy, and the right shape:
+# placement is a fact about your file.
+#
+# ## What the region buys, narrowly, because the wider claim measured false
+#
+# **The re-run, and nothing on a first merge.** Measured in both layouts against
+# every upstream edit that is legal above the marker:
+#
+#     old layout   first merge clean, re-run before the base advances CONFLICTS
+#     region       first merge clean, re-run clean
+#
+# A first-merge probe cannot tell the layouts apart, because there is nothing
+# there to buy. proto.pilot established that with three probes, and it is why the
+# "measured across five offsets" claim that sat here is withdrawn: those five
+# offsets returned an identical answer five times, which is the tell that the
+# parameter varied nothing — *undistinguished, not confirmed*, in a harness
+# rather than in a flag.
 #
 # The earlier estimate of this cost was "all six, including the four that are
 # clean", and it was wrong because the harness measuring it appended at the wrong
@@ -271,9 +299,27 @@ PRESENT_TENSE = {
 # Both appends below — `NOTES_FILE` and `IDEAS_DIR` — predate this region and
 # sat exactly where the marker goes, which is why the merge refused rather than
 # placing them. Resolving it moved nothing but the marker: it was inserted
-# above the pair, so both were already in the region the moment it existed. The
-# measured claim one paragraph up holds for a hand-port too, and the cost here
-# was reading a patch, not rewriting a seam.
+# above the pair, so both were already in the region the moment it existed, and
+# the cost was reading a patch rather than rewriting a seam.
+#
+# **That paragraph used to end by adding that the claim above it held for a
+# hand-port too. The claim is the one v0.28.0 withdrew as false, so the sentence
+# went with it.** A corroboration outlives the thing it corroborates: it names
+# no version, cites no measurement of its own, and reads as local reasoning
+# forever — the same expiry this tree has now hit twice, once on a correction of
+# upstream's prose and once here, agreeing with it. The tell is identical and it
+# is only ever in the incoming diff.
+#
+# What settles placement here is not this note. It is
+# `tests/test_narrative_covers_lifecycle_folders.py` reading this file, which is
+# what upstream put in the sentence's place as well.
+#
+# **v0.28.0 conflicted here again and NOT on the region.** The collision was one
+# stray blank line after the `NARRATIVE` literal, left in v0.8.0 when our append
+# still sat at that spot and the template moved out from under it. It bought
+# nothing, was written down nowhere, and cost a conflict on a line the template
+# edits. Taken to the template's spelling — which is the whole of this release's
+# conflict here.
 
 
 #: `NOTES.md` is proto.pilot's local extension to the set above. It is this
