@@ -326,7 +326,7 @@ def test_flatten_never_raises_on_something_that_is_not_text(helper):
     assert helper.flatten(None) == ""
     assert helper.flatten(Renderable()) == "STRINGIFIED"
     assert helper.flatten(7) == "7"
-    # Booleans are excluded before the `str()` fallback on purpose: `True`
+    # Booleans are excluded before the `str` fallback on purpose: `True`
     # would otherwise put the word "true" on every screen holding a flag.
     assert helper.flatten(True) == ""
     assert helper.flatten(False) == ""
