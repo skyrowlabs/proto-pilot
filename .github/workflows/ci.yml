@@ -434,14 +434,18 @@ jobs:
     # The interpreter is in the NAME on purpose, and the cost is real: a
     # required status context is named, not discovered, so changing this string
     # costs anybody with branch protection an edit and a window where the old
-    # context never reports. A matrix whose legs share a name is one you cannot
-    # require individually, which is the whole point of running two.
+    # context never reports. The leg names say which interpreter went red; they
+    # are not what protection should require. A docs-only change skips this job
+    # before GitHub expands the matrix, so a per-leg context never reports — the
+    # `unit-tests-result` job below is the one name to require instead.
     #
-    # Renamed from `Unit Tests (host-side)` at skeletor v0.18.0. Free here and
-    # measured rather than assumed: neither `main` nor `develop` is protected
-    # and this repository declares no rulesets, so no context is required by
-    # name anywhere. That is a fact about the ACCOUNT, not about this file —
-    # re-check it before renaming again.
+    # Renamed from `Unit Tests (host-side)` at skeletor v0.18.0, when neither
+    # branch was protected. Both were by 2026-09-30, requiring the per-leg names.
+    # That is a fact about the ACCOUNT, not about this file, and no copy of it
+    # here stays true — read it before renaming anything:
+    #
+    #     gh api repos/skyrowlabs/proto-pilot/branches/develop/protection \
+    #       --jq .required_status_checks.contexts
     #
     # **Change this list by changing the recorded argument, not by editing it
     # here.** `.skeletor.json`'s `--python-ceiling` is what the template renders
@@ -550,6 +554,40 @@ jobs:
 
       - name: Skip budget
         run: python scripts/check_skip_budget.py --suite unit
+
+  # ── The unit suite's one name ─────────────────────────────────────────
+  # The matrix above reports once per leg, as `pytest <version>` — and only when
+  # it runs. Skipped by the job-level `if` on a docs-only change, GitHub never
+  # expands the matrix, so it reports ONE check named `pytest ${{ matrix.python }}`
+  # with the expression unexpanded, and a branch protection that requires
+  # `pytest 3.12` waits on it forever. stash.flow's docs-only pull requests were
+  # BLOCKED with every check green or skipped; the other gated jobs are not
+  # matrices, so they report skipped under their real names and pass.
+  #
+  # So protection requires THIS: one static name whatever the matrix holds, which
+  # also ends "read the leg names off a run" in the setup guide. It passes when
+  # the matrix passed, or was skipped because the gate chose docs-only; it fails
+  # when a leg failed or was cancelled, and when the gate itself did not pass —
+  # a skip caused by a failed classifier is not a docs-only skip.
+  unit-tests-result:
+    name: pytest
+    needs: [gate, unit-tests]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: The matrix passed, or was skipped for a docs-only change
+        env:
+          GATE: ${{ needs.gate.result }}
+          UNIT: ${{ needs.unit-tests.result }}
+        run: |
+          if [ "$GATE" != "success" ]; then
+            echo "::error::the gate did not pass ($GATE), so the unit suite's skip means nothing"
+            exit 1
+          fi
+          case "$UNIT" in
+            success|skipped) echo "unit suite: $UNIT" ;;
+            *) echo "::error::unit suite: $UNIT"; exit 1 ;;
+          esac
 
   # ── Integration ─────────────────────────────────────────────────────────
   # Gated on full_suite. When it is skipped it still REPORTS `skipped`, which
