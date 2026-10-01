@@ -4,7 +4,7 @@ The failure this exists to prevent, and it shipped: `skeleton/tui/requirements.t
 pinned `sqlalchemy==2.0.36`, which raises `TypeError` on import under Python
 3.14. Every generated terminal app was unrunnable on this machine, and
 **nothing anywhere went red** — because generation and verification run in
-proto.pilot's own environment, which has 2.0.52, and the verifier boots the
+proto.pilot's own environment, which had 2.0.52, and the verifier boots the
 tree with `sys.executable` and `PYTHONPATH` rather than installing its
 `requirements.txt`. The producer and the consumer of that file never met.
 

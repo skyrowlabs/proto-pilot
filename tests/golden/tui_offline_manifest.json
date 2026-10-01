@@ -13,7 +13,7 @@
   "app/seed.py": "89350b0669e30bc0805a833586db2ec0fd13ea4da45db5c6dcdbbed5c661d52e",
   "app/widgets.py": "0fde18ce66bee8dadb8b3bfb358e06d3f25711b514571ed8519abf7f435a690d",
   "pytest.ini": "1b21f32aaa57fd64bb9ac2fa48a1406d0039742c5fae6a90e31877ec88352dee",
-  "requirements.txt": "fbe88e7abee84ce648db968f6621a8ace7f633a7eaed0d7f59d4b6ca04904807",
+  "requirements.txt": "8851f62a0cd2655d283b5c994dfb23bf95885cfd73060e9c12bb0350a5d332bf",
   "tests/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "tests/conftest.py": "9f5b57ac15baa08198babaabd2a38b7fb3978c7f772aa94881d62168220c74f0",
   "tests/screen.py": "bb79f494d7cbaa2b437e318c9b51ce280dc79a84a81833a98a326507d4cadfdd",
