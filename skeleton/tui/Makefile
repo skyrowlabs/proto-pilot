@@ -25,12 +25,18 @@ install: ## install what the app needs, into the active environment
 	pip install -r requirements.txt
 
 # Built only when `$(PY)` resolved to the local one, because the rule's target
-# IS the interpreter path: if the ambient `python` already works, `$(PY)` is
-# `python`, no such file rule applies, and nothing is created.
+# IS the interpreter path.
 .venv/bin/python: requirements.txt
 	python3 -m venv .venv
 	.venv/bin/pip install --quiet --upgrade pip
 	.venv/bin/pip install --quiet -r requirements.txt
+
+# When the ambient `python` already works, `$(PY)` is `python`, and a
+# prerequisite needs a file or a rule of that name. There was neither, so make
+# stopped with "No rule to make target 'python'" on exactly the machine that
+# needed nothing built. This empty rule is that rule, and it does nothing.
+.PHONY: python
+python: ;
 
 clean:   ## throw the database away; the app rebuilds and reseeds it on start
 	rm -f *.sqlite3

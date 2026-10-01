@@ -36,6 +36,9 @@ which is the one that was wrong.
 
 from __future__ import annotations
 
+import os
+import shutil
+import subprocess
 import sys
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -99,3 +102,36 @@ def test_the_makefile_does_not_assume_the_ambient_python_has_the_dependencies():
     for target in ("run:", "test:"):
         line = next(line for line in makefile.splitlines() if line.startswith(target))
         assert "$(PY)" in line, f"`make {target[:-1]}` does not depend on a resolved interpreter: {line!r}"
+
+
+@pytest.mark.parametrize("satisfied", [True, False], ids=["environment-satisfied", "fresh"])
+@pytest.mark.parametrize("target", ["run", "test"])
+def test_the_makefile_resolves_both_interpreter_paths(tmp_path, satisfied, target):
+    """The assertion above reads the Makefile; this one asks make.
+
+    It read correctly and failed anyway: when the ambient `python` already had
+    the dependencies, `$(PY)` was `python`, which `run:` and `test:` named as a
+    prerequisite with no file and no rule, so make stopped with "No rule to make
+    target 'python'". A string check cannot see a missing rule. `make -n`
+    resolves the graph without running a recipe, and a stub `python` on PATH
+    decides which branch of `$(PY)` it takes.
+    """
+    make = shutil.which("make")
+    if make is None:  # pragma: no cover - every supported host has make
+        pytest.skip("make is not installed")
+    shutil.copy(targets.SKELETON_ROOT / "tui" / "Makefile", tmp_path / "Makefile")
+    (tmp_path / "requirements.txt").write_text("", encoding="utf-8")
+    stub_dir = tmp_path / "stub-bin"
+    stub_dir.mkdir()
+    stub = stub_dir / "python"
+    stub.write_text(f"#!/bin/sh\nexit {0 if satisfied else 1}\n", encoding="utf-8")
+    stub.chmod(0o755)
+    env = {**os.environ, "PATH": f"{stub_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+    result = subprocess.run([make, "-n", target], cwd=tmp_path, env=env, capture_output=True, text=True, timeout=30)
+    assert result.returncode == 0, f"`make {target}` cannot resolve its graph: {result.stderr.strip()}"
+    expected = "python -m" if satisfied else ".venv/bin/python -m"
+    last = result.stdout.strip().splitlines()[-1]
+    assert last.startswith(expected), f"`make {target}` would run {last!r}, expected {expected!r}"
+    assert (
+        "python3 -m venv .venv" in result.stdout
+    ) is not satisfied, "the local environment is built when it is not needed, or skipped when it is"
