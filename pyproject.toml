@@ -26,7 +26,17 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=8.0",
+    # EXACT, and they move together with `skeleton/tui/requirements.txt`: these
+    # are the four versions a generated terminal tree pins, and
+    # `tests/test_terminal_requirements.py` fails unless every pin there equals
+    # the version installed here. CI installs every extra, so this is what holds
+    # CI to what trees ship -- floating, each upstream release turned `develop`
+    # red with no change in this repo. `dependencies` above still floats for
+    # anyone who installs proto without extras.
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+    "sqlalchemy==2.1.1",
+    "textual==8.2.8",
     # The end-to-end tests generate a tree and run that tree's own suite, so
     # this environment needs the WEB target's stack too. The terminal target's
     # is in `dependencies` above, because it is the product's now and not only
@@ -35,10 +45,9 @@ dev = [
     "jinja2>=3.1",
     "httpx>=0.27",
     "python-multipart>=0.0.9",
-    # A generated terminal tree's smoke suite is `async def` with
-    # `asyncio_mode = auto`, and proto-pilot runs it. The application itself
-    # does not need this; the suite it ships with does.
-    "pytest-asyncio>=0.24",
+    # `pytest-asyncio` is pinned above because a generated terminal tree's
+    # smoke suite is `async def` with `asyncio_mode = auto`, and proto-pilot
+    # runs it. The application itself does not need it; the suite it ships with does.
 ]
 
 browser = [
