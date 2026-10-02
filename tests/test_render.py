@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from protopilot.render import SKELETON_DIR, TOKEN_RE, render, render_skeleton, substitutions
+from protopilot.render import TOKEN_RE, render, render_skeleton, substitutions
+from protopilot.targets import web as web_target
+
+# Host-side: no key, no Docker daemon, no network. The offline baseline is
+# what makes the whole pipeline testable under one marker.
+pytestmark = pytest.mark.unit
 
 
 def test_render_substitutes_known_tokens(spec):
@@ -18,7 +23,7 @@ def test_render_raises_on_an_unknown_token(spec):
 
 def test_every_skeleton_token_has_a_value(spec):
     values = set(substitutions(spec))
-    for path in SKELETON_DIR.rglob("*"):
+    for path in web_target.SKELETON_DIR.rglob("*"):
         if not path.is_file() or path.suffix in {".pyc"}:
             continue
         found = {m.group(1) for m in TOKEN_RE.finditer(path.read_text())}

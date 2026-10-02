@@ -1,6 +1,6 @@
 """Orchestration: run the passes, then drive the tree to green.
 
-The pass order is the design, not an accident:
+The pass order is the design, not an accident. On the web target:
 
     schema -> smoke -> seed -> routes -> ui
 
@@ -9,6 +9,11 @@ asked for rather than what got built; the routes pass is then handed them as
 its target. UI comes last because it is the pass most dependent on real
 source -- a template referencing a context key no route passes is the single
 most common way a generated app 500s.
+
+**The tuple itself lives on the target**, in `targets/<name>.py`, because a
+terminal app may not split the same five ways. The two invariants above are
+this module's and hold for every target; the list of modules that satisfies
+them is not.
 """
 
 from __future__ import annotations
@@ -18,17 +23,50 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from protopilot import targets
 from protopilot.llm import LLM
-from protopilot.passes import PassContext, PassResult, repair, routes, seed, smoke, ui
-from protopilot.passes import models as schema_pass
-from protopilot.passes import run_pass
-from protopilot.spec import Spec
-from protopilot.verify import VerifyResult, Verifier
+from protopilot.passes import PassContext, PassResult, intake, run_pass
+from protopilot.spec import MODEL_OWNED_EXCLUSIONS, Screen, Spec
+from protopilot.verify import Verifies, VerifyResult
 
-CODE_PASSES = (schema_pass, smoke, seed, routes, ui)
 SMOKE_PATH = "tests/test_smoke.py"
 
 Log = Callable[[str], None]
+
+#: The structured channel, beside `Log` and never instead of it. A producer
+#: calls both: `log` for the sentence a person reads, `emit` for the fields a
+#: view folds into a progress region. Loosely typed because the payload is
+#: per-kind -- the discipline is that a caller never has to *parse* the
+#: sentence to recover what the emit already carried.
+Emit = Callable[..., None]
+
+
+def no_emit(_kind: str, **_fields: object) -> None:
+    """The default channel. A caller that wants only text gets only text, and
+    every existing caller -- the CLI included -- keeps working untouched."""
+
+
+#: Identity. The slug is the database name and the port is the tab the user has
+#: open, so neither is the model's to revise on an amend.
+IDENTITY = ("slug", "port")
+
+#: What survives an amend unchanged, and why it is DERIVED rather than listed.
+#:
+#: `MODEL_OWNED_EXCLUSIONS` is exactly the set of fields the amend schema does
+#: not contain, because they have an owner that is not intake. A field the
+#: model was never shown cannot come back in its response -- so on an amend it
+#: has to come from the spec that already exists, or it silently reverts to a
+#: default.
+#:
+#: It silently did. Before this was here, `proto add` on a `turn-based-game`
+#: project reset it to `crud` and dropped the theme, the answers and the board
+#: dimensions, then regenerated a tracking app over a game's entities. Nothing
+#: failed; the tree just quietly became a different app.
+#:
+#: Derived, so the next field added to the exclusions is carried without
+#: anybody remembering this list exists. That is the whole reason to compute it
+#: rather than write it down.
+CARRIED_THROUGH_AMEND = IDENTITY + MODEL_OWNED_EXCLUSIONS
 
 
 class PassFailed(RuntimeError):
@@ -49,14 +87,103 @@ class Outcome:
     repairs: list[str] = field(default_factory=list)
 
 
+def _run_intake(idea: str, llm: LLM, ctx: PassContext, *, label: str = "") -> dict:
+    """The intake call, offline or not. One place, so the two front ends cannot
+    drift on which branch they take."""
+    if llm.offline:
+        return intake.offline(idea, ctx)
+    system, user = intake.build(idea, ctx)
+    return llm.structured(system=system, user=user, schema=intake.SCHEMA, label=label or intake.NAME)
+
+
+def spec_from_idea(
+    idea: str,
+    llm: LLM,
+    *,
+    archetype: str,
+    target: str,
+    port: int,
+    direction: str = "",
+    theme=None,
+    answers: dict[str, str] | None = None,
+) -> Spec:
+    """An idea and a classification -> a spec that is fully decided.
+
+    **The only implementation.** `proto new` and `proto serve` are two callers
+    of this, which is a rule the web module's docstring already claimed and
+    this function is what makes true: the same seven fields were being assigned
+    in two places, agreeing only because one person wrote both. Adding
+    `PassContext.archetype` needed an edit in each, and nothing would have
+    failed had only one been made.
+
+    Everything set here is set AFTER validation and never by the model. Intake
+    is not shown these fields (`MODEL_OWNED_EXCLUSIONS`) precisely so it cannot
+    return a confident second opinion that overwrites the human's.
+    """
+    from protopilot import __version__, archetypes
+
+    # First, and before the intake call rather than after it: an unbuildable
+    # pair is refused by name, and refusing it here is what makes that free.
+    # `MissingTarget` comes out of the same call for a target this build does
+    # not have. A hole in the matrix discovered at verify time is the tool
+    # lying about its own coverage; discovered here it costs nothing.
+    targets.check_pair(target, archetype)
+
+    ctx = PassContext(project_dir=Path("."), change=direction, archetype=archetype)
+    spec = Spec.model_validate(_run_intake(idea, llm, ctx))
+
+    spec.port = port
+    spec.target = target
+    spec.direction = direction or spec.direction
+    spec.protopilot_version = __version__
+    spec.archetype = archetype
+    spec.theme = theme if (theme is not None and not theme.is_empty()) else None
+    spec.answers = dict(answers or {})
+    # Screens are the contract the smoke tests and the routes are both
+    # generated from, and the rule belongs to the archetype -- so they are
+    # resolved AFTER `spec.archetype` is set, never before. Model-proposed
+    # `custom` pages survive on top; its guesses at the rest do not.
+    spec.screens = [Screen(**s) for s in archetypes.screens_for(spec, spec.screens)]
+    return spec
+
+
+def amend_spec(previous: Spec, change: str, llm: LLM) -> Spec:
+    """An existing spec and a change request -> the updated spec.
+
+    The other half of the same rule, and the half that was actually broken.
+    An amend response cannot contain the model-owned fields, so every one of
+    them has to be carried across from the spec that already exists --
+    `CARRIED_THROUGH_AMEND` is that set, derived rather than listed.
+
+    Screens are re-resolved rather than taken from the response for the same
+    reason as in `spec_from_idea`: the rule is the archetype's, and the
+    archetype has just been carried forward rather than re-decided.
+    """
+    from protopilot import __version__, archetypes
+
+    system, user = intake.build_amend(previous, change)
+    updated = Spec.model_validate(llm.structured(system=system, user=user, schema=intake.SCHEMA, label="amend"))
+
+    for name in CARRIED_THROUGH_AMEND:
+        setattr(updated, name, getattr(previous, name))
+    updated.protopilot_version = __version__
+    updated.screens = [Screen(**s) for s in archetypes.screens_for(updated, updated.screens)]
+    return updated
+
+
 def generate(
     spec: Spec,
     ctx: PassContext,
     llm: LLM,
     log: Log = print,
     hide_tests: bool = False,
+    emit: Emit = no_emit,
 ) -> list[PassResult]:
-    """Run the five passes in order.
+    """Run the target's passes, in order.
+
+    Which passes those are belongs to `spec.target` -- there used to be a
+    `CODE_PASSES` tuple here, and a terminal app may not split the same five
+    ways, so it moved to the target module rather than growing a branch.
 
     `hide_tests` is presentation only. The smoke pass still runs, still runs
     second, and the routes pass is still handed its output as the target --
@@ -64,20 +191,31 @@ def generate(
     the thing being demoed is not the thing that ships.
     """
     results = []
-    for module in CODE_PASSES:
+    # Bound once: `of` is what turns "pass 3" into "pass 3 of 5", and a view
+    # cannot count the passes itself -- which ones run belongs to the target.
+    modules = list(targets.for_spec(spec).CODE_PASSES)
+    # The running order, up front. Without it a progress view can show what has
+    # happened but not what is coming -- it learns each pass's name only as that
+    # pass starts, so the list grows under the reader instead of filling in.
+    emit("plan", passes=[m.NAME for m in modules])
+    for index, module in enumerate(modules, start=1):
         log(f"  pass {module.NAME}...")
+        emit("pass_started", name=module.NAME, index=index, of=len(modules))
         try:
             result = run_pass(module, spec, ctx, llm)
         except Exception as exc:
             # Name the pass and leave a runbook before re-raising, so the
             # caller reports a stage rather than a stack trace.
-            write_generation_runbook(
-                ctx.project_dir, module.NAME, str(exc), [r.name for r in results]
-            )
+            write_generation_runbook(ctx.project_dir, module.NAME, str(exc), [r.name for r in results])
+            emit("pass_failed", name=module.NAME, index=index, of=len(modules), error=str(exc))
             raise PassFailed(module.NAME, str(exc)) from exc
         shown = [f for f in result.files if not (hide_tests and is_test_path(f))]
         if shown:
             log(f"    {len(shown)} file(s): {', '.join(str(f) for f in shown)}")
+        # `shown`, not `result.files`: the event feeds a view, and a demo that
+        # hides the suite from the log must not surface it in the progress
+        # region instead. What got built is unchanged either way.
+        emit("pass_done", name=module.NAME, index=index, of=len(modules), files=[str(f) for f in shown])
         results.append(result)
     return results
 
@@ -97,9 +235,10 @@ def drive_to_green(
     spec: Spec,
     ctx: PassContext,
     llm: LLM,
-    verifier: Verifier,
+    verifier: Verifies,
     attempts: int = 3,
     log: Log = print,
+    emit: Emit = no_emit,
 ) -> Outcome:
     """Verify, and on failure repair and verify again, up to `attempts` times.
 
@@ -114,13 +253,16 @@ def drive_to_green(
 
     for attempt in range(1, attempts + 2):
         log(f"  verify (attempt {attempt})...")
+        emit("verify_started", attempt=attempt, of=attempts)
         result = verifier.verify()
         history.append(result)
         if result.ok:
             log(f"    {result.summary}")
+            emit("verify_passed", attempt=attempt, summary=result.summary)
             return Outcome(True, attempt, result, history, repairs)
 
         log(f"    failed at {result.stage}: {result.summary}")
+        emit("verify_failed", attempt=attempt, stage=result.stage, summary=result.summary)
         if attempt > attempts:
             break
 
@@ -129,15 +271,24 @@ def drive_to_green(
 
         ctx.failure = result.report()
         log("  pass repair...")
+        emit("repair_started", attempt=attempt, stage=result.stage)
         try:
-            patch = run_pass(repair, spec, ctx, llm)
+            # The target's, not this module's. There used to be a
+            # `from protopilot.passes import repair` at the top of this file,
+            # and it named the web prompt -- which talks about container logs,
+            # template context keys and a 307 redirect, none of which a
+            # terminal tree has. Same loop, same three attempts, same floor.
+            patch = run_pass(targets.for_spec(spec).REPAIR, spec, ctx, llm)
         except Exception as exc:  # noqa: BLE001 -- a failed repair is an outcome
             log(f"    repair pass failed: {exc}")
+            emit("repair_failed", attempt=attempt, error=str(exc))
             break
         if not patch.files:
             log(f"    repair produced no changes: {patch.notes}")
+            emit("repair_empty", attempt=attempt, notes=patch.notes)
             break
         log(f"    patched {', '.join(str(f) for f in patch.files)}")
+        emit("repair_done", attempt=attempt, files=[str(f) for f in patch.files], notes=patch.notes)
         repairs.append(f"attempt {attempt} ({result.stage}): {patch.notes}")
 
         # A repair is not allowed to make the suite pass by shrinking it.
@@ -147,12 +298,14 @@ def drive_to_green(
         after = _test_count(ctx.project_dir)
         if before and after < before:
             (ctx.project_dir / SMOKE_PATH).write_text(original)
-            log(
-                f"    rejected: repair cut the smoke suite from {before} to "
-                f"{after} tests; reverted {SMOKE_PATH}"
-            )
+            log(f"    rejected: repair cut the smoke suite from {before} to " f"{after} tests; reverted {SMOKE_PATH}")
+            emit("repair_rejected", attempt=attempt, before=before, after=after)
             repairs[-1] += "  [test deletion rejected and reverted]"
 
+    # The floor, named. A view that only ever saw `verify_failed` could not
+    # tell "still trying" from "gave up", and the difference is the whole
+    # point of the RUNBOOK the caller is about to write.
+    emit("exhausted", attempts=len(history), stage=history[-1].stage if history else "")
     return Outcome(False, len(history), history[-1] if history else None, history, repairs)
 
 
@@ -175,7 +328,7 @@ Stage: **{stage}**
 {output}
 ```
 
-## Container logs
+## {logs_label}
 
 ```
 {logs}
@@ -187,11 +340,7 @@ Stage: **{stage}**
 
 ## Carrying on by hand
 
-```bash
-docker compose up -d --build        # bring it up
-docker compose logs -f app          # watch it
-docker compose exec -T app pytest -q   # the failing suite
-```
+{manual}
 
 Generated files -- rewritten whole by the next `proto add`, so fix them here
 only if you are done generating:
@@ -240,9 +389,7 @@ so at least the shape is there.
 """
 
 
-def write_generation_runbook(
-    project_dir: Path, pass_name: str, reason: str, done: list[str]
-) -> Path:
+def write_generation_runbook(project_dir: Path, pass_name: str, reason: str, done: list[str]) -> Path:
     """The floor for a pass that never returned.
 
     `drive_to_green` has had a floor since the beginning; generation did not,
@@ -252,24 +399,46 @@ def write_generation_runbook(
     listed = "\n".join(f"- {name}" for name in done) or "- none"
     path = project_dir / "RUNBOOK.md"
     path.write_text(
-        GENERATION_RUNBOOK.format(
-            pass_name=pass_name, reason=reason.strip() or "(no reason given)", done=listed
-        )
+        GENERATION_RUNBOOK.format(pass_name=pass_name, reason=reason.strip() or "(no reason given)", done=listed)
     )
     return path
 
 
+def generated_paths(project_dir: Path, spec: Spec) -> list[str]:
+    """Every generated file in this tree, resolved against the target's list.
+
+    Derived rather than written down. It used to be four literal web paths plus
+    a glob of `app/templates/`, which named a tree the terminal target does not
+    have -- so a terminal RUNBOOK would have told somebody to go and fix
+    `app/routes.py`. Globs are expanded against the tree because that is where
+    the answer is; `app/templates/*.html` cannot be listed without looking.
+    """
+    target = targets.for_spec(spec)
+    out: list[str] = []
+    for pattern in target.WRITABLE:
+        if "*" in pattern:
+            out += sorted(
+                str(match.relative_to(project_dir))
+                for match in project_dir.glob(pattern)
+                if match.is_file() and str(match.relative_to(project_dir)) not in target.PROTECTED
+            )
+        elif (project_dir / pattern).exists():
+            out.append(pattern)
+    return out
+
+
 def write_runbook(project_dir: Path, spec: Spec, outcome: Outcome) -> Path:
+    """The floor. A known-broken prototype beats a mystery.
+
+    Everything medium-specific in it -- what the second captured stream is,
+    what to type to carry on by hand, which files were generated -- comes from
+    the target. A runbook that tells a terminal user to run `docker compose
+    logs -f app` is worse than no runbook: it is a confident wrong answer at
+    the moment somebody has nothing else to go on.
+    """
+    target = targets.for_spec(spec)
     result = outcome.result
-    generated = "\n".join(
-        f"- `{p}`"
-        for p in ["app/models.py", "app/seed.py", "app/routes.py", SMOKE_PATH]
-        + sorted(
-            f"app/templates/{q.name}"
-            for q in (project_dir / "app" / "templates").glob("*.html")
-            if q.name != "base.html"
-        )
-    )
+    generated = "\n".join(f"- `{p}`" for p in generated_paths(project_dir, spec)) or "- none"
     repairs = (
         "\n".join(f"{i}. {r}" for i, r in enumerate(outcome.repairs, 1))
         or "Nothing -- the first verify failed and no repair was attempted."
@@ -281,8 +450,10 @@ def write_runbook(project_dir: Path, spec: Spec, outcome: Outcome) -> Path:
             stage=result.stage if result else "unknown",
             summary=result.summary if result else "no verify result was produced",
             output=(result.output if result else "").strip()[-4000:] or "(none)",
+            logs_label=target.LOGS_LABEL,
             logs=(result.logs if result else "").strip()[-4000:] or "(none)",
             repairs=repairs,
+            manual=target.MANUAL,
             generated=generated,
         )
     )

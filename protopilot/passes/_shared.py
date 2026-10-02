@@ -111,15 +111,54 @@ FILES_SCHEMA: dict = {
 }
 
 
+#: Spec fields the shared block hides from a pass.
+#:
+#: `theme` is the whole list, and it is a rule rather than tidiness: a theme is
+#: the *look*, and a look that can reach the models, the routes or the smoke
+#: tests is an archetype wearing the wrong name. The UI pass puts it back, and
+#: is the only thing that may.
+#:
+#: This has to be done here rather than by asking each pass not to look,
+#: because `spec_block` dumps the entire spec as JSON -- so before this tuple
+#: existed, every pass was shown the theme whether it wanted it or not, and
+#: "the UI pass only" was a claim about prompts nobody could check. Now it is a
+#: property of one tuple, and `tests/test_theme.py` checks it.
+PASS_HIDDEN = ("theme",)
+
+
+def visible_spec(spec):
+    """This spec minus `PASS_HIDDEN`, as a copy.
+
+    A copy, never a mutation: the caller is still generating from the live
+    spec and every field being dropped is read later by somebody.
+    """
+    return spec.model_copy(update=dict.fromkeys(PASS_HIDDEN))
+
+
 def spec_block(spec) -> str:
     """The spec, rendered for a prompt. Both the JSON and the human summary:
     the JSON is what later passes must agree with, the summary is what the
-    model actually reads."""
+    model actually reads.
+
+    Minus `PASS_HIDDEN`, which the UI pass adds back for itself.
+    """
     import json
 
-    return (
+    from protopilot import archetypes
+
+    visible = visible_spec(spec)
+
+    parts = [
         "## The spec\n\n```json\n"
-        + json.dumps(spec.model_dump(mode="json"), indent=2)
+        + json.dumps(visible.model_dump(mode="json"), indent=2)
         + "\n```\n\n"
-        + spec.summary()
-    )
+        + visible.summary()
+    ]
+    # The archetype's fragment goes in the USER message, never into
+    # STACK_BRIEF: that prefix is byte-identical across passes on purpose so it
+    # stays a prompt cache prefix, and text that varies by archetype would stop
+    # it being one. One place, so every pass gets it without five edits.
+    brief = archetypes.brief_for(spec)
+    if brief:
+        parts.append("## What kind of thing this is\n\n" + brief)
+    return "\n\n".join(parts)

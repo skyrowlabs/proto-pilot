@@ -12,15 +12,16 @@ from protopilot.verify import VerifyResult
 
 GREEN = VerifyResult(True, "tests", "green -- app is up on http://localhost:8099")
 RED_TESTS = VerifyResult(
-    False, "tests", "the smoke tests failed",
-    "E  assert 500 == 200", "jinja2.exceptions.UndefinedError: 'rows' is undefined",
+    False,
+    "tests",
+    "the smoke tests failed",
+    "E  assert 500 == 200",
+    "jinja2.exceptions.UndefinedError: 'rows' is undefined",
 )
 RED_BUILD = VerifyResult(False, "build", "could not build", "no such image")
 
 THREE_TESTS = (
-    "def test_a():\n    assert True\n\n\n"
-    "def test_b():\n    assert True\n\n\n"
-    "def test_c():\n    assert True\n"
+    "def test_a():\n    assert True\n\n\n" "def test_b():\n    assert True\n\n\n" "def test_c():\n    assert True\n"
 )
 
 
@@ -74,9 +75,7 @@ def test_attempts_are_bounded_and_the_tree_is_handed_back(spec, tmp_path):
 
 def test_a_runbook_records_what_is_broken(spec, tmp_path):
     ctx = project(spec, tmp_path)
-    outcome = drive_to_green(
-        spec, ctx, FakeLLM([]), FakeVerifier([RED_BUILD]), attempts=0, log=lambda _: None
-    )
+    outcome = drive_to_green(spec, ctx, FakeLLM([]), FakeVerifier([RED_BUILD]), attempts=0, log=lambda _: None)
     assert not outcome.ok
 
     path = write_runbook(tmp_path, spec, outcome)
@@ -90,12 +89,8 @@ def test_a_repair_that_deletes_tests_is_reverted(spec, tmp_path):
     """The one failure mode the prompt cannot prevent and nobody would notice:
     green because there is nothing left to fail."""
     ctx = project(spec, tmp_path)
-    llm = FakeLLM(
-        [patch("tests/test_smoke.py", "def test_a():\n    assert True\n", "trimmed")]
-    )
-    outcome = drive_to_green(
-        spec, ctx, llm, FakeVerifier([RED_TESTS, GREEN]), attempts=1, log=lambda _: None
-    )
+    llm = FakeLLM([patch("tests/test_smoke.py", "def test_a():\n    assert True\n", "trimmed")])
+    outcome = drive_to_green(spec, ctx, llm, FakeVerifier([RED_TESTS, GREEN]), attempts=1, log=lambda _: None)
 
     restored = (tmp_path / "tests" / "test_smoke.py").read_text()
     assert restored.count("def test_") == 3
@@ -106,9 +101,7 @@ def test_a_repair_that_keeps_the_test_count_is_allowed(spec, tmp_path):
     ctx = project(spec, tmp_path)
     rewritten = THREE_TESTS.replace("assert True", "assert 1 == 1")
     llm = FakeLLM([patch("tests/test_smoke.py", rewritten, "corrected an assertion")])
-    drive_to_green(
-        spec, ctx, llm, FakeVerifier([RED_TESTS, GREEN]), attempts=1, log=lambda _: None
-    )
+    drive_to_green(spec, ctx, llm, FakeVerifier([RED_TESTS, GREEN]), attempts=1, log=lambda _: None)
     assert "assert 1 == 1" in (tmp_path / "tests" / "test_smoke.py").read_text()
 
 
@@ -135,6 +128,10 @@ def test_a_repair_with_no_changes_stops_the_loop(spec, tmp_path):
 import pytest
 
 from protopilot import build as builder
+
+# Host-side: no key, no Docker daemon, no network. The offline baseline is
+# what makes the whole pipeline testable under one marker.
+pytestmark = pytest.mark.unit
 
 
 class ExplodingLLM:
@@ -182,8 +179,7 @@ def test_the_runbook_lists_the_passes_that_did_finish(tmp_path, spec):
 
     llm = ExplodingLLM(
         fail_on="smoke",
-        responses=[{"files": [{"path": "app/models.py", "content": models_py(spec)}],
-                    "notes": ""}],
+        responses=[{"files": [{"path": "app/models.py", "content": models_py(spec)}], "notes": ""}],
     )
     with pytest.raises(builder.PassFailed):
         builder.generate(spec, ctx, llm, log=lambda _: None)

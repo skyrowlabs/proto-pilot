@@ -71,9 +71,7 @@ class ClaudeLLM:
             try:
                 import anthropic
             except ImportError as exc:  # pragma: no cover - dependency guard
-                raise LLMError(
-                    "the `anthropic` package is not installed; `pip install anthropic`"
-                ) from exc
+                raise LLMError("the `anthropic` package is not installed; `pip install anthropic`") from exc
             # Zero-arg: resolves ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN, or an
             # `ant auth login` profile. An unset env var does not mean no
             # credentials.
@@ -143,9 +141,7 @@ class ClaudeLLM:
 
         if getattr(message, "stop_reason", None) == "refusal":
             details = getattr(message, "stop_details", None)
-            raise Refused(
-                getattr(details, "category", None), getattr(details, "explanation", None)
-            )
+            raise Refused(getattr(details, "category", None), getattr(details, "explanation", None))
 
         text = next((b.text for b in message.content if b.type == "text"), None)
         if text is None:
@@ -154,6 +150,41 @@ class ClaudeLLM:
             return json.loads(text)
         except json.JSONDecodeError as exc:
             raise LLMError(f"pass {label!r} returned invalid JSON: {exc}") from exc
+
+
+#: The flags that make this backend a *generator* rather than an agent.
+#:
+#: `claude --print` runs with its full tool set by default -- Read, Write, Bash,
+#: and the caller's working directory. So `files.py`'s guarantee, which README
+#: and AGENTS.md both state flatly ("the model can only write five paths",
+#: "model output is data, not authority"), was true of the `api` backend and
+#: false of this one: the guard authorises what the returned JSON may write and
+#: has no authority over the subprocess that returned it. Verified 2026-09-03 by
+#: asking `claude --print` to overwrite a file in the cwd, which it did, with
+#: `permission_denials: []`.
+#:
+#: Three flags rather than one, and the third is the one that is easy to miss.
+#: `--tools ""` is an allow list of nothing, which beats `--disallowed-tools`
+#: (a deny list has to name every tool, and missing one is silent). But it
+#: governs only the **built-in** registry: MCP servers survive it, and with
+#: `--tools ""` alone the model reported it still had the operator's Google
+#: Drive, Slack and Cloudflare connections. An allow list is exhaustive only
+#: over the registry it governs, and a second registry is invisible to it.
+#:
+#: Checked by asking the model what it holds rather than by trusting the flags
+#: -- `tests/test_llm_isolation.py` pins the argv, and the live check that
+#: produced this list reported exactly one tool, `StructuredOutput`.
+#:
+#: A side effect worth knowing when reading token counts: dropping the tool
+#: definitions takes the ambient system prompt from ~32k to ~3.6k cached
+#: tokens, so this is also the cheaper configuration by a wide margin.
+ISOLATION = (
+    "--tools",
+    "",
+    "--strict-mcp-config",
+    "--mcp-config",
+    '{"mcpServers":{}}',
+)
 
 
 class ClaudeCodeLLM:
@@ -216,6 +247,7 @@ class ClaudeCodeLLM:
             json.dumps(schema),
             "--output-format",
             "json",
+            *ISOLATION,
         ]
         result = self._runner.run(argv, timeout=self.timeout)
         if not result.ok:
@@ -235,10 +267,7 @@ class ClaudeCodeLLM:
         # parses what the CLI has already parsed.
         data = envelope.get("structured_output")
         if data is None:
-            raise LLMError(
-                f"pass {label!r}: no structured output "
-                f"(stop_reason {envelope.get('stop_reason')!r})"
-            )
+            raise LLMError(f"pass {label!r}: no structured output " f"(stop_reason {envelope.get('stop_reason')!r})")
         return data
 
 
@@ -285,6 +314,4 @@ def build_llm(offline: bool = False, backend: str | None = None) -> LLM:
         return ClaudeCodeLLM()
     if choice == "api":
         return ClaudeLLM()
-    raise LLMError(
-        f"unknown backend {choice!r}; expected 'api', 'claude-code' or 'offline'"
-    )
+    raise LLMError(f"unknown backend {choice!r}; expected 'api', 'claude-code' or 'offline'")

@@ -7,7 +7,6 @@ be a terminal.
 
 from __future__ import annotations
 
-import shutil
 import subprocess
 from pathlib import Path
 
@@ -15,18 +14,37 @@ from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from protopilot import __version__, build as builder, registry
+from protopilot import build as builder
+from protopilot import generation, registry, targets
 from protopilot.build import is_test_path
-from protopilot.jobs import STORE, Job
+from protopilot.jobs import STORE
 from protopilot.llm import build_llm
-from protopilot.passes import PassContext, clarify, intake
-from protopilot.render import render_skeleton
+from protopilot.passes import PassContext, clarify
 from protopilot.runner import SubprocessRunner, docker_available
-from protopilot.spec import Screen, Spec, checkable_paths
-from protopilot.baseline import standard_screens
-from protopilot.verify import Verifier
+from protopilot.spec import Spec
 
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+
+
+def archetypes_default() -> str:
+    from protopilot import archetypes
+
+    return archetypes.DEFAULT
+
+
+#: The medium this front end generates in, pinned rather than defaulted.
+#:
+#: It used to take `targets.DEFAULT`, with the reason "the web front end has no
+#: target picker yet" -- a **workaround**, and the flip in Phase 6 of
+#: `docs/implementations/spec/terminal-target.md` falsified it. The durable reason is the one
+#: that survives: what this front end hands back is a link you click, and a
+#: terminal app has no link. `job.url` would be a URL to nothing.
+#:
+#: So this is not "the default, copied". It is a constraint of the medium the
+#: front end is itself built in, and it stays `web` until somebody builds the
+#: half of the UI that tells a browser user how to run a thing that is not in a
+#: browser. `proto new --target web` is the same generation from a shell.
+TARGET = "web"
 
 
 def run_generation(
@@ -37,81 +55,74 @@ def run_generation(
     attempts: int = 3,
     verifier_factory=None,
 ) -> None:
-    """One generation, start to finish. Module level so it can be tested.
+    """One generation, in this front end's medium.
 
-    This is the same sequence the CLI runs, in the same order, through the
-    same functions -- the front end is a second caller of the pipeline, not a
-    second implementation of it.
+    The sequence itself lives in `protopilot/generation.py`, so that a front
+    end which is not a web server can drive it without importing FastAPI. What
+    stays here is the one thing that is genuinely this front end's: the target
+    pin, and the reason for it directly above.
+
+    Kept as a function rather than an alias so `TARGET` is applied at call time.
+    A module-level `run_generation = partial(..., target=TARGET)` would bind the
+    pin at import and silently ignore a test that sets `app.TARGET` — which the
+    suite does, to assert the pin is real.
     """
-    from protopilot.cli import free_port
-
-    llm = build_llm(backend=backend)
-    log = job.log
-
-    log("intake...")
-    ctx = PassContext(project_dir=Path("."), change=job.direction)
-    if llm.offline:
-        data = intake.offline(job.idea, ctx)
-    else:
-        system, user = intake.build(job.idea, ctx)
-        data = llm.structured(
-            system=system, user=user, schema=intake.SCHEMA, label=intake.NAME
-        )
-
-    spec = Spec.model_validate(data)
-    spec.port = free_port()
-    spec.direction = job.direction or spec.direction
-    spec.protopilot_version = __version__
-    if not spec.screens:
-        spec.screens = [Screen(**item) for item in standard_screens(spec)]
-
-    target = Path(workspace) / spec.slug
-    if target.exists():
-        shutil.rmtree(target)
-    log(spec.summary())
-
-    render_skeleton(spec, target)
-    spec.save(target)
-    job.project_dir = str(target)
-    job.port = spec.port
-
-    ctx = PassContext(project_dir=target, change=job.direction)
-    builder.generate(spec, ctx, llm, log=log, hide_tests=demo)
-
-    log("verify...")
-    make_verifier = verifier_factory or (
-        lambda: Verifier(target, spec.port, SubprocessRunner(),
-                         screens=checkable_paths(spec))
+    generation.run_generation(
+        job,
+        workspace,
+        target=TARGET,
+        backend=backend,
+        demo=demo,
+        attempts=attempts,
+        verifier_factory=verifier_factory,
     )
-    outcome = builder.drive_to_green(
-        spec, ctx, llm, make_verifier(), attempts=attempts, log=log
-    )
-
-    registry.record(
-        slug=spec.slug, name=spec.name, path=target, port=spec.port, idea=job.idea
-    )
-    job.url = f"http://localhost:{spec.port}"
-    if not outcome.ok:
-        # Handed back anyway, with the stage named -- the same floor the CLI has.
-        stage = outcome.result.stage if outcome.result else "unknown"
-        log(f"red at {stage}; the tree is at {target}")
 
 
 def run_clarify(job, backend: str | None = None) -> None:
-    """Ask a few questions. One call, before anything is generated."""
+    """Classify the idea and assemble the questions. One call, before anything
+    is generated.
+
+    The model is asked only for what it can see and we cannot: the shape, the
+    theme, and up to two questions specific to this idea. The archetype's own
+    fixed questions are merged in here, from the registry, so no tokens are
+    spent asking it to repeat what we already wrote down.
+    """
+    from protopilot import archetypes
+
     llm = build_llm(backend=backend)
     if llm.offline:
-        # The baseline cannot read an idea, so it has no questions to ask.
-        job.result = {"heads_up": "", "questions": []}
+        # The baseline cannot read an idea, so it cannot classify one either.
+        # It still gets the default archetype's questions: those are ours and
+        # need no model.
+        chosen = archetypes.DEFAULT
+        job.result = {
+            "archetype": chosen,
+            "choices": archetypes.names(),
+            "theme": {},
+            "heads_up": "",
+            "fixed": clarify.fixed_questions(chosen),
+            "questions": [],
+        }
         return
+
     system, user = clarify.build(job.idea, job.direction)
-    job.result = llm.structured(
-        system=system, user=user, schema=clarify.SCHEMA, label=clarify.NAME
-    )
+    result = llm.structured(system=system, user=user, schema=clarify.schema(), label=clarify.NAME)
+    chosen = clarify.chosen_archetype(result)
+    result["archetype"] = chosen
+    result["fixed"] = clarify.fixed_questions(chosen)
+    result["choices"] = archetypes.names()
+    job.result = result
 
 
-def run_amend(job, project_dir: Path, change: str, backend: str | None = None,
-              demo: bool = True, attempts: int = 3, verifier_factory=None) -> None:
+def run_amend(
+    job,
+    project_dir: Path,
+    change: str,
+    backend: str | None = None,
+    demo: bool = True,
+    attempts: int = 3,
+    verifier_factory=None,
+) -> None:
     """Apply a change to an existing prototype. The CLI's `add`, over HTTP."""
     import subprocess
 
@@ -128,27 +139,18 @@ def run_amend(job, project_dir: Path, change: str, backend: str | None = None,
     subprocess.call(["docker", "compose", "down", "-v"], cwd=str(target))  # noqa: S603
 
     log("amending spec...")
-    system, user = intake.build_amend(spec, change)
-    data = llm.structured(system=system, user=user, schema=intake.SCHEMA, label="amend")
-    updated = Spec.model_validate(data)
-    # Identity is not the model's to change: the slug is the database name and
-    # the port is what the user has open in a tab.
-    updated.slug, updated.port = spec.slug, spec.port
-    updated.protopilot_version = __version__
+    updated = builder.amend_spec(spec, change, llm)
     log(updated.summary())
     updated.save(target)
 
     ctx = PassContext(project_dir=target, change=change)
-    builder.generate(updated, ctx, llm, log=log, hide_tests=demo)
+    builder.generate(updated, ctx, llm, log=log, hide_tests=demo, emit=job.event)
 
     log("verify...")
     make_verifier = verifier_factory or (
-        lambda: Verifier(target, updated.port, SubprocessRunner(),
-                         screens=checkable_paths(updated))
+        lambda: targets.for_spec(updated).verifier(target, updated, SubprocessRunner())
     )
-    outcome = builder.drive_to_green(
-        updated, ctx, llm, make_verifier(), attempts=attempts, log=log
-    )
+    outcome = builder.drive_to_green(updated, ctx, llm, make_verifier(), attempts=attempts, log=log, emit=job.event)
     job.project_dir = str(target)
     job.port = updated.port
     job.url = f"http://localhost:{updated.port}"
@@ -167,11 +169,15 @@ def create_app(workspace: Path, backend: str | None = None, demo: bool = True) -
 
     @app.get("/", response_class=HTMLResponse)
     def index(request: Request):
+        # `load`, never `prune`: this used to prune on every page view, so
+        # merely opening the front end deleted every entry whose directory
+        # had gone. Same trap `proto ls` had, one refresh away instead of
+        # one command away.
         ok, why = docker_available(SubprocessRunner())
         return TEMPLATES.TemplateResponse(
-            request, "index.html",
-            {"projects": registry.prune(), "jobs": STORE.all(),
-             "docker_ok": ok, "docker_why": why, "demo": demo},
+            request,
+            "index.html",
+            {"projects": registry.load(), "jobs": STORE.all(), "docker_ok": ok, "docker_why": why, "demo": demo},
         )
 
     @app.post("/clarify")
@@ -181,13 +187,19 @@ def create_app(workspace: Path, backend: str | None = None, demo: bool = True) -
         return RedirectResponse(f"/clarify/{job.id}", status_code=303)
 
     @app.get("/clarify/{job_id}", response_class=HTMLResponse)
-    def clarify_page(request: Request, job_id: str):
+    def clarify_page(request: Request, job_id: str, archetype: str = ""):
         job = STORE.get(job_id)
         if job is None:
             return RedirectResponse("/", status_code=303)
-        return TEMPLATES.TemplateResponse(
-            request, "clarify.html", {"job": job, "demo": demo}
-        )
+
+        # Overruling the classifier is a GET with no model call: the fixed
+        # questions come from the registry, so switching shape re-renders from
+        # what this build already knows rather than asking again.
+        selected = job.result.get("archetype", "")
+        if archetype and archetype in job.result.get("choices", []):
+            selected = archetype
+            job.result["fixed"] = clarify.fixed_questions(selected)
+        return TEMPLATES.TemplateResponse(request, "clarify.html", {"job": job, "demo": demo, "selected": selected})
 
     @app.post("/generate")
     async def generate(request: Request):
@@ -196,13 +208,16 @@ def create_app(workspace: Path, backend: str | None = None, demo: bool = True) -
         direction = str(form.get("direction", "")).strip()
         # Answers arrive as answer::<question text>; folding them into
         # `direction` means they reach every pass with no new plumbing.
-        answers = {
-            key.split("::", 1)[1]: str(value)
-            for key, value in form.items()
-            if key.startswith("answer::")
-        }
-        direction = clarify.answers_to_direction(direction, answers)
+        # Keyed by question ID now, not by question text: the id is what makes
+        # an answer addressable by the pass that eventually reads it.
+        answers = {key.split("::", 1)[1]: str(value) for key, value in form.items() if key.startswith("answer::")}
+        chosen = str(form.get("archetype") or "").strip() or archetypes_default()
+        typed, prose = clarify.split_answers(chosen, answers)
+        direction = clarify.merge_direction(direction, prose)
         job = STORE.create(idea, direction)
+        job.archetype = chosen
+        job.answers = typed
+        job.theme = {k: str(form.get(f"theme::{k}", "")).strip() for k in ("palette", "motif", "tone", "subject")}
         STORE.run(job, _generate)
         return RedirectResponse(f"/jobs/{job.id}", status_code=303)
 
@@ -214,8 +229,7 @@ def create_app(workspace: Path, backend: str | None = None, demo: bool = True) -
         job = STORE.create(f"[change] {change.strip()}", "")
         STORE.run(
             job,
-            lambda j: run_amend(j, Path(entry.path), change.strip(),
-                                backend=backend, demo=demo),
+            lambda j: run_amend(j, Path(entry.path), change.strip(), backend=backend, demo=demo),
         )
         return RedirectResponse(f"/jobs/{job.id}", status_code=303)
 
@@ -240,7 +254,8 @@ def create_app(workspace: Path, backend: str | None = None, demo: bool = True) -
             return RedirectResponse("/", status_code=303)
         root = Path(entry.path)
         files = sorted(
-            p.relative_to(root) for p in root.rglob("*")
+            p.relative_to(root)
+            for p in root.rglob("*")
             if p.is_file() and not {"__pycache__", ".git", ".pytest_cache"} & set(p.parts)
         )
         show_tests = bool(tests) or not demo
@@ -248,9 +263,16 @@ def create_app(workspace: Path, backend: str | None = None, demo: bool = True) -
         if not show_tests:
             files = [f for f in files if not is_test_path(f)]
         return TEMPLATES.TemplateResponse(
-            request, "project.html",
-            {"entry": entry, "files": files, "show_tests": show_tests,
-             "hidden": hidden, "spec": Spec.load(root).summary(), "demo": demo},
+            request,
+            "project.html",
+            {
+                "entry": entry,
+                "files": files,
+                "show_tests": show_tests,
+                "hidden": hidden,
+                "spec": Spec.load(root).summary(),
+                "demo": demo,
+            },
         )
 
     def _compose(entry, *args: str) -> int:
@@ -264,9 +286,9 @@ def create_app(workspace: Path, backend: str | None = None, demo: bool = True) -
         if action == "up":
             _compose(entry, "up", "-d", "--build")
         elif action == "down":
-            _compose(entry, "down")          # data kept
+            _compose(entry, "down")  # data kept
         elif action == "purge":
-            _compose(entry, "down", "-v")    # data dropped
+            _compose(entry, "down", "-v")  # data dropped
         elif action == "forget":
             # Leaves the tree on disk; just stops listing it.
             registry.forget(Path(entry.path))

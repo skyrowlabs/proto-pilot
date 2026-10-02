@@ -47,11 +47,7 @@ class PageResult:
     @property
     def ok(self) -> bool:
         return (
-            not self.load_error
-            and self.status is not None
-            and self.status < 400
-            and not self.errors
-            and self.painted
+            not self.load_error and self.status is not None and self.status < 400 and not self.errors and self.painted
         )
 
 
@@ -90,8 +86,12 @@ def _executable() -> str | None:
     override = os.environ.get("PROTOPILOT_CHROMIUM")
     if override:
         return override
-    for candidate in ("/usr/bin/chromium", "/usr/bin/chromium-browser",
-                      "/usr/bin/google-chrome-stable", "/usr/bin/google-chrome"):
+    for candidate in (
+        "/usr/bin/chromium",
+        "/usr/bin/chromium-browser",
+        "/usr/bin/google-chrome-stable",
+        "/usr/bin/google-chrome",
+    ):
         if Path(candidate).exists():
             return candidate
     return None  # let Playwright use its bundled build if it has one
@@ -102,7 +102,7 @@ def available() -> str:
     try:
         import playwright  # noqa: F401
     except ImportError:
-        return "playwright is not installed (`pip install -e \".[browser]\"`)"
+        return 'playwright is not installed (`pip install -e ".[browser]"`)'
     return ""
 
 

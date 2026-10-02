@@ -57,6 +57,10 @@ from fakes import FakeRunner
 
 from protopilot.llm import ClaudeCodeLLM, LLMError, build_llm
 
+# Host-side: no key, no Docker daemon, no network. The offline baseline is
+# what makes the whole pipeline testable under one marker.
+pytestmark = pytest.mark.unit
+
 SCHEMA = {"type": "object", "properties": {"name": {"type": "string"}}}
 
 
@@ -74,16 +78,12 @@ def envelope(**over) -> str:
 
 def run_with(stdout: str, code: int = 0) -> ClaudeCodeLLM:
     runner = FakeRunner([(["claude"], (code, stdout, ""))])
-    llm = ClaudeCodeLLM(runner=runner)
-    llm.runner = runner
-    return llm
+    return ClaudeCodeLLM(runner=runner)
 
 
 def test_returns_the_validated_structured_output():
     llm = run_with(envelope())
-    assert llm.structured(system="s", user="u", schema=SCHEMA, label="schema") == {
-        "name": "PackRat"
-    }
+    assert llm.structured(system="s", user="u", schema=SCHEMA, label="schema") == {"name": "PackRat"}
 
 
 def test_passes_the_schema_and_model_to_the_cli():

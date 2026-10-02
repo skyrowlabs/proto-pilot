@@ -15,7 +15,11 @@ from __future__ import annotations
 import pytest
 
 from protopilot.browser import BrowserResult, PageResult
-from protopilot.spec import Screen, Spec, checkable_paths
+from protopilot.spec import Screen, checkable_paths
+
+# Host-side: no key, no Docker daemon, no network. The offline baseline is
+# what makes the whole pipeline testable under one marker.
+pytestmark = pytest.mark.unit
 
 
 def test_a_page_that_loaded_and_painted_is_ok():
@@ -31,8 +35,7 @@ def test_a_blank_canvas_fails_even_though_the_server_was_fine():
 
 
 def test_a_javascript_error_fails_a_page_that_returned_200():
-    page = PageResult(path="/board", status=200, painted=True,
-                      errors=["drawBoard is not defined"])
+    page = PageResult(path="/board", status=200, painted=True, errors=["drawBoard is not defined"])
     assert not page.ok
     report = BrowserResult(False, [page]).report()
     assert "JavaScript error" in report and "drawBoard is not defined" in report

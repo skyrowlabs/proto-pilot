@@ -10,11 +10,18 @@ say nothing useful in the assertion.
 
 from __future__ import annotations
 
-from protopilot.files import WRITABLE
 from protopilot.passes._shared import FILES_SCHEMA, STACK_BRIEF, spec_block
 
 NAME = "repair"
-WRITES = WRITABLE
+
+#: Empty, and it is the one pass for which that does not mean "writes nothing".
+#:
+#: Repair may rewrite any path the running target allows, and that list belongs
+#: to the target (`targets/web.py`) rather than to this module -- it used to be
+#: `files.WRITABLE` here, which named one target and would have been wrong for
+#: the other the day a second one existed. `run_pass` enforces the real set
+#: from `spec.target`; nothing reads this constant.
+WRITES: tuple[str, ...] = ()
 SCHEMA = FILES_SCHEMA
 
 TASK = """\

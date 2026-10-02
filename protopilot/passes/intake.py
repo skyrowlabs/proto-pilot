@@ -10,8 +10,7 @@ from __future__ import annotations
 
 import re
 
-from protopilot.baseline import standard_screens
-from protopilot.spec import Spec, intake_schema
+from protopilot.spec import intake_schema
 
 NAME = "intake"
 WRITES: tuple[str, ...] = ()
@@ -42,19 +41,14 @@ Rules:
 - `direction` echoes back any styling or behavioural steer the user gave, in
   their words. Empty string if they gave none.
 
-Screens: always include this set, because the tests and the routes are
-generated from it and both must agree.
+Screens: leave `screens` empty unless the idea needs a page that is not a
+list, a form or a single record. The standard pages are generated from the
+shape of the app, not by you, and anything here that is not `custom` is
+discarded.
 
-- one `custom` screen "Home" at "/"
-- per entity, in order: a `list` at "/<plural>", a `form` at "/<plural>/new",
-  and a `detail` at "/<plural>/{row_id}" -- with the literal braces.
-
-You may add at most two further `custom` screens when the idea genuinely
-needs a page that is not a list, a form or a single record -- a playing
-board, a calendar, a seating chart, a dashboard. Name it and give it a path.
-Most ideas need none; do not add one for the sake of it. A custom screen is
-the only way to specify a page whose shape is not CRUD, so if the idea is
-"play a game" or "see the week at a glance", that is what it needs.
+You may propose at most two `custom` screens -- a calendar, a seating chart,
+a dashboard. Name it and give it a path. Most ideas need none: the shape you
+are given already provides the page you are most likely reaching for.
 
 Use the entity's snake_case plural. Prefer the user's own vocabulary for
 `name` and for field names: if they say "gig", the entity is Gig, not Event.
@@ -62,17 +56,16 @@ Use the entity's snake_case plural. Prefer the user's own vocabulary for
 ## What the runtime can and cannot do
 
 Every app is server-rendered HTML: FastAPI, Jinja templates, plain forms and
-full page loads. There is NO JavaScript, NO canvas, NO WebGL, NO npm, NO CDN,
-and no realtime connection of any kind.
+full page loads. There is NO npm, NO CDN, NO WebGL, and no realtime connection
+of any kind. Nothing may exist only in the browser.
 
-Buildable, and often better than it sounds: a grid of squares where each
-square is a form button, a page that re-renders after every submit, and real
-artwork drawn as inline SVG -- vector shapes, hand-drawn by the UI pass, not
-emoji standing in for illustrations. That is how you build a board game here,
-and two people taking turns at one browser works fine.
+Buildable, and often better than it sounds: a page that re-renders after
+every submit, any control expressible as a form button, and real artwork
+drawn as inline SVG -- vector shapes, hand-drawn by the UI pass, not emoji
+standing in for illustrations.
 
-So do NOT write a limit saying the pieces or the artwork will be emoji. They
-will be drawn. Photographs and 3D models are still out; drawing is not.
+So do NOT write a limit saying the artwork will be emoji. It will be drawn.
+Photographs and 3D models are still out; drawing is not.
 
 Buildable with care: small touches of inline vanilla JavaScript, and a
 `<canvas>` where a picture genuinely has to be computed pixel by pixel. Both
@@ -91,12 +84,43 @@ Leave `limits` empty only when the idea genuinely fits as asked.
 """
 
 
+def archetype_brief(name: str) -> str:
+    """The classified shape's own fragment, for the user message.
+
+    Intake is the one pass with no spec to read the archetype off, so the
+    classifier's answer is handed to it through `ctx`. This is where the
+    board-game prose that used to live in `SYSTEM` went: it was paid for on
+    every generation, game or gear list, and it is `turn-based-game`'s to say.
+
+    Failing soft is deliberate. A name this build does not have must produce a
+    slightly less informed spec, never a traceback before the first pass.
+    """
+    if not name:
+        return ""
+    from protopilot import archetypes
+
+    try:
+        module = archetypes.get(name)
+    except archetypes.MissingArchetype:
+        return ""
+    fragment = getattr(module, "brief", None)
+    return fragment() if callable(fragment) else ""
+
+
 def build(spec_or_idea, ctx) -> tuple[str, str]:
     """`spec_or_idea` is the raw idea string for this pass."""
     idea = spec_or_idea if isinstance(spec_or_idea, str) else spec_or_idea.purpose
     user = f"Idea: {idea}\n"
     if ctx.change:
         user += f"\nExtra direction from the user: {ctx.change}\n"
+    brief = archetype_brief(getattr(ctx, "archetype", ""))
+    if brief:
+        user += (
+            "\n## What kind of thing this is\n\n"
+            + brief
+            + "\n\nSpecify the entities that shape actually needs. It is already decided;\n"
+            "do not argue with it and do not specify a different app.\n"
+        )
     return SYSTEM, user
 
 
@@ -131,13 +155,12 @@ def offline(idea: str, ctx) -> dict:
         "protopilot_version": "0.1.0",
         "direction": ctx.change,
     }
-    data["screens"] = standard_screens(Spec.model_validate(data))
+    # Screens are the archetype's, and this function does not know which one
+    # it is. The caller fills them in through `archetypes.screens_for`.
     return data
 
 
-AMEND_SYSTEM = (
-    SYSTEM
-    + """
+AMEND_SYSTEM = SYSTEM + """
 
 ## Amending an existing spec
 
@@ -152,15 +175,20 @@ Return the COMPLETE updated spec.
 - Regenerate the `screens` list from the same rule as before, so it stays
   consistent with the entities after your change.
 """
-)
 
 
 def build_amend(spec, change: str) -> tuple[str, str]:
     import json
 
+    from protopilot.passes._shared import visible_spec
+
+    # Hidden here too, and for a sharper reason than in the code passes: the
+    # amend schema is the intake schema, so `theme` is not a field the model is
+    # allowed to return. Showing it could only invite an opinion with nowhere
+    # to go.
     user = (
         "## Current spec\n\n```json\n"
-        + json.dumps(spec.model_dump(mode="json"), indent=2)
+        + json.dumps(visible_spec(spec).model_dump(mode="json"), indent=2)
         + "\n```\n\n## The change the user asked for\n\n"
         + change.strip()
         + "\n"

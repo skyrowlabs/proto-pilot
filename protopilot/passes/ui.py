@@ -39,8 +39,11 @@ Shape:
   a `<p class="empty">` with a link to the create form -- not a blank page.
 - detail: `row.display` as the heading, a `<dl>` of the fields, a link back to
   the parent if there is one, a list of children if there are any, and Edit /
-  Delete controls. Delete is a `<form method="post">` with a button, never a
-  link -- a crawler or a prefetch must not be able to delete a row.
+  Delete controls IF the routes define endpoints for them. Read `routes.py`
+  and offer only what it serves: a form posting to a path no route matches is
+  a 405, and not every shape of app has an edit or a delete at all. Delete,
+  where it exists, is a `<form method="post">` with a button, never a link --
+  a crawler or a prefetch must not be able to delete a row.
 - form: one `<label>` per field wrapping its input, with the input type
   matching the field type (`text`, `textarea`, `number`, `checkbox`, `date`,
   `datetime-local`). Prefill from `obj` when it is set and leave blank when it
@@ -111,22 +114,78 @@ cannot be seen to work is worse than no script.
 """
 
 
-def build(spec, ctx) -> tuple[str, str]:
-    user = (
-        spec_block(spec)
-        + "\n\n## Already generated\n\n"
-        + ctx.sources("app/models.py", "app/routes.py")
+def theme_block(spec) -> str:
+    """The look, spoken in the one pass that is allowed to hear it.
+
+    `spec_block` hides `theme` from every pass (see `_shared.PASS_HIDDEN`);
+    this is where it comes back. Keeping the whole of it in one function is
+    what makes the rule checkable by reading rather than by trusting.
+
+    It is deliberately phrased as what to *draw* and what to *call things*,
+    never as a palette to implement. This pass may not write CSS -- the
+    stylesheet is skeleton -- so colour arrives as `fill` and `stroke` on the
+    SVG shapes the pass is already drawing, and the rest of a theme lives in
+    wording. A theme that needed a stylesheet would be asking for a stack
+    change, which is the one thing no axis here may do.
+    """
+    theme = getattr(spec, "theme", None)
+    if theme is None or theme.is_empty():
+        return ""
+
+    lines = ["\n\n## The theme\n"]
+    lines.append("The user asked for a particular look. Apply it inside the rules above.\n")
+    if theme.subject:
+        lines.append(
+            f"- **Subject: {theme.subject}.** This is what the drawn artwork depicts. Where\n"
+            "  the page has a picture in it -- pieces, icons, an empty-state illustration --\n"
+            "  draw that subject rather than a generic shape."
+        )
+    if theme.palette:
+        lines.append(
+            f"- **Palette: {theme.palette}.** Colour the SVG you draw with it, using `fill`\n"
+            "  and `stroke` attributes on the shapes. Do NOT write CSS and do not add a\n"
+            "  `<style>` block: the stylesheet is fixed, and the page chrome keeps its own\n"
+            "  colours."
+        )
+    if theme.motif:
+        lines.append(
+            f"- **Motif: {theme.motif}.** A small repeated shape. Draw it once as a Jinja\n"
+            "  macro and reuse it -- as a bullet, a divider, a marker -- rather than pasting\n"
+            "  it everywhere or letting it crowd the page."
+        )
+    if theme.tone:
+        lines.append(
+            f"- **Tone: {theme.tone}.** This is the wording: headings, button labels, and\n"
+            "  especially the empty states, which are the sentences a person reads first."
+        )
+
+    lines.append(
+        "\nThe theme changes what is drawn and what things are called. It changes\n"
+        "nothing else. Routes, context keys, field names and page structure are already\n"
+        "decided and are not yours to restyle -- a template that renames a context key to\n"
+        "suit a theme 500s on the first request."
     )
+    return "\n".join(lines)
+
+
+def build(spec, ctx) -> tuple[str, str]:
+    user = spec_block(spec) + "\n\n## Already generated\n\n" + ctx.sources("app/models.py", "app/routes.py")
     if spec.direction:
         user += f"\n\nThe user's direction for how this should look and feel: {spec.direction}"
+    user += theme_block(spec)
     return STACK_BRIEF + TASK, user
 
 
+def _templates(spec) -> dict:
+    """This archetype's templates, or the baseline's. See `archetypes.generator`."""
+    from protopilot import archetypes
+
+    override = archetypes.generator(spec, "templates_for")
+    return override(spec) if override else baseline.templates_for(spec)
+
+
 def offline(spec, ctx) -> dict:
-    files = [
-        {"path": path, "content": body}
-        for path, body in sorted(baseline.templates_for(spec).items())
-    ]
+    files = [{"path": path, "content": body} for path, body in sorted(_templates(spec).items())]
     return {
         "files": files,
         "notes": "baseline: nav, index, and list/detail/form per entity.",

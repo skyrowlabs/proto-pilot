@@ -16,6 +16,10 @@ import pytest
 from protopilot import registry
 from protopilot.build import is_test_path
 
+# Host-side: no key, no Docker daemon, no network. The offline baseline is
+# what makes the whole pipeline testable under one marker.
+pytestmark = pytest.mark.unit
+
 
 @pytest.fixture(autouse=True)
 def isolated_registry(tmp_path, monkeypatch):
@@ -108,3 +112,30 @@ def test_delete_refuses_the_home_directory(tmp_path, monkeypatch):
     with pytest.raises(registry.NotAProject):
         registry.delete(tmp_path, runner=lambda argv, cwd: None)
     assert tmp_path.exists()
+
+
+def test_no_test_can_write_to_the_operators_real_registry(tmp_path):
+    """The autouse guard in `conftest.py`, asserted rather than assumed.
+
+    Every generation a suite runs calls `registry.record`. Before the guard
+    existed this machine's own `proto ls` held 129 entries pointing at
+    `/tmp/pytest-of-*/...` — one per generation any test had ever run, each
+    naming a directory pytest deleted seconds later.
+
+    The damage is entirely **outside** the repository, which is why nothing
+    caught it: every test passed, every gate was green, and the only evidence
+    was a operator running `proto ls` and finding their own list buried. So the
+    check has to be for the guard itself, not for its effect.
+
+    Derived from the real resolver, not from the environment variable: reading
+    the variable back would test that `monkeypatch.setenv` works. `registry_path()`
+    is what `record` actually calls.
+    """
+    from protopilot.registry import _state_home, registry_path
+
+    resolved = registry_path()
+    real = _state_home() / "proto-pilot" / "projects.json"
+    assert resolved != real, "a test is pointed at the operator's real registry"
+    assert str(tmp_path.parent.parent) in str(resolved) or "pytest" in str(
+        resolved
+    ), f"the registry is neither the real one nor a test one: {resolved}"

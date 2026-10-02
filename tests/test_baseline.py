@@ -7,7 +7,12 @@ import ast
 import pytest
 
 from protopilot import baseline
-from protopilot.spec import Entity, Field_, Spec
+from protopilot.archetypes import crud
+from protopilot.spec import Field_, Spec
+
+# Host-side: no key, no Docker daemon, no network. The offline baseline is
+# what makes the whole pipeline testable under one marker.
+pytestmark = pytest.mark.unit
 
 jinja2 = pytest.importorskip("jinja2")
 
@@ -31,7 +36,10 @@ def test_generated_python_survives_an_empty_spec(generator):
 def test_generated_templates_parse(spec):
     env = jinja2.Environment()
     for path, body in baseline.templates_for(spec).items():
-        env.parse(body), path
+        try:
+            env.parse(body)
+        except jinja2.TemplateSyntaxError as exc:
+            pytest.fail(f"{path}: {exc}")
 
 
 def test_every_field_type_is_supported_everywhere():
@@ -83,7 +91,7 @@ def test_required_fields_get_a_coercion_fallback(spec):
 
 
 def test_standard_screens_cover_every_entity(spec):
-    paths = {s["path"] for s in baseline.standard_screens(spec)}
+    paths = {s["path"] for s in crud.screens(spec)}
     assert "/" in paths
     for entity in spec.entities:
         assert f"/{entity.plural}" in paths

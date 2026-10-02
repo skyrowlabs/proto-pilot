@@ -7,6 +7,10 @@ from pydantic import ValidationError
 
 from protopilot.spec import Entity, Field_, Screen, Spec, intake_schema
 
+# Host-side: no key, no Docker daemon, no network. The offline baseline is
+# what makes the whole pipeline testable under one marker.
+pytestmark = pytest.mark.unit
+
 
 def test_plural_is_derived_when_absent():
     assert Entity(name="Trip").plural == "trips"

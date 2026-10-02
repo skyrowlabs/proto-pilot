@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import pytest
 from fakes import FakeRunner
 
 from protopilot.verify import Verifier
+
+# Host-side: no key, no Docker daemon, no network. The offline baseline is
+# what makes the whole pipeline testable under one marker.
+pytestmark = pytest.mark.unit
 
 HEALTHY = (200, '{"ok": true, "app": "Gear List"}')
 REFUSED = (0, "connection refused")

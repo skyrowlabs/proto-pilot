@@ -56,9 +56,7 @@ class Entity(BaseModel):
     name: str = Field(description="PascalCase singular, e.g. Trip")
     plural: str = Field(default="", description="snake_case plural, e.g. trips")
     fields: list[Field_] = Field(default_factory=list)
-    belongs_to: str | None = Field(
-        default=None, description="PascalCase name of the parent entity, or null"
-    )
+    belongs_to: str | None = Field(default=None, description="PascalCase name of the parent entity, or null")
 
     @field_validator("name")
     @classmethod
@@ -96,6 +94,32 @@ class Screen(BaseModel):
         return v
 
 
+class Theme(BaseModel):
+    """How it should look and feel. Orthogonal to what it *is*.
+
+    A themed chess app is archetype `turn-based-game` and theme `cats`, and
+    keeping those on separate axes is what stops the work being the product of
+    the two: a theme costs one prompt fragment and no offline baseline at all.
+
+    Every field is free text, and deliberately not an enum. Whatever closed set
+    we picked, the first person to want something outside it would be refused --
+    and a theme the UI pass interprets loosely is a better outcome than a theme
+    the schema rejects.
+    """
+
+    palette: str = Field(default="", description="e.g. 'warm earth tones', 'high-contrast neon'")
+    motif: str = Field(default="", description="the recurring visual idea, e.g. 'paw prints'")
+    tone: str = Field(default="", description="e.g. 'playful', 'clinical', 'hand-drawn'")
+    subject: str = Field(default="", description="what the drawn artwork depicts, e.g. 'cats and dogs'")
+
+    def is_empty(self) -> bool:
+        return not any((self.palette, self.motif, self.tone, self.subject))
+
+    def describe(self) -> str:
+        parts = [p for p in (self.subject, self.palette, self.motif, self.tone) if p]
+        return ", ".join(parts)
+
+
 class Spec(BaseModel):
     """The whole app, as far as proto-pilot is concerned."""
 
@@ -109,6 +133,36 @@ class Spec(BaseModel):
     external_apis: list[str] = Field(default_factory=list)
     port: int = 8080
     protopilot_version: str = "0.1.0"
+    # What SHAPE of thing this is. Selects the question set, the screen rule,
+    # the prompt fragments the code passes are given, and the offline baseline.
+    # Defaulted rather than required, so every spec written before archetypes
+    # existed still loads and still generates the app it always did.
+    archetype: str = "crud"
+    # What MEDIUM it is built in -- a web app in a browser, or a terminal app
+    # in a shell. Selects the skeleton, the pass tuple, the write guard's
+    # allowed paths and the verifier; see `protopilot/targets/`.
+    #
+    # Defaulted to "web", and this default is not a preference. It is the
+    # answer to "what did a spec.json written before the target axis existed
+    # mean?", and it stays "web" forever for that reason.
+    #
+    # `targets.DEFAULT` -- what a NEW spec is born with -- moved to "tui" on
+    # 2026-09-04 and this did not move with it. They were equal for a day and
+    # they were never the same decision; collapsing them now would silently
+    # rebuild every pre-axis prototype in a different medium.
+    target: str = "web"
+    # How it should LOOK. Read by the UI pass and by nothing else -- a theme
+    # that can reach routes or models is an archetype wearing the wrong name.
+    theme: Theme | None = None
+    # Answers to the archetype's FIXED questions, keyed by their stable id.
+    # Model-invented questions have model-invented ids and no contract, so they
+    # keep going to `direction`; this field is the half that has a schema.
+    answers: dict[str, str] = Field(default_factory=dict)
+    # The archetype's own typed slice, validated by its `EXTRA` model rather
+    # than by this one. `Spec` stays a single loadable type -- a subclass per
+    # archetype would break `Spec.load`, which does not know the archetype
+    # until after it has parsed the file.
+    extra: dict = Field(default_factory=dict)
     # Free-text direction the user gave, carried through to every pass so
     # "make it feel like a kanban board" survives past intake.
     direction: str = ""
@@ -131,9 +185,7 @@ class Spec(BaseModel):
     def load(cls, project_dir: Path) -> "Spec":
         path = Path(project_dir) / SPEC_DIR / SPEC_FILENAME
         if not path.exists():
-            raise FileNotFoundError(
-                f"no spec at {path} -- is {project_dir} a proto-pilot project?"
-            )
+            raise FileNotFoundError(f"no spec at {path} -- is {project_dir} a proto-pilot project?")
         return cls.model_validate_json(path.read_text())
 
     def save(self, project_dir: Path) -> Path:
@@ -148,10 +200,38 @@ class Spec(BaseModel):
         return next((e for e in self.entities if e.name == name), None)
 
     def summary(self) -> str:
-        """What gets printed for the human review checkpoint."""
-        lines = [f"{self.name} ({self.slug})  ->  port {self.port}", f"  {self.purpose}"]
+        """What gets printed for the human review checkpoint.
+
+        The port appears only for a target that has one. A terminal app listens
+        on nothing, and this is the one screen a person is asked to approve --
+        so a headline reading "port 8082" over an app with no port is the tool
+        being confidently wrong at the only moment somebody could object.
+
+        The lookup is defensive because this method has to work for a spec
+        naming a target this build does not have: `proto spec` prints an
+        unknown spec rather than refusing to show it.
+        """
+        from protopilot import targets
+
+        try:
+            ported = bool(targets.for_spec(self).USES_PORT)
+        except targets.MissingTarget:
+            ported = True
+
+        headline = f"{self.name} ({self.slug})" + (f"  ->  port {self.port}" if ported else "")
+        lines = [headline, f"  {self.purpose}"]
+        # Both axes, always, and never conditionally. This is the only gate in
+        # the tool, and a person approving a generation has to be able to see
+        # which KIND of thing it is before the tokens are spent -- a field the
+        # summary omits is a field nobody reviews.
+        lines.append(f"  target: {self.target}")
+        lines.append(f"  archetype: {self.archetype}")
+        if self.theme and not self.theme.is_empty():
+            lines.append(f"  theme: {self.theme.describe()}")
         if self.direction:
             lines.append(f"  direction: {self.direction}")
+        for key, value in self.answers.items():
+            lines.append(f"    {key}: {value}")
         lines.append("  entities:")
         for e in self.entities:
             parent = f" (belongs to {e.belongs_to})" if e.belongs_to else ""
@@ -209,14 +289,33 @@ def _pluralise(word: str) -> str:
     return word + "s"
 
 
+#: Spec fields the intake model does not decide, and is therefore not shown.
+#:
+#: `_strictify` marks every property in the schema as required, so a field left
+#: in here is a field the model MUST invent a value for. `archetype` and `theme`
+#: are classified by the clarify pass, and `answers` is assembled by the tool
+#: from what the human actually chose -- asking intake to guess any of them
+#: would produce a confident second opinion that silently overwrites the first.
+#: `target` is here for the same reason and one step further: it decides which
+#: skeleton the model is writing against, so a model that could return it could
+#: contradict the prompt it was just given.
+#:
+#: `build.CARRIED_THROUGH_AMEND` is derived from this tuple, so a field added
+#: here also survives `proto add` -- which is why the derivation exists.
+MODEL_OWNED_EXCLUSIONS = ("archetype", "target", "theme", "answers", "extra")
+
+
 def intake_schema() -> dict:
     """JSON Schema handed to the model for the intake pass.
 
     Generated from the pydantic model rather than hand-written, so a field
-    added above cannot silently fail to reach the model.
+    added above cannot silently fail to reach the model -- minus the fields
+    listed in `MODEL_OWNED_EXCLUSIONS`, which have an owner that is not intake.
     """
     schema = Spec.model_json_schema()
     schema = _inline_defs(schema)
+    for name in MODEL_OWNED_EXCLUSIONS:
+        schema.get("properties", {}).pop(name, None)
     _strictify(schema)
     return schema
 

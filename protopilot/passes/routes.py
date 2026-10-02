@@ -52,16 +52,24 @@ names from the same rule, so a name invented here is a 500 at render time.
 
 
 def build(spec, ctx) -> tuple[str, str]:
-    user = (
-        spec_block(spec)
-        + "\n\n## Already generated\n\n"
-        + ctx.sources("app/models.py", "tests/test_smoke.py")
-    )
+    user = spec_block(spec) + "\n\n## Already generated\n\n" + ctx.sources("app/models.py", "tests/test_smoke.py")
     return STACK_BRIEF + TASK, user
+
+
+def _generate(spec) -> str:
+    """This archetype's generator, or the baseline's.
+
+    An archetype whose pages are not CRUD has to be able to replace this; one
+    whose pages are CRUD must not have to. See `archetypes.generator`.
+    """
+    from protopilot import archetypes
+
+    override = archetypes.generator(spec, "routes_py")
+    return override(spec) if override else baseline.routes_py(spec)
 
 
 def offline(spec, ctx) -> dict:
     return {
-        "files": [{"path": "app/routes.py", "content": baseline.routes_py(spec)}],
+        "files": [{"path": "app/routes.py", "content": _generate(spec)}],
         "notes": "baseline: seven CRUD routes per entity plus an index.",
     }
