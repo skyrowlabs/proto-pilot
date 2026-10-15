@@ -22,7 +22,6 @@ import argparse
 import re
 import sys
 from pathlib import Path
-from typing import List, Set
 
 # Bootstrap only: put the package on sys.path so `scripts.paths` — which
 # owns every path below — can be imported. See scripts/paths.py.
@@ -67,15 +66,15 @@ def _tables_text() -> str:
     return "\n".join(t.read_text(encoding="utf-8") for t in TABLES if t.exists())
 
 
-def referenced() -> Set[str]:
+def referenced() -> set[str]:
     return set(_DOC_PATH.findall(_tables_text()))
 
 
-def routed_dirs() -> Set[str]:
+def routed_dirs() -> set[str]:
     return set(_DOC_DIR.findall(_tables_text()))
 
 
-def unrouted(directory: Path, files: Set[str], dirs: Set[str]) -> List[str]:
+def unrouted(directory: Path, files: set[str], dirs: set[str]) -> list[str]:
     """Folders holding docs that no routing row reaches.
 
     > A subfolder is routed by its own `README.md` **or its own path**. A routed
@@ -90,7 +89,7 @@ def unrouted(directory: Path, files: Set[str], dirs: Set[str]) -> List[str]:
     README. Per-file rows there would go stale the next time a rule is added,
     which is the registry this whole check exists to avoid.
     """
-    found: List[str] = []
+    found: list[str] = []
     for child in sorted(d for d in directory.iterdir() if d.is_dir()):
         rel = child.relative_to(PROJECT_ROOT).as_posix()
         if f"{rel}/README.md" in files or f"{rel}/" in dirs:
