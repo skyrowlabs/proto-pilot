@@ -723,6 +723,9 @@ is only a pointer at it).
   upstream — is rewritten against the template's API and keeps the end-to-end
   row-to-walk case the template's own test does not ask. Nothing for skeletor
   to fix; that test file is adoptable as-is if they want `unrouted()` covered.
+  Adopted at skeletor v0.55.0: the template's copy replaced ours and our six
+  fixture entries in `scripts/doc_refs_allowlist.yaml` went with it, so both
+  files now match the render.
 
 - **2026-09-04 — the terminal target, all six phases, and `proto new` now
   builds one by default.** Filed at

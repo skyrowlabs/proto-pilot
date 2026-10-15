@@ -18,28 +18,20 @@ out of scope with no special case, and it must hold at any depth: a depth cutoff
 gets the same answer here by accident and the wrong one for a future
 `docs/reports/releases/v1.2/`.
 
-Both halves came from skeletor, who built this check for their template after we
-reported the folder-registration hole. This file is ours and the script is
-theirs byte for byte, so everything here is written against the template's API:
-`referenced()` folds files and folders into one set, and `unrouted()` takes that
-set and returns `(stranded, routed)`. A local API on top of a template file is a
-conflict on every upgrade, which is what the v0.51.0 round found.
+Written by proto.pilot against this template's API and adopted here, so the
+predicate's tests ship beside the script rather than in one adopter's tree.
 """
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import pytest
 
+from scripts import check_doc_tables as tables
+from scripts.check_doc_tables import _DOC_DIR, _DOC_PATH, unrouted
+
 pytestmark = pytest.mark.unit
-
-REPO = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO))
-
-from scripts import check_doc_tables as tables  # noqa: E402
-from scripts.check_doc_tables import _DOC_DIR, _DOC_PATH, unrouted  # noqa: E402
 
 
 @pytest.mark.parametrize(
@@ -103,7 +95,7 @@ def test_routing_a_child_does_not_route_its_parent(tmp_path: Path, monkeypatch) 
     assert routed == ["docs/reports/regular"]
 
 
-#: Every path is one this tree ships and cannot lose: `pp check doc-refs` reads
+#: Every path is one the template ships and cannot lose: `pp check doc-refs` reads
 #: a `docs/` path in a comment as a claim. `docs/reports/` holds no `.md` of its
 #: own, so the walk has to descend through it rather than stop at it.
 FIXTURE_DOCS = [

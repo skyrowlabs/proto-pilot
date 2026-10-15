@@ -13,16 +13,14 @@
 docs/TODO/x.md: the checker's own docstring example
 docs/a.md: a fixture name tests/test_doc_links_fix.py and tests/test_publication.py create in a temporary tree
 docs/b.md: a fixture name tests/test_doc_links_fix.py and tests/test_publication.py create in a temporary tree
+docs/archive/README.md: a fixture tests/test_doc_routing_predicate.py creates in a temporary tree
+docs/archive/spec/deep/two.md: a fixture tests/test_doc_routing_predicate.py creates in a temporary tree
+docs/archive/spec/one.md: a fixture tests/test_doc_routing_predicate.py creates in a temporary tree
+docs/parked/idea.md: a fixture tests/test_doc_routing_predicate.py creates in a temporary tree
+docs/reports/releases/v1.2/audit.md: a fixture tests/test_doc_routing_predicate.py creates in a temporary tree
+docs/reports/stray.md: a fixture tests/test_doc_routing_predicate.py creates in a temporary tree
 
 # ── Your entries go below this line ──────────────────────────────────────────
 #
 # skeletor adds its entries above this block and renders nothing below it, so a
 # release's lines and yours are never adjacent and merge cleanly.
-
-# proto.pilot's own, moved from the retired .validate-ignore at v0.53.0.
-docs/reports/releases/v1.2/audit.md: a regex input in tests/test_doc_routing_predicate.py; a nested, dotted path the doc-path pattern must match whole
-docs/parked/idea.md: a tmp_path fixture in tests/test_doc_routing_predicate.py; a folder no row routes
-docs/archive/README.md: a tmp_path fixture in tests/test_doc_routing_predicate.py; the README that routes its folder
-docs/archive/spec/one.md: a tmp_path fixture in tests/test_doc_routing_predicate.py; a doc under a routed folder
-docs/archive/spec/deep/two.md: a tmp_path fixture in tests/test_doc_routing_predicate.py; shows the walk has no depth cutoff
-docs/reports/stray.md: a tmp_path fixture in tests/test_doc_routing_predicate.py; a sibling that routing a child folder must not cover
