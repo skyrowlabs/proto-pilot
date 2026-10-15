@@ -59,7 +59,7 @@ gate.**~~
 
 skeletor built the gate after reading this report, and the argument is one I had
 in front of me and did not see: **all three classes above are prose.** A fenced
-` ```bash ` block is different *in kind* — it is not describing a command, it is
+`bash` block is different *in kind* — it is not describing a command, it is
 telling you to run one.
 
 Scope the scan to fenced blocks and all three fall out at once. Not by
@@ -70,7 +70,7 @@ They measured it rather than asserting it: 24 invocations across a generated
 tree, **0 false positives**, including their own replacement paragraph that
 names `setup` three times to explain its absence. Planted three cases — the
 original line restored (fires), the same command in prose (silent), a tank plan
-with a ```bash block calling an unbuilt command (silent).
+with a fenced `bash` block calling an unbuilt command (silent).
 
 So the finding this report should have reached is the opposite of the one it
 published, and skeletor put the reason better than "I read past it":

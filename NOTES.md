@@ -5,7 +5,7 @@ work; update when you resolve something. This is the working state that does not
 belong in `README.md` (the design document) or `AGENTS.md` (the rules — `CLAUDE.md`
 is only a pointer at it).
 
-> **Reconstructed 2026-08-28.** This lived at `~/skyrow.labs/proto-pilot-notes.md`,
+> **Reconstructed 2026-08-28.** This lived at `proto-pilot-notes.md`,
 > outside every repo, at a workspace root that is not a git repository. It was
 > unbacked and it is gone; its previous contents could not be recovered. Both
 > `CLAUDE.md` files pointed at it as the live parking lot, so two guides were
@@ -159,7 +159,7 @@ is only a pointer at it).
   **That list was wrong too, and both of us got it wrong differently.** I
   scoped my grep to `strategy/`; two files sit above it, and one is
   `workspace.md` — which *is* the workspace CLAUDE.md, reached through the
-  symlink at `~/skyrow.labs/CLAUDE.md`, carrying seven mentions including the
+  symlink at the workspace root's `CLAUDE.md`, carrying seven mentions including the
   branch rule about this repo. **A `strategy/`-scoped grep is structurally blind
   to the guide that governs the workspace.** Theirs used `grep -i proto`, which
   matches `prototype`, so it carried three files that never mention us.
