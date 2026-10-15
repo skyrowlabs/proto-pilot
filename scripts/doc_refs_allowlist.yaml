@@ -1,0 +1,23 @@
+# References to `docs/...` paths and `#fragments` that name nothing real BY
+# DESIGN, and why. `check_source_doc_refs.py` reads the path entries;
+# `check_doc_links.py` reads the `path#fragment` entries. One reader for the
+# format: `scripts/allowlist.py`, which drops an entry with no reason.
+#
+# Legitimate: help-text examples, output destinations a run creates, test
+# fixtures, template placeholders, in-app routes that look like anchors.
+# NOT legitimate: a reference that broke when a plan was filed. Repoint it.
+#
+# An entry whose reference no longer appears anywhere is stale and fails
+# `tests/test_doc_refs_allowlist.py`; delete it rather than re-justify it.
+
+docs/TODO/x.md: the checker's own docstring example
+docs/a.md: a fixture name tests/test_doc_links_fix.py and tests/test_publication.py create in a temporary tree
+docs/b.md: a fixture name tests/test_doc_links_fix.py and tests/test_publication.py create in a temporary tree
+
+# proto.pilot's own, moved from the retired .validate-ignore at v0.53.0.
+docs/reports/releases/v1.2/audit.md: a regex input in tests/test_doc_routing_predicate.py; a nested, dotted path the doc-path pattern must match whole
+docs/parked/idea.md: a tmp_path fixture in tests/test_doc_routing_predicate.py; a folder no row routes
+docs/archive/README.md: a tmp_path fixture in tests/test_doc_routing_predicate.py; the README that routes its folder
+docs/archive/spec/one.md: a tmp_path fixture in tests/test_doc_routing_predicate.py; a doc under a routed folder
+docs/archive/spec/deep/two.md: a tmp_path fixture in tests/test_doc_routing_predicate.py; shows the walk has no depth cutoff
+docs/reports/stray.md: a tmp_path fixture in tests/test_doc_routing_predicate.py; a sibling that routing a child folder must not cover

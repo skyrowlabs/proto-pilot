@@ -1,4 +1,10 @@
 # Default owner for everything.
+#
+# SCAFFOLD: if `skyrowlabs` is an organisation, GitHub rejects a bare `@skyrowlabs`
+# on every line ("Unknown owner") and no review is ever requested — measured
+# on proto.pilot through `gh api repos/{owner}/{repo}/codeowners/errors`, five
+# errors for five lines. Name a team (`@skyrowlabs/<team>`) or a user, then
+# delete this note. A user account is accepted as rendered.
 *                           @skyrowlabs
 
 # The governance layer. A change here changes how every other change is
