@@ -8,7 +8,6 @@ green, which is the single most expensive failure mode a test suite has.
 
 from __future__ import annotations
 
-import importlib.util
 import os
 import sys
 from pathlib import Path
@@ -105,6 +104,14 @@ def _never_the_network(request: pytest.FixtureRequest, monkeypatch: pytest.Monke
     refuse_remote(monkeypatch)
 
 
+# ── Your fixtures go below this line ──────────────────────────────────────────
+#
+# skeletor adds its fixtures above this block and renders nothing below it, so a
+# release's new fixture and yours are never adjacent and merge cleanly. The block
+# itself is frozen. Asked for by proto.pilot, whose fixtures at the end of this
+# file conflicted with the template's at v0.49.0 and again at v0.51.0.
+
+
 # ── proto.pilot's own fixtures ──────────────────────────────────────────
 
 
@@ -175,6 +182,8 @@ def helper():
     by name when it walks the skeleton, because a `.pyc` read as text is a
     `UnicodeDecodeError` in a test whose failure message is then about nothing.
     """
+    import importlib.util
+
     from protopilot import targets
 
     path = targets.SKELETON_ROOT / "tui" / "tests" / "screen.py"
