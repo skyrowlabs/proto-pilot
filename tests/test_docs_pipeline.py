@@ -49,35 +49,6 @@ DOC_TABLE_ROWS = [
     ("- **A plan template** (`docs/TODO/_TEMPLATE.md`)", None),
 ]
 
-#: The fixture tree, and `docs/reports/` earns its place by holding no `.md` of
-#: its own: a folder that only contains folders is descended into rather than
-#: reported, so it proves the walk does not stop at the first unrouted level.
-#:
-#: Every path is one this tree really ships, and that is load-bearing rather
-#: than tidy: the template's version of this fixture named a plan that is real
-#: upstream and absent here, so the merged test failed `pp check doc-refs` on
-#: arrival — including, on the first attempt, from the comment explaining the
-#: failure, which names a path just as loudly. The fix is a real path,
-#: never a `.validate-ignore` entry — an exemption list is where a real path
-#: goes to stop being checked.
-#:
-#: `_TEMPLATE.md` rather than a real plan, and that is the second correction:
-#: the first choice here was a plan sitting in the tank, which broke the moment
-#: that plan was **filed** — the tank is the one directory in this tree whose
-#: contents are supposed to leave. The template and the README are the two
-#: things in `docs/TODO/` that structurally never move.
-FIXTURE_DOCS = [
-    "docs/rules/commits.md",
-    "docs/TODO/README.md",
-    "docs/TODO/_TEMPLATE.md",
-    "docs/reports/regular/README.md",
-]
-
-#: The three that hold docs directly, and so are the three a routing row must
-#: reach. Derived from the fixture rather than restated, because a second list
-#: is the thing this file keeps finding bugs in.
-FIXTURE_FOLDERS = {str(Path(d).parent) for d in FIXTURE_DOCS}
-
 
 @pytest.mark.parametrize("row,folder", DOC_TABLE_ROWS, ids=[r[0][:40] for r in DOC_TABLE_ROWS])
 def test_only_a_claim_about_a_folder_routes_it(row, folder, tmp_path, monkeypatch):
@@ -93,38 +64,24 @@ def test_only_a_claim_about_a_folder_routes_it(row, folder, tmp_path, monkeypatc
     routes three folders that way and no other, so the pattern could not simply
     be tightened. A deeper README routes its own folder and never a parent.
 
-    The failure was permissive, which is why nothing caught it: `unrouted()`
+    The failure was permissive, which is why nothing caught it: `stranded()`
     under-reported and the gate stayed green over a folder nothing points at —
     the thing this check exists to remove, one door along.
-
-    **Asked through `unrouted()`, not through the reference sets**, and that is
-    a deliberate divergence from the template's version of this test. Upstream
-    merges files and folders into one `referenced()` and can therefore ask a set
-    what it routes; here they are two functions — `referenced()` for exact file
-    paths, `routed_dirs()` for folder-shaped rows — and a folder's own README
-    routes it by matching *as a file*, which is why `_DOC_DIR` never had to carry
-    that case. Neither half of that split answers the question alone, so asking
-    either one would test an implementation detail and miss the predicate. The
-    real consumer is where the three ways of routing a folder are actually
-    combined, so that is what this asks.
     """
-    for rel in FIXTURE_DOCS:
-        doc = tmp_path / rel
-        doc.parent.mkdir(parents=True, exist_ok=True)
-        doc.write_text("# fixture\n", encoding="utf-8")
-
     table = tmp_path / "DOCS_INDEX.md"
     table.write_text(row + "\n", encoding="utf-8")
     monkeypatch.setattr(tables, "TABLES", [table])
-    monkeypatch.setattr(tables, "PROJECT_ROOT", tmp_path)
 
-    stranded = set(tables.unrouted(tmp_path / "docs", tables.referenced(), tables.routed_dirs()))
-    routed = FIXTURE_FOLDERS - stranded
+    routed = tables.referenced()
+
+    # Folders only — a row naming a file legitimately registers that file, and
+    # the question here is which folders it vouches for.
+    folders = {ref for ref in routed if not ref.endswith(".md")}
 
     if folder is None:
-        assert not routed, f"{row!r} names a file and should route no folder, got {sorted(routed)}"
+        assert not folders, f"{row!r} names a file and should route no folder, got {sorted(folders)}"
     else:
-        assert routed == {folder}, f"{row!r} should route exactly {folder!r}, got {sorted(routed)}"
+        assert folders == {folder}, f"{row!r} should route exactly {folder!r}, got {sorted(folders)}"
 
 
 def test_every_gated_plan_names_its_gate(tank):

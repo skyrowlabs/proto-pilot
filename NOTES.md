@@ -707,6 +707,23 @@ is only a pointer at it).
 
   Standing, unchanged: `tests/test_pyright_scope.py` stays deleted.
 
+- **2026-10-15 — `scripts/check_doc_tables.py` is the template's again, byte
+  for byte.** The entry above kept ours for two rounds on the ground that the
+  split API expressed the rule "where it cannot be got wrong". Checked against
+  v0.51.2 rather than remembered: both versions carry the same two regexes with
+  the same lookahead, both route a folder by its own README or its own path,
+  and both stop the walk at a routed folder. The split protected nothing the
+  template's `referenced()` + two-argument `unrouted()` does not, and it cost a
+  conflict on every upgrade that touched the file plus a merged test that could
+  not pass here. Two things the template does better: `unrouted()` returns the
+  routed folders too, so the success line counts what the check reached rather
+  than what `rglob` found on disk; and hidden directories are skipped.
+  `tests/test_docs_pipeline.py` is the template's too now (hash matches the
+  manifest), and `tests/test_doc_routing_predicate.py` — ours, not shipped
+  upstream — is rewritten against the template's API and keeps the end-to-end
+  row-to-walk case the template's own test does not ask. Nothing for skeletor
+  to fix; that test file is adoptable as-is if they want `unrouted()` covered.
+
 - **2026-09-04 — the terminal target, all six phases, and `proto new` now
   builds one by default.** Filed at
   [docs/implementations/spec/terminal-target.md](docs/implementations/spec/terminal-target.md) with per-phase

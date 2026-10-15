@@ -19,9 +19,11 @@ gets the same answer here by accident and the wrong one for a future
 `docs/reports/releases/v1.2/`.
 
 Both halves came from skeletor, who built this check for their template after we
-reported the folder-registration hole. The narrow `_DOC_PATH` that made every
-nested row invisible was theirs to find -- we had looked straight at it and
-called it harmless.
+reported the folder-registration hole. This file is ours and the script is
+theirs byte for byte, so everything here is written against the template's API:
+`referenced()` folds files and folders into one set, and `unrouted()` takes that
+set and returns `(stranded, routed)`. A local API on top of a template file is a
+conflict on every upgrade, which is what the v0.51.0 round found.
 """
 
 from __future__ import annotations
@@ -36,6 +38,7 @@ pytestmark = pytest.mark.unit
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
+from scripts import check_doc_tables as tables  # noqa: E402
 from scripts.check_doc_tables import _DOC_DIR, _DOC_PATH, unrouted  # noqa: E402
 
 
@@ -73,27 +76,66 @@ def _tree(root: Path, *relative: str) -> None:
 
 
 def test_an_unrouted_folder_is_reported(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setattr("scripts.check_doc_tables.PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(tables, "PROJECT_ROOT", tmp_path)
     _tree(tmp_path, "docs/parked/idea.md")
-    assert unrouted(tmp_path / "docs", set(), set()) == ["docs/parked"]
+    assert unrouted(tmp_path / "docs", set()) == (["docs/parked"], [])
 
 
 def test_a_routed_folder_owns_everything_below_it(tmp_path: Path, monkeypatch) -> None:
     """No depth cutoff: the walk stops at the routed folder, however deep it goes."""
-    monkeypatch.setattr("scripts.check_doc_tables.PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(tables, "PROJECT_ROOT", tmp_path)
     _tree(tmp_path, "docs/archive/README.md", "docs/archive/spec/one.md", "docs/archive/spec/deep/two.md")
 
-    by_readme = unrouted(tmp_path / "docs", {"docs/archive/README.md"}, set())
-    assert by_readme == [], "a routed folder was descended into"
+    by_readme = unrouted(tmp_path / "docs", {"docs/archive/README.md"})
+    assert by_readme == ([], ["docs/archive"]), "a routed folder was descended into"
 
-    by_path = unrouted(tmp_path / "docs", set(), {"docs/archive/"})
-    assert by_path == [], "routing by path did not stop the walk"
+    by_path = unrouted(tmp_path / "docs", {"docs/archive"})
+    assert by_path == ([], ["docs/archive"]), "routing by path did not stop the walk"
 
 
 def test_routing_a_child_does_not_route_its_parent(tmp_path: Path, monkeypatch) -> None:
     """The exactness rule, end to end rather than at the regex."""
-    monkeypatch.setattr("scripts.check_doc_tables.PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(tables, "PROJECT_ROOT", tmp_path)
     _tree(tmp_path, "docs/reports/regular/README.md", "docs/reports/stray.md")
 
-    found = unrouted(tmp_path / "docs", {"docs/reports/regular/README.md"}, set())
-    assert found == ["docs/reports"], "the child's row vouched for the parent"
+    stranded, routed = unrouted(tmp_path / "docs", {"docs/reports/regular/README.md"})
+    assert stranded == ["docs/reports"], "the child's row vouched for the parent"
+    assert routed == ["docs/reports/regular"]
+
+
+#: Every path is one this tree ships and cannot lose: `pp check doc-refs` reads
+#: a `docs/` path in a comment as a claim. `docs/reports/` holds no `.md` of its
+#: own, so the walk has to descend through it rather than stop at it.
+FIXTURE_DOCS = [
+    "docs/rules/commits.md",
+    "docs/TODO/README.md",
+    "docs/TODO/_TEMPLATE.md",
+    "docs/reports/regular/README.md",
+]
+
+
+@pytest.mark.parametrize(
+    "row,expected",
+    [
+        ("- **Rules** (`docs/rules/`)", ["docs/rules"]),
+        ("- **Backlog** (`docs/TODO/README.md`)", ["docs/TODO"]),
+        ("- **Deep** (`docs/reports/regular/README.md`)", ["docs/reports/regular"]),
+        ("- **A plan template** (`docs/TODO/_TEMPLATE.md`)", []),
+    ],
+    ids=lambda v: v[:40] if isinstance(v, str) else "",
+)
+def test_a_table_row_routes_through_to_the_walk(row: str, expected: list, tmp_path: Path, monkeypatch) -> None:
+    """From a table row to the folders the walk reports routed, with nothing skipped.
+
+    The template's own test (`tests/test_docs_pipeline.py`) asks `referenced()`
+    what a row routes. That proves the set; this proves the consumer of the set
+    agrees, which is the only place the three ways of routing a folder meet.
+    """
+    monkeypatch.setattr(tables, "PROJECT_ROOT", tmp_path)
+    _tree(tmp_path, *FIXTURE_DOCS)
+    table = tmp_path / "DOCS_INDEX.md"
+    table.write_text(row + "\n", encoding="utf-8")
+    monkeypatch.setattr(tables, "TABLES", [table])
+
+    _, routed = tables.unrouted(tmp_path / "docs", tables.referenced())
+    assert routed == expected, f"{row!r} routed {routed}, expected {expected}"
