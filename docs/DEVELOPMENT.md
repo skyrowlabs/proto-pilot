@@ -3,10 +3,10 @@
 ## First-Time Setup
 
 ```bash
-cp .env.example .env                            # then fill it in
-.venv/bin/pre-commit install --install-hooks    # commit-msg format + lint gates
-python scripts/git/install_merge_drivers.py     # the regen-docs driver
-./pp check health                               # is everything answering?
+cp .env.example .env                                   # then fill it in
+.venv/bin/pre-commit install --install-hooks           # commit-msg format + lint gates
+.venv/bin/python scripts/git/install_merge_drivers.py  # clone-local config
+./pp check health                                      # is everything answering?
 ```
 
 **There is no `pp setup`, deliberately** — see `AGENTS.md`, which explains that
@@ -21,10 +21,12 @@ version control:
 
 - **Git hooks** (`pre-commit install --install-hooks`) — the commit-msg format
   check and the lint gates.
-- **The `regen-docs` merge driver** — its definition lives in `.git/config`,
-  which is not tracked, so **every clone after the first installs it by hand**.
-  That is the third line above; there is no step that does it for you. Verify
-  with `pp check merge-drivers`, which checks and never installs.
+- **The clone-local config** (`scripts/git/install_merge_drivers.py`, the third
+  line above) — the `regen-docs` merge driver and `commit.template`. Both live in
+  `.git/config`, which is not tracked, so a clone that skipped that line has
+  `.gitattributes` naming a driver that does not exist and a `check pre-push` that
+  is red until it runs. Verify with `pp check merge-drivers`, which checks and
+  never installs.
 
 The block above is static text, and so are the install blocks in `README.md` and
 `AGENTS.md`. They were generated from one source when this repository was

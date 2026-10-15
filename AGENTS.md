@@ -25,7 +25,7 @@ look optional to anybody not using that tool.
 
 ```bash
 python -m venv .venv && .venv/bin/pip install -r scripts/requirements.txt
-.venv/bin/pre-commit install --install-hooks
+.venv/bin/pre-commit install --install-hooks && .venv/bin/python scripts/git/install_merge_drivers.py
 ./pp check pre-push   # every host-runnable CI gate; green on a fresh tree
 ./pp test unit        # the fast suite
 ./pp check health     # can this checkout generate? (runs `proto doctor`)
