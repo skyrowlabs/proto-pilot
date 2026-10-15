@@ -24,6 +24,7 @@ apart (`tests/test_reporting_jobs.py` asserts it).
 
 ```bash
 pp report cron --print    # emit the block for `crontab -e`
+pp report cron --install  # replace this tree's block; every other line is kept
 pp report cron --check    # does the LIVE crontab match the registry?
 pp report watch           # what ran recently, and what it decided
 ```
@@ -169,7 +170,7 @@ exactly this reason; `tests/test_reporting_jobs.py` asserts it still does.
    own leaves the rest claiming a refresh that never happened.
 6. If it should not be scheduled yet, add it to
    `scripts/reporting_schedule_allowlist.yaml` **with a reason**. Otherwise
-   re-run `pp report cron --print` and reinstall the crontab.
+   re-run `pp report cron --install`.
 
 Steps 1–5 are cross-checked by `tests/test_reporting_jobs.py`, and step 2's
 shell-outs by `tests/test_reporting_shellout.py`. Only step 6's
