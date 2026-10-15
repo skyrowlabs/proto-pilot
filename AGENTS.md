@@ -25,6 +25,7 @@ look optional to anybody not using that tool.
 
 ```bash
 python -m venv .venv && .venv/bin/pip install -r scripts/requirements.txt
+.venv/bin/pip install -e ".[browser,dev,web]"
 .venv/bin/pre-commit install --install-hooks && .venv/bin/python scripts/git/install_merge_drivers.py
 ./pp check pre-push   # every host-runnable CI gate; green on a fresh tree
 ./pp test unit        # the fast suite
@@ -32,11 +33,12 @@ python -m venv .venv && .venv/bin/pip install -r scripts/requirements.txt
 ```
 
 **Every one of them exists** — that is the claim this paragraph is making, and it
-is the one worth checking. The install lines came from the same source as the
-README's Setup block when this repository was scaffolded, and what keeps them in
-step now is `tests/test_setup_blocks_agree.py` rather than the generator, which
-left. The three lines after them belong to this file alone and are not compared
-with anything. An
+is the one worth checking. Every line but the last is shared with the README's
+Setup block, and what keeps them in step is `tests/test_setup_blocks_agree.py`
+rather than the generator, which left. The second line is this tree's own, not
+the template's: it installs proto.pilot with every extra, because the unit suite
+imports all of them, and `tests/test_quick_start_installs_the_product.py` holds
+it to what CI installs. The last line belongs to this file alone. An
 earlier version of this file opened with a `setup` and a
 `service up` subcommand, which the CLI has never implemented — and `setup`
 could not be implemented, because the CLI cannot run until the install it would
