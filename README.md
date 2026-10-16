@@ -303,8 +303,7 @@ the marker-based test suites and the scheduled-job machinery are not local
 inventions — they are one shared shell, debugged once.
 
 ```bash
-python -m venv .venv && .venv/bin/pip install -r scripts/requirements.txt
-.venv/bin/pip install -e ".[browser,dev,web]"
+python -m venv .venv && .venv/bin/pip install -r scripts/requirements.txt && .venv/bin/python scripts/install_project.py
 .venv/bin/pre-commit install --install-hooks && .venv/bin/python scripts/git/install_merge_drivers.py
 ./pp check pre-push      # every CI gate this host can run
 ./pp test unit           # the fast suite

@@ -19,7 +19,7 @@
     "comparison.",
     "Read the test's docstring before changing either way.",
     "Raised 2 -> 4 on adoption (skeletor v0.6.2). The 2 was the scaffolder's value for a generic python tree; this tree already agreed on four lines, and an upgrade ships the scaffold-time number into a tree that has since moved. Measured with tests/test_setup_blocks_agree.py::setup_blocks, not chosen.",
-    "Raised 4 -> 5 when both blocks gained the editable install of proto.pilot itself with every extra, so a fresh clone that follows the Quick Start is green; tests/test_quick_start_installs_the_product.py holds that line to CI's rule."
+    "Lowered 5 -> 4 at skeletor v0.56.1: the template's line 1 now ends by running scripts/install_project.py, so this tree's own second line (the editable install with every extra) is gone. The blocks still agree on every line they share."
   ],
-  "min_shared_prefix": 5
+  "min_shared_prefix": 4
 }

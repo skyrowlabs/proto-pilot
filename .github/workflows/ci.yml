@@ -265,7 +265,7 @@ jobs:
 
       - name: pyright (whole project)
         run: |
-          pip install pyright==1.1.411
+          pip install pyright==1.1.414
           pyright --project pyrightconfig.json
 
   # ── Node ────────────────────────────────────────────────────────────────
@@ -504,10 +504,9 @@ jobs:
       # install is a superset of the other.
       #
       # The step is the template's and is deliberately taken unchanged, so it
-      # does not conflict on every future upgrade. It reads the extra NAMES out
-      # of pyproject.toml and installs ALL of them — it does not assume the
-      # extra is called `dev`, which would be the same class of guess as
-      # assuming the tree has a package at all.
+      # does not conflict on every future upgrade. `scripts/install_project.py`
+      # installs ALL the extras pyproject.toml names — it does not assume the
+      # extra is called `dev` — and the setup block runs the same script.
       #
       # This comment used to say `dev` was the only extra. It has not been true
       # since `browser` and `web` were added, and nothing could notice: the step
@@ -523,26 +522,7 @@ jobs:
       - run: pip install -r scripts/requirements.txt
 
       - name: Install the project, if it is one
-        run: |
-          if [ ! -f pyproject.toml ] || ! grep -q '^\[project\]' pyproject.toml; then
-            echo "no [project] block in this tree — nothing to install"
-            exit 0
-          fi
-          # One line because a heredoc cannot be indented into a YAML block —
-          # its terminator has to sit at column 0, and the Python inside would
-          # carry this block's indent. Reads the extra NAMES only; it never
-          # decides anything, so a malformed pyproject.toml fails the step
-          # loudly — GitHub runs this under `bash -eo pipefail`, so the failing
-          # substitution stops it — rather than quietly resolving to "no extras"
-          # and installing the wrong thing. Verified, not assumed.
-          extras=$(python -c 'import importlib.util as u, sys; sys.exit(0) if u.find_spec("tomllib") is None else None; import tomllib; d = tomllib.load(open("pyproject.toml", "rb")); print(",".join(sorted((d.get("project") or {}).get("optional-dependencies") or {})))')
-          if [ -n "$extras" ]; then
-            echo "pyproject.toml declares [project] with extras: $extras — installing all of them"
-            pip install -e ".[$extras]"
-          else
-            echo "pyproject.toml declares [project], no extras — installing it editable"
-            pip install -e .
-          fi
+        run: python scripts/install_project.py
 
       # `--junitxml` is not optional decoration: the step below reads that file
       # and has nothing to say without it. It ran without one for as long as
@@ -627,26 +607,7 @@ jobs:
       - run: pip install -r scripts/requirements.txt
 
       - name: Install the project, if it is one
-        run: |
-          if [ ! -f pyproject.toml ] || ! grep -q '^\[project\]' pyproject.toml; then
-            echo "no [project] block in this tree — nothing to install"
-            exit 0
-          fi
-          # One line because a heredoc cannot be indented into a YAML block —
-          # its terminator has to sit at column 0, and the Python inside would
-          # carry this block's indent. Reads the extra NAMES only; it never
-          # decides anything, so a malformed pyproject.toml fails the step
-          # loudly — GitHub runs this under `bash -eo pipefail`, so the failing
-          # substitution stops it — rather than quietly resolving to "no extras"
-          # and installing the wrong thing. Verified, not assumed.
-          extras=$(python -c 'import importlib.util as u, sys; sys.exit(0) if u.find_spec("tomllib") is None else None; import tomllib; d = tomllib.load(open("pyproject.toml", "rb")); print(",".join(sorted((d.get("project") or {}).get("optional-dependencies") or {})))')
-          if [ -n "$extras" ]; then
-            echo "pyproject.toml declares [project] with extras: $extras — installing all of them"
-            pip install -e ".[$extras]"
-          else
-            echo "pyproject.toml declares [project], no extras — installing it editable"
-            pip install -e .
-          fi
+        run: python scripts/install_project.py
 
       # There is no stack to stand up. proto.pilot's only real integration is
       # generating a tree and booting it under Docker, and CI deliberately does

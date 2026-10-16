@@ -90,6 +90,7 @@ pytestmark = [pytest.mark.unit]
 ./pp test all              # everything except `manual`
 ./pp test unit --ci        # reproduce CI's skip semantics locally
 ./pp test coverage -w 20   # the worst-covered modules — where a test buys most
+./pp test coverage --suite unit --suite ui   # measure suites together, budgeted as unit+ui
 ```
 
 `--ci` sets `PP_CI=1`, under which an env-gate skip becomes a **failure**.
