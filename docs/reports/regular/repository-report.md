@@ -1,6 +1,6 @@
 ---
 commit_range: v0.2.0..HEAD
-generated: "2026-10-25T03:00:48Z"
+generated: "2026-11-01T03:00:38Z"
 previous_release: v0.2.0
 release: unreleased
 status: in-flight
@@ -8,20 +8,20 @@ status: in-flight
 
 # Repository Report
 
-> **Window:** unreleased (since v0.2.0) — `v0.2.0..HEAD` (22 commits, at `4e056f2`)
+> **Window:** unreleased (since v0.2.0) — `v0.2.0..HEAD` (23 commits, at `b4545f3`)
 
 > Nothing in this window is in production; all of it ships with the next release.
 >
-> **Since the previous edition (`fa374f1`)** the only commit is that edition
-> itself (`4e056f2`). Every risk and line reference below was re-checked at
-> `4e056f2` and still holds.
+> **Since the previous edition (`b4545f3`) nothing has been committed** — that
+> edition is HEAD. Every risk and line reference below was re-checked at
+> `b4545f3` and still holds.
 
 ## Metrics
 
 | Figure | Value |
 | ------ | ----- |
-| Commits | 22 |
-| By type | chore 17 · docs 3 · fix 1 · refactor 1 |
+| Commits | 23 |
+| By type | chore 17 · docs 4 · fix 1 · refactor 1 |
 | Captures this job filed and still open (`finding_count`) | 0 |
 | Holding tank | 2 plans: 1 planned, 1 blocked; ready queue empty, nothing awaiting review |
 
@@ -34,7 +34,7 @@ gives none.
 
 ## What changed
 
-Sixteen of the 22 commits are skeletor upgrades (`.skeletor.json` v0.42.0 → v0.57.0).
+Sixteen of the 23 commits are skeletor upgrades (`.skeletor.json` v0.42.0 → v0.57.0).
 **`protopilot/`, the product package, has no commits in this window** — every
 change is to the CLI shell, CI, docs tooling or tests.
 
@@ -74,12 +74,12 @@ change is to the CLI shell, CI, docs tooling or tests.
 
 **Reports**
 - The v0.2.0 report window closed (`af32686`); the window that froze no reports is recorded (`8ac5800`);
-  this report was refreshed for the open window (`4e056f2`).
+  this report was refreshed for the open window (`4e056f2`, `b4545f3`).
 
 ## Risks
 
 1. **CODEOWNERS requests no reviews, and that is true right now.** Running `./pp doctor`
-   at `4e056f2` returns `❌ CODEOWNERS names owners GitHub recognises — 5 line(s)
+   at `b4545f3` returns `❌ CODEOWNERS names owners GitHub recognises — 5 line(s)
    GitHub rejects`, starting at `.github/CODEOWNERS:8` (`@skyrowlabs`). The defect
    predates this window. What is new is that `pp doctor` makes it visible, and
    `.github/CODEOWNERS:3` carries the template's note on fixing it. **Not filed:**
