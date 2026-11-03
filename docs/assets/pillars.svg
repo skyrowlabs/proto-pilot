@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 190" width="1000" height="190" role="img" aria-label="Three things proto.pilot is: verified by running, two media from one pipeline, and it works offline">
+  <title>Verified by running · Two media, one pipeline · Works offline</title>
+  <g font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif">
+    <g transform="translate(0,0)">
+      <rect x="0.5" y="0.5" width="323" height="189" rx="14" fill="#05090e" stroke="#1c2633"/>
+      <rect x="22" y="22" width="40" height="40" rx="10" fill="#818cf8" fill-opacity="0.14"/>
+      <g transform="translate(31,31) scale(0.9167)" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></g>
+      <text x="22" y="98" font-family="'Space Grotesk', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" font-weight="700" fill="#e8edf4">Verified by running</text>
+      <text font-size="14" fill="#a9b6c6"><tspan x="22" y="126">It boots the app, drives it and runs</tspan><tspan x="22" y="147">the smoke suite. Red gets a bounded</tspan><tspan x="22" y="168">repair loop, then a RUNBOOK.</tspan></text>
+    </g>
+    <g transform="translate(338,0)">
+      <rect x="0.5" y="0.5" width="323" height="189" rx="14" fill="#05090e" stroke="#1c2633"/>
+      <rect x="22" y="22" width="40" height="40" rx="10" fill="#60a5fa" fill-opacity="0.14"/>
+      <g transform="translate(31,31) scale(0.9167)" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 10l3 2-3 2M12 15h5"/></g>
+      <text x="22" y="98" font-family="'Space Grotesk', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" font-weight="700" fill="#e8edf4">Two media, one pipeline</text>
+      <text font-size="14" fill="#a9b6c6"><tspan x="22" y="126">A Textual + SQLite app in your</tspan><tspan x="22" y="147">terminal by default; FastAPI and</tspan><tspan x="22" y="168">Postgres in Docker with --target web.</tspan></text>
+    </g>
+    <g transform="translate(676,0)">
+      <rect x="0.5" y="0.5" width="323" height="189" rx="14" fill="#05090e" stroke="#1c2633"/>
+      <rect x="22" y="22" width="40" height="40" rx="10" fill="#a78bfa" fill-opacity="0.14"/>
+      <g transform="translate(31,31) scale(0.9167)" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4v10l-8 4-8-4V7z"/><path d="M4 7l8 4 8-4M12 11v10"/></g>
+      <text x="22" y="98" font-family="'Space Grotesk', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="18" font-weight="700" fill="#e8edf4">Works offline</text>
+      <text font-size="14" fill="#a9b6c6"><tspan x="22" y="126">Every pass has a deterministic twin,</tspan><tspan x="22" y="147">so CI runs the whole pipeline with</tspan><tspan x="22" y="168">no key and no Docker daemon.</tspan></text>
+    </g>
+  </g>
+</svg>
