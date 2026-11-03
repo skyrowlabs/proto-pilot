@@ -3,10 +3,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/skyrowlabs/proto-pilot/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/skyrowlabs/proto-pilot/actions/workflows/ci.yml/badge.svg?branch=develop"></a>
-  <a href="https://github.com/skyrowlabs/proto-pilot/tags"><img alt="Latest tag" src="https://img.shields.io/github/v/tag/skyrowlabs/proto-pilot?sort=semver&label=version&labelColor=1c2633&color=818cf8"></a>
-  <a href="https://github.com/skyrowlabs/proto-pilot/actions/workflows/ci.yml"><img alt="Python 3.11 to 3.14" src="https://img.shields.io/badge/python-3.11%E2%80%933.14-818cf8?labelColor=1c2633"></a>
-  <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/github/license/skyrowlabs/proto-pilot?labelColor=1c2633&color=7a8fa8"></a>
+  <img src="https://img.shields.io/badge/repo-private-7a8fa8?labelColor=1c2633" alt="repo: private">
+  <img src="https://img.shields.io/badge/stage-poc-818cf8?labelColor=1c2633" alt="stage: poc">
+  <img alt="Python 3.11 to 3.14" src="https://img.shields.io/badge/python-3.11%E2%80%933.14-818cf8?labelColor=1c2633">
+  <a href="#the-offline-baseline"><img alt="works offline" src="https://img.shields.io/badge/works-offline-818cf8?labelColor=1c2633"></a>
 </p>
 
 <p align="center">
