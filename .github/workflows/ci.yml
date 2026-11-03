@@ -23,13 +23,10 @@ name: CI
 #
 #      **No check in this tree can catch that**, because which contexts are
 #      required is a list in the account rather than a line in any file. It is
-#      the same class as the Actions pull-request switch. Nothing here is
-#      currently exposed to it — neither `develop` nor `main` is protected and
-#      this repository declares no rulesets, measured 2026-09-09, the same
-#      account fact the job-name comment below rests on. That is the reason to
-#      read this paragraph *before* protecting a branch rather than after: the
-#      hole opens at the moment somebody first requires a context, and the
-#      obvious required list is the leaves.
+#      the same class as the Actions pull-request switch. Whether this tree is
+#      exposed is an account fact, so no sentence here states it; read it:
+#      `gh api repos/skyrowlabs/proto-pilot/branches/develop/protection
+#      --jq .required_status_checks.contexts` must name `CI Gate`.
 #
 #   2. A `synchronize` event on a READY pull request re-runs everything that PR
 #      earns. Iterating in draft and flipping to ready once, at the end, is the
@@ -174,18 +171,13 @@ jobs:
       # which deepens a fetch of refs and cannot reach an orphan — there is
       # nothing to deepen to. A remedy that does not exist is the expensive
       # kind of wrong answer. Reported by stash.flow.
-      - name: Commit subjects the contract in force can read
+      # The range both steps below check, decided once.
+      - name: Which commits this change adds
+        id: range
         env:
           BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
           FORCED: ${{ github.event.forced }}
         run: |
-          # This step used to exit 0 here when no Release Please config was
-          # present, so a `--versioning tag` tree had no CI commit gate at all:
-          # the commit-msg hook binds only contributors who installed it, and a
-          # web-UI commit, a merge button or a bot reached the release branch
-          # with any subject. The script decides the contract itself now — the
-          # config's section list where there is one, the hook's own rules
-          # where there is not — so nothing here asks about the file.
           REASON=""
           if [ "$FORCED" = "true" ]; then
             REASON="force-push: \`before\` names a commit no ref reaches"
@@ -194,15 +186,40 @@ jobs:
           fi
           if [ -n "$REASON" ]; then
             echo "$REASON — checking HEAD alone"
-            # `--range -1` and not a bare call. The script's default is
-            # `@{u}..HEAD` — the set a local push would send — and a checkout
-            # here has no upstream, so a bare call would land on HEAD alone by
-            # coincidence rather than by instruction. The branch that MEANS
-            # HEAD alone says HEAD alone.
-            python scripts/check_commit_subjects.py --range -1
+            # `-1` and not an empty range. The scripts' default is `@{u}..HEAD`
+            # — the set a local push would send — and a checkout here has no
+            # upstream, so no range would land on HEAD alone by coincidence
+            # rather than by instruction. The branch that MEANS HEAD alone
+            # says HEAD alone.
+            echo "range=-1" >> "$GITHUB_OUTPUT"
           else
-            python scripts/check_commit_subjects.py --range "$BASE..${{ github.sha }}"
+            echo "range=$BASE..${{ github.sha }}" >> "$GITHUB_OUTPUT"
           fi
+
+      # This step used to exit 0 when no Release Please config was present, so
+      # a `--versioning tag` tree had no CI commit gate at all: the commit-msg
+      # hook binds only contributors who installed it, and a web-UI commit, a
+      # merge button or a bot reached the release branch with any subject. The
+      # script decides the contract itself now — the config's section list
+      # where there is one, the hook's own rules where there is not.
+      - name: Commit subjects the contract in force can read
+        run: python scripts/check_commit_subjects.py --range "${{ steps.range.outputs.range }}"
+
+      # Secrets in the same commits, here rather than in `lint` because this job
+      # never skips: a token pasted into a docs-only change is still a leak.
+      # The binary is the hook's own pin, checksum-verified; `gitleaks-action`
+      # needs a licence key for organisation repositories.
+      - name: No secret in the commits this change adds
+        run: |
+          VERSION="$(python scripts/leak_scan.py --pinned)"
+          ASSET="gitleaks_${VERSION}_linux_x64.tar.gz"
+          URL="https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}"
+          cd "$RUNNER_TEMP"
+          curl -fsSLO "$URL/$ASSET" -O "$URL/gitleaks_${VERSION}_checksums.txt"
+          grep " $ASSET\$" "gitleaks_${VERSION}_checksums.txt" | sha256sum -c -
+          tar xzf "$ASSET" gitleaks
+          cd "$GITHUB_WORKSPACE"
+          PATH="$RUNNER_TEMP:$PATH" python scripts/leak_scan.py --range "${{ steps.range.outputs.range }}"
 
   # ── Lint ────────────────────────────────────────────────────────────────
   # FULL-SUITE-BECAUSE: every gate in this job also runs in the pre-commit
@@ -294,8 +311,9 @@ jobs:
   # under a condition that has since changed is not wrong, but it stops being
   # about today the moment nobody says which world it was measured in.
   #
-  # `docs_only != 'true'` is `unit-tests`' condition and it is the right one
-  # here for `unit-tests`' reason: **the node job is the product's own suite.**
+  # `docs_only != 'true'` is the right condition here because **the node job
+  # is the product's own suite**, which a docs change cannot reach. The python
+  # unit suite has no condition at all: its tests do read `docs/`.
   # `lint` and `integration` can afford `full_suite` because a lint finding is
   # not a broken build; a product that does not typecheck is.
   #
@@ -406,8 +424,9 @@ jobs:
         run: npm run --if-present format:check
 
   # ── Unit tests ──────────────────────────────────────────────────────────
-  # Ungated by full_suite: the host-side suite is minutes, and it is the check
-  # most likely to catch the thing a docs-only detector got wrong.
+  # Ungated, by `docs_only` too: the host-side suite is minutes, and tests here
+  # read `docs/` (plans, tables, references), so a docs-only change is exactly
+  # what they judge. Gated, a red tree merged green (skeletor#4, from mind.head).
   unit-tests:
     # Two versions, and which two is the whole point.
     #
@@ -436,9 +455,9 @@ jobs:
     # The interpreter is in the NAME so a run says which leg failed: the matrix
     # makes one job report as several, and legs sharing a name are
     # indistinguishable on the checks list. **Do not require these names.** They
-    # report only when the matrix runs — skipped, it reports once under the
-    # unexpanded expression — so a protection naming `pytest <version>` blocks
-    # every docs-only pull request. Protection requires `pytest`, the job below.
+    # report only when the matrix runs — skipped (a failed gate), it reports
+    # once under the unexpanded expression — and change whenever the matrix
+    # does. Protection requires `pytest`, the job below.
     #
     # Renamed from `Unit Tests (host-side)` at skeletor v0.18.0. What either
     # branch requires is a fact about the ACCOUNT, not about this file, and no
@@ -469,7 +488,6 @@ jobs:
     # nothing gets one leg*, and this tree said something.
     name: pytest ${{ matrix.python }}
     needs: gate
-    if: needs.gate.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -536,40 +554,33 @@ jobs:
         run: python scripts/check_skip_budget.py --suite unit
 
   # ── The unit suite's one name ─────────────────────────────────────────
-  # The matrix above reports once per leg, as `pytest <version>` — and only when
-  # it runs. Skipped by the job-level `if` on a docs-only change, GitHub never
-  # expands the matrix, so it reports ONE check named `pytest ${{ matrix.python }}`
-  # with the expression unexpanded, and a branch protection that requires
-  # `pytest 3.12` waits on it forever. stash.flow's docs-only pull requests were
-  # BLOCKED with every check green or skipped; the other gated jobs are not
-  # matrices, so they report skipped under their real names and pass.
-  #
-  # So protection requires THIS: one static name whatever the matrix holds, so
-  # nobody has to read the leg names off a run to set it up, and a change to the
-  # matrix costs no protection edit. `docs/DEVELOPMENT.md` says the same to a
-  # reader deciding what to require, which is where one looks. It passes when
-  # the matrix passed, or was skipped because the gate chose docs-only; it fails
-  # when a leg failed or was cancelled, and when the gate itself did not pass —
-  # a skip caused by a failed classifier is not a docs-only skip.
+  # The matrix above reports once per leg, as `pytest <version>`, and a skipped
+  # matrix reports ONE check with the expression unexpanded — so a protection
+  # naming `pytest 3.12` can wait forever (stash.flow's PRs were blocked so).
+  # Protection requires THIS: one static name whatever the matrix holds.
+  # `docs/DEVELOPMENT.md` says the same to a reader deciding what to require.
+  # It passes only when the matrix passed. The suite has no condition of its
+  # own, so a skip means the gate failed, and a skip is never a pass.
   unit-tests-result:
     name: pytest
     needs: [gate, unit-tests]
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: The matrix passed, or was skipped for a docs-only change
+      - name: The matrix passed
         env:
           GATE: ${{ needs.gate.result }}
           UNIT: ${{ needs.unit-tests.result }}
         run: |
           if [ "$GATE" != "success" ]; then
-            echo "::error::the gate did not pass ($GATE), so the unit suite's skip means nothing"
+            echo "::error::the gate did not pass ($GATE), so the unit suite did not run"
             exit 1
           fi
-          case "$UNIT" in
-            success|skipped) echo "unit suite: $UNIT" ;;
-            *) echo "::error::unit suite: $UNIT"; exit 1 ;;
-          esac
+          if [ "$UNIT" != "success" ]; then
+            echo "::error::unit suite: $UNIT"
+            exit 1
+          fi
+          echo "unit suite: $UNIT"
 
   # ── Integration ─────────────────────────────────────────────────────────
   # Gated on full_suite. When it is skipped it still REPORTS `skipped`, which
