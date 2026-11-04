@@ -509,38 +509,21 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v7
-        with:
-          python-version: ${{ matrix.python }}
-          cache: pip
-          cache-dependency-path: pyproject.toml
-
-      # Two installs, two audiences: `scripts/requirements.txt` is the repo's own
-      # tooling, and the step below is the product plus the generated app's
-      # stack — the end-to-end test runs a generated tree in process, so every
-      # dependency that tree needs is in this repo's `dev` extra. Neither
-      # install is a superset of the other.
+      # The interpreter, scripts/requirements.txt and the project itself: one
+      # action, shared with coverage-nightly.yml so the two install the same thing.
       #
-      # The step is the template's and is deliberately taken unchanged, so it
-      # does not conflict on every future upgrade. `scripts/install_project.py`
-      # installs ALL the extras pyproject.toml names — it does not assume the
-      # extra is called `dev` — and the setup block runs the same script.
-      #
-      # This comment used to say `dev` was the only extra. It has not been true
-      # since `browser` and `web` were added, and nothing could notice: the step
-      # derives the list, so the code stayed right while the sentence rotted.
-      # All three are installed here on purpose. `browser` is the one that looks
-      # expensive and is not — the pip package is small, and Playwright only
-      # costs anything once `playwright install` fetches browsers, which this
-      # workflow never runs. The browser stage is skipped and reported as
-      # skipped, never as green.
+      # Here "the project" is the product plus the generated app's stack: the
+      # end-to-end test runs a generated tree in process, so every dependency
+      # that tree needs is in an extra, and `scripts/install_project.py` installs
+      # every extra pyproject.toml names. `browser` looks expensive and is not --
+      # Playwright only costs anything once `playwright install` fetches browsers,
+      # which this workflow never runs; the browser stage is reported as skipped.
       #
       # No API key and no Docker daemon: the offline baseline is what makes the
       # pipeline testable here, which is the point of having one.
-      - run: pip install -r scripts/requirements.txt
-
-      - name: Install the project, if it is one
-        run: python scripts/install_project.py
+      - uses: ./.github/actions/unit-setup
+        with:
+          python-version: ${{ matrix.python }}
 
       # `--junitxml` is not optional decoration: the step below reads that file
       # and has nothing to say without it. It ran without one for as long as
