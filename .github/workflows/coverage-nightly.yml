@@ -93,6 +93,8 @@ jobs:
           # ships no integration tests. The report is still written, so the
           # ratchet reads a real zero rather than a missing file.
           [ "$status" -eq 0 ] || [ "$status" -eq 5 ]
+          # No `-m ui` run: cli/test_cmds.py rows `ui` unscheduled and empty, and
+          # ci.yml does not select it. Schedule it in both when a ui test exists.
           python -m coverage xml -o tmp/coverage.xml
 
       - name: Coverage ratchet
