@@ -10,7 +10,7 @@
 
 click>=8.1
 # scripts/rehearse_scheduled.py reads workflows with it.
-pyyaml>=6.0
+pyyaml>=6.0.3
 
 pytest>=8.0
 pytest-timeout>=2.3
