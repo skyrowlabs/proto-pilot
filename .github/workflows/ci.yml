@@ -510,7 +510,7 @@ jobs:
         with:
           fetch-depth: 0
       # The interpreter, scripts/requirements.txt and the project itself: one
-      # action, shared with coverage-nightly.yml so the two install the same thing.
+      # action, shared by every workflow that runs this suite so they install the same thing.
       #
       # Here "the project" is the product plus the generated app's stack: the
       # end-to-end test runs a generated tree in process, so every dependency
@@ -521,9 +521,15 @@ jobs:
       #
       # No API key and no Docker daemon: the offline baseline is what makes the
       # pipeline testable here, which is the point of having one.
+      #
+      # The pip cache is keyed on both files the action installs from.
       - uses: ./.github/actions/unit-setup
         with:
           python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: |
+            scripts/requirements.txt
+            pyproject.toml
 
       # `--junitxml` is not optional decoration: the step below reads that file
       # and has nothing to say without it. It ran without one for as long as
