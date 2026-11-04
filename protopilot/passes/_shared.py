@@ -39,7 +39,7 @@ Modules you import from, which already exist:
 
 Third-party packages available to import, beyond the framework itself:
 
-- `PIL` (Pillow 12) -> `Image`, `ImageFilter`, `ImageEnhance`, `ImageOps`.
+- `PIL` (Pillow 13) -> `Image`, `ImageFilter`, `ImageEnhance`, `ImageOps`.
   Available for apps that transform images. Nothing else is installed, and
   you cannot add a dependency: `requirements.txt` is skeleton and a pass that
   needs a package which is not listed here has no way to get one.
