@@ -184,7 +184,7 @@ def test_the_directory_is_on_a_line_of_its_own():
     it wraps at exactly the point where the path stops being readable. So the
     directory gets its own line, unadorned, and the command follows it.
     """
-    directory = "/home/someone/work/proto-pilot/prototypes/pong_simulator"
+    directory = "/srv/work/proto-pilot/prototypes/pong_simulator"
     rendered = lines(
         fold(
             [

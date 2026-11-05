@@ -25,7 +25,7 @@
   "app/templates/trips_list.html": "4325c07415c7c77bb4ce6fad8a593eaba6d47ec62d17560b463259beb8e1ce47",
   "app/templating.py": "d9d681fd0b370ba1323f6d4f21a30070402ebc9aebd0fc8ee397637a0d1bd82e",
   "compose.yml": "becce4e2fbf96d997b69df19f9348154a05a21683737d5d571887609b788db4a",
-  "requirements.txt": "8d8e7da4a12e7a659b8d0381870d9b5ade046441b0c4f27043781955f4228369",
+  "requirements.txt": "28942b8078d3e3459009e2e4ab16fc017eeb621879fa71ecb889b2fb886cfe64",
   "tests/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "tests/conftest.py": "8ea7021b20fd6934aedb6a73c35c0e875d2f7d82f3edb336e9ca05eb6bad515d",
   "tests/test_health.py": "c0f37fb6463ca1dd5a55953a44f36b66b6277449aa76163bd0e4a76686d73123",

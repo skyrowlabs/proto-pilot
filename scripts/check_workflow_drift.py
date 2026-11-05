@@ -64,7 +64,7 @@ import argparse
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Pattern, Tuple
+from re import Pattern
 
 # Bootstrap only: put the package on sys.path so `scripts.paths` — which
 # owns every path below — can be imported. See scripts/paths.py.
@@ -80,10 +80,10 @@ ALLOWLIST = SCRIPTS_DIR / "workflow_drift_allowlist.yaml"
 
 #: `(what the rule is about, enrolment patterns, required steps)`. A job is
 #: enrolled in a rule if its text matches ANY of that rule's patterns, and must
-#: then contain every step the rule names. Each step names the failure it
-#: prevents — an entry with no stated failure gets deleted by the next person
+#: then contain every step the rule names; `a|b` is satisfied by either. Each
+#: step names the failure it prevents — an entry with no stated failure gets deleted by the next person
 #: who finds it inconvenient.
-RULES: List[Tuple[str, List[Pattern[str]], Dict[str, str]]] = [
+RULES: list[tuple[str, list[Pattern[str]], dict[str, str]]] = [
     (
         "stands the stack up",
         [re.compile(r"docker\s+compose\s+up"), re.compile(r"uses:\s*\./\.github/actions/\S*stack")],
@@ -93,11 +93,17 @@ RULES: List[Tuple[str, List[Pattern[str]], Dict[str, str]]] = [
         "runs the suite",
         [re.compile(r"python\s+-m\s+pytest\b")],
         {
-            "pip install -e": "without it a tree that is a package cannot import its own dependencies, and "
-            "the suite fails at collection — see ci.yml's 'Install the project, if it is one'",
+            "scripts/install_project.py|pip install -e|uses: ./.github/actions/unit-setup": "without it a tree "
+            "that is a package cannot import its own dependencies, and the suite fails at collection — see "
+            "scripts/install_project.py and .github/actions/unit-setup",
         },
     ),
 ]
+
+
+def _spelled(step: str) -> str:
+    """`a|b` as `'a' or 'b'`. Outside the f-string: a nested same quote parses only on 3.12+."""
+    return " or ".join(f"'{alternative}'" for alternative in step.split("|"))
 
 
 def key_for(workflow: str, job_id: str) -> str:
@@ -120,7 +126,7 @@ def _allowlist() -> dict:
     return allowlist.read(ALLOWLIST)
 
 
-def _jobs(path: Path) -> Dict[str, str]:
+def _jobs(path: Path) -> dict[str, str]:
     """Split a workflow into `job-id -> job text`, by indentation.
 
     A YAML parser would be more correct and would add a dependency to a check
@@ -134,7 +140,7 @@ def _jobs(path: Path) -> Dict[str, str]:
     except StopIteration:
         return {}
 
-    jobs: Dict[str, List[str]] = {}
+    jobs: dict[str, list[str]] = {}
     current = None
     for line in lines[start + 1 :]:
         match = re.match(r"^  ([A-Za-z0-9_-]+):\s*$", line)
@@ -161,7 +167,7 @@ def main() -> int:
     # What each exempt job is actually missing, so an entry can be asked whether
     # it is still describing something. Collected for every enrolled job rather
     # than only the unexempt ones — the exempt ones are the whole question.
-    divergence: Dict[str, List[str]] = {}
+    divergence: dict[str, list[str]] = {}
 
     for workflow in sorted(WORKFLOWS.glob("*.yml")):
         for job_id, body in _jobs(workflow).items():
@@ -171,10 +177,10 @@ def main() -> int:
             key = key_for(workflow.name, job_id)
             enrolled.append(key)
             missing = [
-                f"{key}: {about}, and is missing '{step}' — {why}"
+                f"{key}: {about}, and is missing {_spelled(step)} — {why}"
                 for about, steps in rules
                 for step, why in steps.items()
-                if step not in body
+                if not any(alternative in body for alternative in step.split("|"))
             ]
             divergence[key] = missing
             if key not in exempt:
@@ -184,7 +190,7 @@ def main() -> int:
     # An entry whose job was fixed has outlived its reason; one whose job is
     # gone is worse — the job name can come back for something else and arrive
     # already exempt, which is an exemption nobody chose.
-    def why(key: str) -> Optional[str]:
+    def why(key: str) -> str | None:
         if key not in divergence:
             return "no enrolled job by that name"
         if not divergence[key]:

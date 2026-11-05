@@ -18,7 +18,7 @@
   "app/templates/index.html": "d82898d53e724f51b33571662c66a21caad595e3f61db4b9b6c2f38f92dc09a0",
   "app/templating.py": "d9d681fd0b370ba1323f6d4f21a30070402ebc9aebd0fc8ee397637a0d1bd82e",
   "compose.yml": "f733409510946df2d6a6a4393156ac4b2f5a112c3bd4ccc914e0e7665215eb56",
-  "requirements.txt": "8d8e7da4a12e7a659b8d0381870d9b5ade046441b0c4f27043781955f4228369",
+  "requirements.txt": "28942b8078d3e3459009e2e4ab16fc017eeb621879fa71ecb889b2fb886cfe64",
   "tests/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "tests/conftest.py": "8ea7021b20fd6934aedb6a73c35c0e875d2f7d82f3edb336e9ca05eb6bad515d",
   "tests/test_health.py": "c0f37fb6463ca1dd5a55953a44f36b66b6277449aa76163bd0e4a76686d73123",

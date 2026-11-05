@@ -1,9 +1,13 @@
-# Default owner for everything.
-*                           @skyrowlabs
+# Who reviews what. Rendered from `skeletor-new --owner`: a user (`@name`) or a
+# team (`@org/team`). A bare `@org` is rejected by GitHub ("Unknown owner") and
+# requests no review at all; proto.pilot had five such lines. Without `--owner`
+# every rule below is commented out, and `pp doctor` reports that nobody owns
+# anything: uncomment them with a real owner.
+*                           @JestonBlu
 
 # The governance layer. A change here changes how every other change is
 # reviewed, so it gets read even when the diff looks mechanical.
-/.claude/                   @skyrowlabs
-/.github/workflows/         @skyrowlabs
-/.pre-commit-config.yaml    @skyrowlabs
-/scripts/docs/              @skyrowlabs
+/.claude/                   @JestonBlu
+/.github/workflows/         @JestonBlu
+/.pre-commit-config.yaml    @JestonBlu
+/scripts/docs/              @JestonBlu

@@ -17,11 +17,9 @@ Copy this file's shape for a new job: collect into a plain dict, hand it to
 
 from __future__ import annotations
 
-import subprocess
 import sys
 from collections import Counter
 from pathlib import Path
-from typing import Dict
 
 # Bootstrap only: put the package on sys.path so `scripts.paths` — which
 # owns every path below — can be imported. See scripts/paths.py.
@@ -29,14 +27,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from scripts.docs import plans, release_window  # noqa: E402
 from scripts.paths import PROJECT_ROOT, TODO_DIR  # noqa: E402
-from scripts.reporting import agent_runner  # noqa: E402
+from scripts.reporting import agent_runner, shellout  # noqa: E402
 
 
 def _git(*args: str) -> str:
-    return subprocess.run(["git", *args], cwd=str(PROJECT_ROOT), capture_output=True, text=True).stdout.strip()
+    return shellout.run(["git", *args], cwd=str(PROJECT_ROOT), capture_output=True, text=True).stdout.strip()
 
 
-def collect() -> Dict[str, object]:
+def collect() -> dict[str, object]:
     """Facts about the current release window. No judgements — those are the
     agent's job, and mixing the two makes both unverifiable."""
     window = release_window.window()
@@ -45,7 +43,7 @@ def collect() -> Dict[str, object]:
     log = _git("log", "--pretty=%s", commit_range).splitlines()
     types = Counter(line.split("(")[0].split(":")[0].strip() for line in log if ":" in line)
 
-    churn = Counter()
+    churn: Counter[str] = Counter()
     for line in _git("log", "--name-only", "--pretty=format:", commit_range).splitlines():
         if line.strip():
             churn[line.strip()] += 1

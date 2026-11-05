@@ -8,11 +8,9 @@ green, which is the single most expensive failure mode a test suite has.
 
 from __future__ import annotations
 
-import importlib.util
 import os
 import sys
 from pathlib import Path
-from typing import Optional
 
 import pytest
 
@@ -29,7 +27,7 @@ def in_ci() -> bool:
     return os.environ.get(CI_FLAG) == "1"
 
 
-def require_or_skip(condition: bool, reason: str, *, requires: Optional[str] = None) -> None:
+def require_or_skip(condition: bool, reason: str, *, requires: str | None = None) -> None:
     """Skip locally, **fail** in CI.
 
     Use for anything CI guarantees — services running, seed data present, a
@@ -57,6 +55,63 @@ def repo_root():
     from scripts.paths import PROJECT_ROOT
 
     return PROJECT_ROOT
+
+
+@pytest.fixture(autouse=True)
+def _never_the_users_state(tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Point the state root at a fresh directory for every test.
+
+    Unset, it falls back to the user's real state under the home directory, so a
+    test that forgot it would write there. A test that sets its own still wins,
+    because autouse fixtures run first. stash.flow's incident: `stash-flow@c5544b3`.
+    """
+    from scripts.paths import STATE_ROOT_ENV
+
+    monkeypatch.setenv(STATE_ROOT_ENV, str(tmp_path_factory.mktemp("state-root")))
+
+
+@pytest.fixture(autouse=True)
+def _never_the_users_browser(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fail a test that would open the user's real browser.
+
+    A test that means to open one replaces it with a recorder, which wins
+    because it is patched later. stash.flow's incident: `stash-flow@a2fe3b7`.
+    """
+    import webbrowser
+
+    def refuse(name: str):
+        def refused(*args, **kwargs):
+            raise AssertionError(f"a test reached the real webbrowser.{name}{args!r}; replace it with a recorder")
+
+        return refused
+
+    for name in ("open", "open_new", "open_new_tab"):
+        monkeypatch.setattr(webbrowser, name, refuse(name))
+
+
+@pytest.fixture(autouse=True)
+def _never_the_network(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep a unit test on loopback and away from every secret-shaped variable. See `tests/guards.py`.
+
+    Other suites may reach real services by design. A test that patches the socket
+    itself still wins, because it is patched later.
+    """
+    if request.node.get_closest_marker("unit") is None:
+        return
+    from tests.guards import hide_secrets, refuse_remote
+
+    hide_secrets(monkeypatch)
+    refuse_remote(monkeypatch)
+
+
+# ── Your fixtures go below this line ──────────────────────────────────────────
+#
+# skeletor adds its fixtures and imports above this block and renders nothing
+# below it, so a release's lines and yours are never adjacent and merge cleanly.
+# Keep the imports your fixtures need below this line too, or inside the fixture
+# that uses them: one placed among the template's imports conflicts there.
+# The block itself is frozen. Asked for by proto.pilot, whose fixtures at the end
+# of this file conflicted with the template's at v0.49.0 and again at v0.51.0.
 
 
 # ── proto.pilot's own fixtures ──────────────────────────────────────────
@@ -129,6 +184,8 @@ def helper():
     by name when it walks the skeleton, because a `.pyc` read as text is a
     `UnicodeDecodeError` in a test whose failure message is then about nothing.
     """
+    import importlib.util
+
     from protopilot import targets
 
     path = targets.SKELETON_ROOT / "tui" / "tests" / "screen.py"

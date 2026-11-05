@@ -24,19 +24,19 @@ look optional to anybody not using that tool.
 ## Quick Start
 
 ```bash
-python -m venv .venv && .venv/bin/pip install -r scripts/requirements.txt
-.venv/bin/pre-commit install --install-hooks
+python -m venv .venv && .venv/bin/pip install -r scripts/requirements.txt && .venv/bin/python scripts/install_project.py
+.venv/bin/pre-commit install --install-hooks && .venv/bin/python scripts/git/install_merge_drivers.py
 ./pp check pre-push   # every host-runnable CI gate; green on a fresh tree
 ./pp test unit        # the fast suite
 ./pp check health     # can this checkout generate? (runs `proto doctor`)
 ```
 
 **Every one of them exists** — that is the claim this paragraph is making, and it
-is the one worth checking. The install lines came from the same source as the
-README's Setup block when this repository was scaffolded, and what keeps them in
-step now is `tests/test_setup_blocks_agree.py` rather than the generator, which
-left. The three lines after them belong to this file alone and are not compared
-with anything. An
+is the one worth checking. Every line but the last is shared with the README's
+Setup block, and what keeps them in step is `tests/test_setup_blocks_agree.py`
+rather than the generator, which left. The first line ends by installing
+proto.pilot itself with every extra, through the same script CI runs, because
+the unit suite imports all of them. The last line belongs to this file alone. An
 earlier version of this file opened with a `setup` and a
 `service up` subcommand, which the CLI has never implemented — and `setup`
 could not be implemented, because the CLI cannot run until the install it would
@@ -270,9 +270,9 @@ merge.
 `gh pr create --draft`. Mark it ready only when you believe it is green.
 
 CI jobs are gated by cost: a draft PR carrying code runs the cheap ones and skips the
-expensive ones, and a docs-only PR runs the gate alone whether it is draft or ready — that
-is the other rule, and it decides first. `.github/scripts/docs-only.cjs` decides both, and
-is the only place that does; `ci.yml` says which job is in which class.
+expensive ones, and a docs-only PR runs the gate and the unit suite whether it is draft or
+ready — that is the other rule, and it decides first. `.github/scripts/docs-only.cjs`
+decides both, and is the only place that does; `ci.yml` says which job is in which class.
 
 This named the five jobs by name for one release, which is a claim about *your* workflow
 rather than about the rule — a tree that had renamed or dropped one got a sentence that was

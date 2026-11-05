@@ -5,7 +5,7 @@ work; update when you resolve something. This is the working state that does not
 belong in `README.md` (the design document) or `AGENTS.md` (the rules — `CLAUDE.md`
 is only a pointer at it).
 
-> **Reconstructed 2026-08-28.** This lived at `~/skyrow.labs/proto-pilot-notes.md`,
+> **Reconstructed 2026-08-28.** This lived at `proto-pilot-notes.md`,
 > outside every repo, at a workspace root that is not a git repository. It was
 > unbacked and it is gone; its previous contents could not be recovered. Both
 > `CLAUDE.md` files pointed at it as the live parking lot, so two guides were
@@ -159,7 +159,7 @@ is only a pointer at it).
   **That list was wrong too, and both of us got it wrong differently.** I
   scoped my grep to `strategy/`; two files sit above it, and one is
   `workspace.md` — which *is* the workspace CLAUDE.md, reached through the
-  symlink at `~/skyrow.labs/CLAUDE.md`, carrying seven mentions including the
+  symlink at the workspace root's `CLAUDE.md`, carrying seven mentions including the
   branch rule about this repo. **A `strategy/`-scoped grep is structurally blind
   to the guide that governs the workspace.** Theirs used `grep -i proto`, which
   matches `prototype`, so it carried three files that never mention us.
@@ -706,6 +706,26 @@ is only a pointer at it).
   checked.
 
   Standing, unchanged: `tests/test_pyright_scope.py` stays deleted.
+
+- **2026-10-15 — `scripts/check_doc_tables.py` is the template's again, byte
+  for byte.** The entry above kept ours for two rounds on the ground that the
+  split API expressed the rule "where it cannot be got wrong". Checked against
+  v0.51.2 rather than remembered: both versions carry the same two regexes with
+  the same lookahead, both route a folder by its own README or its own path,
+  and both stop the walk at a routed folder. The split protected nothing the
+  template's `referenced()` + two-argument `unrouted()` does not, and it cost a
+  conflict on every upgrade that touched the file plus a merged test that could
+  not pass here. Two things the template does better: `unrouted()` returns the
+  routed folders too, so the success line counts what the check reached rather
+  than what `rglob` found on disk; and hidden directories are skipped.
+  `tests/test_docs_pipeline.py` is the template's too now (hash matches the
+  manifest), and `tests/test_doc_routing_predicate.py` — ours, not shipped
+  upstream — is rewritten against the template's API and keeps the end-to-end
+  row-to-walk case the template's own test does not ask. Nothing for skeletor
+  to fix; that test file is adoptable as-is if they want `unrouted()` covered.
+  Adopted at skeletor v0.55.0: the template's copy replaced ours and our six
+  fixture entries in `scripts/doc_refs_allowlist.yaml` went with it, so both
+  files now match the render.
 
 - **2026-09-04 — the terminal target, all six phases, and `proto new` now
   builds one by default.** Filed at

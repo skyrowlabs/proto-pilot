@@ -37,12 +37,13 @@ Stdlib only — imported by host-side jobs that must not grow dependencies.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import sys
+from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional
 from zoneinfo import ZoneInfo
 
 # Bootstrap only: put the package on sys.path so `scripts.paths` — which
@@ -68,6 +69,75 @@ SCHEDULE_ALLOWLIST = SCRIPTS_DIR / "reporting_schedule_allowlist.yaml"
 #: push the assignment past the line limit.
 CRON_CWD = str(PROJECT_ROOT)
 
+#: Minutes every job here waits after its cron slot. Every checkout on a host
+#: shares one crontab, so trees with the same registry would all start at the same
+#: minute; the default spreads them by a hash of this checkout's path, which
+#: keeps the order of this tree's own jobs. Set an int to pin it; 0 turns it off.
+SCHEDULE_OFFSET_PINNED: int | None = None
+OFFSET_SPAN_MINUTES = 30
+
+
+def schedule_offset() -> int:
+    """This checkout's delay after every cron slot, in minutes."""
+    if SCHEDULE_OFFSET_PINNED is not None:
+        return SCHEDULE_OFFSET_PINNED
+    return int(hashlib.sha256(CRON_CWD.encode()).hexdigest(), 16) % OFFSET_SPAN_MINUTES
+
+
+@dataclass(frozen=True)
+class Seat:
+    """An identity a job's agent runs as: whose Claude account it bills, whose GitHub it acts as."""
+
+    name: str
+    what: str
+    credential_env: str | None = None  # holds a `claude setup-token` token; None is the ambient login
+    gh_token_env: str | None = None  # holds a GitHub token for `gh` and pushes; None is gh's own login
+
+
+#: Every identity a job may run as. `personal` is whoever is logged into `claude`
+#: and `gh` here. An automation seat is a row naming the variables its tokens
+#: live in, e.g. `Seat("team", "the automation seat", "TEAM_CLAUDE_TOKEN", "TEAM_GH_TOKEN")`,
+#: each declared in .env.example and marked `# secret`.
+SEATS = (Seat("personal", "whoever is logged into `claude` and `gh` on this host"),)
+
+#: Which seat a run uses. The cron block sets it to CRON_SEAT; unset is DEFAULT_SEAT.
+SEAT_ENV = "PP_SEAT"
+DEFAULT_SEAT = "personal"
+#: The seat scheduled jobs run as, written into the generated cron block.
+CRON_SEAT = "personal"
+
+
+class SeatError(ValueError):
+    """A seat that is unknown, or named with no credential to run it."""
+
+
+def resolve_seat(env: Mapping[str, str] | None = None) -> Seat:
+    """The seat a run started now would use; a typo raises rather than billing `personal`."""
+    raw = ((os.environ if env is None else env).get(SEAT_ENV) or DEFAULT_SEAT).strip().lower()
+    for seat in SEATS:
+        if seat.name == raw:
+            return seat
+    raise SeatError(f"{SEAT_ENV}={raw!r} is not a seat; expected one of {', '.join(s.name for s in SEATS)}")
+
+
+def seat_env(env: Mapping[str, str] | None = None) -> dict[str, str]:
+    """The variables that make a child process run as the resolved seat; raises SeatError.
+
+    A seat naming a credential that is unset refuses: falling through to the
+    ambient login would bill somebody else and still report ok.
+    """
+    source = os.environ if env is None else env
+    seat = resolve_seat(source)
+    out = {}
+    for var, child in ((seat.credential_env, "CLAUDE_CODE_OAUTH_TOKEN"), (seat.gh_token_env, "GH_TOKEN")):
+        if var is None:
+            continue
+        if not source.get(var):
+            raise SeatError(f"seat {seat.name!r} needs {var}, and it is unset")
+        out[child] = source[var]
+    return out
+
+
 #: The timezone every schedule here is expressed in.
 #:
 #: These describe the HOST's crontab, which fires in the host's local time — so
@@ -91,6 +161,27 @@ def now_local() -> datetime:
     return datetime.now(SCHEDULE_TZ).replace(tzinfo=None)
 
 
+def host_zone_disagreement(now: datetime | None = None) -> str | None:
+    """Why this host's clock is not SCHEDULE_TZ's, or None when every offset agrees.
+
+    Cron fires in host time and every schedule here is read in SCHEDULE_TZ, so a
+    host in another zone runs each job at a time nothing here reports. Checked now
+    and half a year on, since two zones can agree until one changes for DST.
+    """
+    now = now or datetime.now(UTC)
+    for instant in (now, now + timedelta(days=182)):
+        host, ours = instant.astimezone().utcoffset(), instant.astimezone(SCHEDULE_TZ).utcoffset()
+        if host != ours:
+            zone = f"{SCHEDULE_TZ.key} (UTC{_hours(ours)})"
+            return f"on {instant:%Y-%m-%d} this host is UTC{_hours(host)} and the schedule is {zone}"
+    return None
+
+
+def _hours(offset: timedelta | None) -> str:
+    minutes = int((offset or timedelta()).total_seconds() // 60)
+    return f"{'+' if minutes >= 0 else '-'}{abs(minutes) // 60:02d}:{abs(minutes) % 60:02d}"
+
+
 #: What a job is allowed to repair without asking.
 #:
 #: It defaults to `none`, deliberately: a job added without thinking about blast
@@ -102,6 +193,17 @@ FIX_POLICIES = {
     "docs": "may repair generated docs and commit them",
     "code": "may open a pull request; never merges, never pushes to a protected branch",
 }
+
+#: Where a job's findings go when it neither fixes them nor rules them out.
+#:
+#: A report nobody acts on re-derives the same finding every edition: jam.sense's
+#: `M-9` sat through ten (`jam-sense@a4894a3ac`). Declared, never inferred —
+#: `fix_policy` is what a job may change, which is a different question.
+#: `tests/test_reporting_jobs.py` holds every report-writing job to one of these.
+SINK_QUEUE = "queue"  # filed with `pp bug`/`task`, attributed and capped per job
+SINK_READER = "reader"  # somebody reads the report; `Job.reader` names who, and how often
+SINK_NONE = "no-findings"  # the job reports facts and never a finding
+SINKS = (SINK_QUEUE, SINK_READER, SINK_NONE)
 
 
 @dataclass(frozen=True)
@@ -116,7 +218,12 @@ class Job:
     fix_policy: str = "none"
     commits: bool = False  # does it touch the git tree?
     first_week_only: bool = False  # monthly jobs ride a weekly lane; see below
-    heartbeat_var: Optional[str] = None  # env var holding its dead-man-switch URL
+    heartbeat_var: str | None = None  # env var holding its dead-man-switch URL
+    findings_sink: str | None = None  # one of SINKS, for a job that writes a report
+    reader: str = ""  # for SINK_READER: who reads it, and how often
+    #: False for a job with no agent stage at all; only then may it record `ok`
+    #: without one, because `run_ledger` otherwise reads that as a stopped job.
+    agent: bool = True
 
     def needle(self) -> str:
         """What identifies THIS tree's line for this job in a live crontab.
@@ -141,7 +248,9 @@ class Job:
         return f"cd {CRON_CWD} && ./pp report {self.key}"
 
     def command(self) -> str:
-        return f"{self.needle()} >> {CRON_LOG} 2>&1"
+        offset = schedule_offset()
+        delay = f"sleep {offset * 60} && " if offset else ""
+        return f"{delay}{self.needle()} >> {CRON_LOG} 2>&1"
 
     def cron_line(self) -> str:
         return f"{self.cron} {self.command()}"
@@ -152,19 +261,21 @@ class Job:
 #: Sunday" is not expressible in cron fields at all, and a bare day-of-month
 #: schedule lands on a weekly lane one month in seven. The gate is enforced once,
 #: in the runner.
-def in_first_week(when: Optional[datetime] = None) -> bool:
+def in_first_week(when: datetime | None = None) -> bool:
     return (when or now_local()).day <= 7
 
 
-#: ONE fully-worked job ships here — registry entry, module, prompt, heartbeat
-#: variable — because a registry seeded with entries whose modules do not exist
-#: is a registry whose own tests are red on arrival, and a suite people have
-#: learned to expect red from has stopped working.
+#: Every entry ships its module, prompt and heartbeat variable, because a
+#: registry naming modules that do not exist is red on arrival. `repo-report` is
+#: the worked example to copy. The two drainers work the capture lanes in
+#: `scripts/lanes.py` (one issue each per run, a draft pull request each) and ship
+#: switched off in `reporting_schedule_allowlist.yaml`; `overnight` reports on
+#: the night, every night, with no agent.
 #:
 #: Add the rest by copying this shape. `docs/AGENTIC_AUTOMATION.md` § Adding a
 #: job lists the five places a new entry touches; `tests/test_reporting_jobs.py`
 #: fails if you miss one.
-JOBS: List[Job] = [
+JOBS: list[Job] = [
     Job(
         key="repo-report",
         module="repo_report",
@@ -174,13 +285,85 @@ JOBS: List[Job] = [
         fix_policy="own-report",
         commits=True,
         heartbeat_var="HEARTBEAT_REPO_REPORT",
+        findings_sink=SINK_QUEUE,
+    ),
+    Job(
+        key="agent-task",
+        module="agent_task",
+        cadence="nightly 02:15",
+        cron="15 2 * * *",
+        writes="—",
+        fix_policy="code",
+        commits=True,
+        heartbeat_var="HEARTBEAT_AGENT_TASK",
+    ),
+    Job(
+        key="agent-fix",
+        module="agent_fix",
+        cadence="nightly 03:15",
+        cron="15 3 * * *",
+        writes="—",
+        fix_policy="code",
+        commits=True,
+        heartbeat_var="HEARTBEAT_AGENT_FIX",
+    ),
+    Job(
+        key="dep-migrate",
+        module="dep_migrate",
+        cadence="nightly 04:15",
+        cron="15 4 * * *",
+        writes="—",
+        fix_policy="code",
+        commits=True,
+        heartbeat_var="HEARTBEAT_DEP_MIGRATE",
+    ),
+    Job(
+        key="overnight",
+        module="overnight",
+        cadence="nightly 06:30",
+        cron="30 6 * * *",
+        writes="tmp/reporting/overnight.md",
+        heartbeat_var="HEARTBEAT_OVERNIGHT",
+        findings_sink=SINK_NONE,
+        agent=False,
     ),
 ]
 
-JOBS_BY_KEY: Dict[str, Job] = {job.key: job for job in JOBS}
+#: **Add your own jobs as an append, in the space between the two frozen rules
+#: at the end of this section.** An entry edited into the list above is a
+#: change beside every entry a release adds, so it conflicts; an append does not.
+#: skeletor's own tree is the first to need it.
+#:
+#:     JOBS += [Job(key="nightly-check", module="nightly_check", cadence="nightly 01:00", cron="0 1 * * *", writes="—")]
 
 
-def _allowlisted() -> Dict[str, str]:
+# ── Extending JOBS ───────────────────────────────────────────────────────────
+#
+# **Put every append to JOBS, and any comment you write about it, in the space
+# between the two frozen rules at the bottom of this block.** skeletor ships that
+# space empty and never adds a line to it; `scripts/paths.py` records why there
+# are two rules and what the space buys.
+#
+# ── Nothing below this line is skeletor's ────────────────────────────────────
+#
+# Everything of yours goes between this rule and the closing one below: appends,
+# and any prose you write about them. Both rules are frozen — skeletor does not
+# rewrite either block and renders nothing between them, so your insertion point
+# is never adjacent to a template line that a release might edit. The
+# explanation above IS ordinary prose and does get rewritten, which is why the
+# rule sits at the bottom of it rather than at the top.
+
+
+# ── Skeletor's again below this line ─────────────────────────────────────────
+#
+# The space is bounded on both sides for the reason `scripts/paths.py` measures:
+# this file carries template-owned code further down, and one rule alone would
+# have certified all of it as yours.
+
+JOBS_BY_KEY: dict[str, Job] = {job.key: job for job in JOBS}
+
+
+def _allowlisted() -> dict[str, str]:
     """Jobs deliberately registered but NOT scheduled, with their reasons.
 
     Read through `scripts/allowlist.py`, the one reader every allowlist in this
@@ -189,19 +372,27 @@ def _allowlisted() -> Dict[str, str]:
     return allowlist.read(SCHEDULE_ALLOWLIST)
 
 
+#: The generated block's delimiters, which is what lets an install replace it in place.
+BLOCK_BEGIN = "# ── BEGIN generated by"
+BLOCK_END = "# ── END generated"
+
+
 def crontab_block() -> str:
     """The crontab block, generated. Never hand-copy this into `crontab -e`
     from the docs — the registry is the system; the docs table is documentation
     of it, and only one of the two can be wrong without anybody noticing."""
     exempt = _allowlisted()
     lines = [
-        "# ── BEGIN generated by `pp report cron --print` ──",
+        f"{BLOCK_BEGIN} `pp report cron --print` ──",
         "# Do not hand-edit. Regenerate after any change to scripts/reporting/jobs.py.",
         "SHELL=/bin/bash",
         # cron does not give you your login PATH. A job that works in your shell
         # and not under cron is almost always this, and it fails by not finding
         # the interpreter — which reads as a broken job rather than a broken PATH.
         f"PATH={os.environ.get('PATH', '/usr/local/bin:/usr/bin:/bin')}",
+        # The identity every job below runs as; `report cron --check` requires it.
+        f"{SEAT_ENV}={CRON_SEAT}",
+        f"# Each job starts {schedule_offset()} min after its slot (this checkout's offset).",
         "",
     ]
     for job in JOBS:
@@ -210,5 +401,38 @@ def crontab_block() -> str:
             continue
         lines.append(f"# {job.key} — {job.cadence} — {job.writes}")
         lines.append(job.cron_line())
-    lines.append("# ── END generated ──")
+    lines.append(f"{BLOCK_END} ──")
     return "\n".join(lines) + "\n"
+
+
+def merged_crontab(live: str) -> str:
+    """`live` with this tree's block replaced by today's, and every other line kept.
+
+    A crontab is per user, so it holds other projects' lines: piping the block
+    into `crontab -` deleted all of them, and the advice said to (skyrow-workspace,
+    on a 303-line crontab). A block is this tree's when a line in it runs from
+    `CRON_CWD`, so a sibling tree with the same CLI name keeps its own. A stray
+    line of ours outside any block is dropped, since the block re-adds it.
+    """
+    ours = f"cd {CRON_CWD} && ./pp report "
+    kept: list[str] = []
+    block: list[str] | None = None
+    placed = False
+    for line in live.splitlines():
+        if block is None and line.startswith(BLOCK_BEGIN):
+            block = [line]
+        elif block is not None:
+            block.append(line)
+            if line.startswith(BLOCK_END):
+                if any(ours in entry for entry in block):
+                    kept += [] if placed else crontab_block().splitlines()
+                    placed = True
+                else:
+                    kept += block
+                block = None
+        elif ours not in line:
+            kept.append(line)
+    kept += block or []
+    if not placed:
+        kept += crontab_block().splitlines()
+    return "\n".join(kept) + "\n"

@@ -3,10 +3,10 @@
 ## First-Time Setup
 
 ```bash
-cp .env.example .env                            # then fill it in
-.venv/bin/pre-commit install --install-hooks    # commit-msg format + lint gates
-python scripts/git/install_merge_drivers.py     # the regen-docs driver
-./pp check health                               # is everything answering?
+cp .env.example .env                                   # then fill it in
+.venv/bin/pre-commit install --install-hooks           # commit-msg format + lint gates
+.venv/bin/python scripts/git/install_merge_drivers.py  # clone-local config
+./pp check health                                      # is everything answering?
 ```
 
 **There is no `pp setup`, deliberately** — see `AGENTS.md`, which explains that
@@ -21,10 +21,12 @@ version control:
 
 - **Git hooks** (`pre-commit install --install-hooks`) — the commit-msg format
   check and the lint gates.
-- **The `regen-docs` merge driver** — its definition lives in `.git/config`,
-  which is not tracked, so **every clone after the first installs it by hand**.
-  That is the third line above; there is no step that does it for you. Verify
-  with `pp check merge-drivers`, which checks and never installs.
+- **The clone-local config** (`scripts/git/install_merge_drivers.py`, the third
+  line above) — the `regen-docs` merge driver and `commit.template`. Both live in
+  `.git/config`, which is not tracked, so a clone that skipped that line has
+  `.gitattributes` naming a driver that does not exist and a `check pre-push` that
+  is red until it runs. Verify with `pp check merge-drivers`, which checks and
+  never installs.
 
 The block above is static text, and so are the install blocks in `README.md` and
 `AGENTS.md`. They were generated from one source when this repository was
@@ -88,6 +90,7 @@ pytestmark = [pytest.mark.unit]
 ./pp test all              # everything except `manual`
 ./pp test unit --ci        # reproduce CI's skip semantics locally
 ./pp test coverage -w 20   # the worst-covered modules — where a test buys most
+./pp test coverage --suite unit --suite ui   # only these suites, budgeted as unit+ui
 ```
 
 `--ci` sets `PP_CI=1`, under which an env-gate skip becomes a **failure**.
@@ -99,11 +102,11 @@ Full rules: [`docs/rules/testing.md`](rules/testing.md).
 
 | Event                          | What runs                              | ~min |
 | ------------------------------ | -------------------------------------- | ---- |
-| Draft PR, docs-only            | `CI Gate` alone                        | ~1   |
+| Draft PR, docs-only            | `CI Gate` + `pytest`                   | ~4   |
 | Draft PR carrying code         | `CI Gate` + `Node` + `pytest`          | ~5   |
-| Ready PR → `develop`, docs-only | `CI Gate` alone               | ~1   |
+| Ready PR → `develop`, docs-only | `CI Gate` + `pytest`          | ~4   |
 | Ready PR → `develop`, code      | `CI Gate` + `Node` + `pytest` | ~5   |
-| Ready PR → `main`, docs-only | `CI Gate` alone            | ~1   |
+| Ready PR → `main`, docs-only | `CI Gate` + `pytest`       | ~4   |
 | Ready PR → `main`, code      | **everything**             | full |
 | Ready PR opened by Dependabot  | **everything** — deliberately exempt   | full |
 | Push to `develop` or `main` | **everything**, and Release Please on `main` | full |
@@ -115,14 +118,14 @@ Three things about this table are load-bearing:
    `paths-ignore` on the trigger: a required check that never reports at all
    blocks the PR forever.
 
-   **A matrix job is the exception, and `pytest` is why.** The unit suite runs
-   once per interpreter, as `pytest <version>`, and when its `if:` skips it on a
-   docs-only change GitHub never expands the matrix: one check reports, named
-   `pytest ${{ matrix.python }}` with the expression unexpanded, so a
-   protection requiring `pytest <version>` waits forever on a pull request
-   whose every check is green. **Require `pytest`, never `pytest <version>`.**
-   `pytest` is one job that `needs:` the matrix and always reports — pass when
-   every leg passed or the gate chose docs-only, fail otherwise. A protection
+   **The unit suite is never gated, docs-only included**, because its tests
+   read `docs/` — plans, tables, references — so a docs-only change is what
+   they judge. It runs once per interpreter, as `pytest <version>`, and a
+   skipped matrix reports one check with the expression unexpanded, so a
+   protection requiring `pytest <version>` can wait forever.
+   **Require `pytest`, never `pytest <version>`.** `pytest` is one job that
+   `needs:` the matrix and always reports — pass when every leg passed, fail
+   otherwise, including when the gate failed and nothing ran. A protection
    set up before that job existed names the per-version contexts; no file in
    this tree can change that setting, so check it.
 
@@ -139,10 +142,36 @@ Three things about this table are load-bearing:
    the moment branch protection is satisfied, so without the exemption every
    eligible bump merges having never run the suite it exists to be checked by.
 
+### Dependency updates
+
+`.github/dependabot.yml` proposes version updates monthly, each held back five
+days (`cooldown`) so a hijacked release can be yanked before it is proposed.
+`.github/workflows/dependabot-auto-merge.yml` merges a Dependabot pull request
+once CI passes on it, using the GitHub App's token (`APP_ID`, `APP_PRIVATE_KEY`)
+so the merge itself runs CI on the base branch. Patches and minors merge,
+security updates included, and so does a major in a dev manifest
+(`scripts/requirements.txt`, `requirements-dev*.txt`, `package.json`
+devDependencies), because the suite running under it is the migration test. A
+major anywhere else is runtime and is left for a person. The decision, and the
+list of dev manifests to extend, is `.github/scripts/dependabot-hold.cjs`. Without the App's secrets it merges
+nothing and says so in the run.
+
+The lint tools (black, flake8, isort, pyright) are ignored there. Each is pinned
+in two files and `tests/test_lint_tool_parity.py` is red until both agree, so a
+bump to one of them could never merge. Bump those by hand, in both files.
+
 ## Releases
 
 Versioning is Conventional Commits → Release Please. Commit types decide the
 bump; `CHANGELOG.md` and `VERSION` are generated. **Never hand-edit either.**
+
+The release lands on `main`, so back-merge it. Until you do,
+`develop` does not contain the release commit, and `git describe` there
+names the release before this one (mind.head):
+
+```bash
+git switch develop && git merge --no-ff main && git push
+```
 
 A release closes the report window: in-flight reports under
 `docs/reports/regular/` freeze into `docs/reports/releases/<tag>/`. See
@@ -182,3 +211,32 @@ PP_PYTHON=.venv-ci/bin/python ./pp check pre-push   # 3. CI's exact interpreter
 Step 3 matters more than it looks. A local venv that has drifted from CI's
 pinned interpreter produces failures that exist in one environment and not the
 other, and the tool names are identical, so the version never occurs to anyone.
+
+### After an upgrade
+
+An upgrade that writes leaves `tmp/upgrade/REPORT.md` behind: the conflict
+count, the base it started from and each pending file are filled in, and every
+other section says in a comment what belongs there. Fill those in, whoever ran
+it, so every upgrade of this tree is reported the same way. A second run of the
+same upgrade, such as `--ported`, keeps what you wrote and marks a conflict you
+resolved; an upgrade to a different version starts the file again.
+
+### A scheduled workflow
+
+No pull request runs a job triggered by `schedule:`, so its first real run is
+the night after the merge. Run it here first:
+
+```bash
+./pp check scheduled --plan   # what would run, and where it would stop
+./pp check scheduled          # run it: the working tree, a clean venv
+```
+
+It rehearses the working tree as `git add -A` would commit it, so run it straight
+after an upgrade, before committing. It exits 2 when no job could be rehearsed in
+full: nothing was checked, and that is not a pass.
+
+A clean venv is the point. A dependency only that job needs is missing there
+and present in your `.venv`, so the rehearsal fails and your own suite passes.
+What it cannot stand in for (another action, a secret, a condition beyond
+`github.event_name`) stops the job, and the job is reported as not rehearsed,
+never as passing. `scripts/rehearse_scheduled.py` has the rules.

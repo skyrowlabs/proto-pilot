@@ -1,10 +1,25 @@
-# proto.pilot
+<p align="center">
+  <img src="docs/assets/hero.svg" alt="proto.pilot, by SKYROW.LABS: a paper plane leaves a spark of an idea and dives into an open container box. Give it an idea and a little direction, and get back a prototype you can run, in your terminal or in Docker." width="100%">
+</p>
 
 <p align="center">
-  <a href="https://github.com/skyrowlabs/proto-pilot/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/skyrowlabs/proto-pilot/actions/workflows/ci.yml/badge.svg?branch=develop"></a>
-  <a href="https://github.com/skyrowlabs/proto-pilot/tags"><img alt="Latest tag" src="https://img.shields.io/github/v/tag/skyrowlabs/proto-pilot?label=version"></a>
-  <a href="https://github.com/skyrowlabs/proto-pilot/actions/workflows/ci.yml"><img alt="Python 3.11 to 3.14" src="https://img.shields.io/badge/python-3.11%E2%80%933.14-blue"></a>
-  <a href="LICENSE"><img alt="MIT licence" src="https://img.shields.io/github/license/skyrowlabs/proto-pilot"></a>
+  <img src="https://img.shields.io/badge/repo-private-7a8fa8?labelColor=1c2633" alt="repo: private">
+  <img src="https://img.shields.io/badge/stage-poc-818cf8?labelColor=1c2633" alt="stage: poc">
+  <img alt="Python 3.11 to 3.14" src="https://img.shields.io/badge/python-3.11%E2%80%933.14-818cf8?labelColor=1c2633">
+  <a href="#the-offline-baseline"><img alt="works offline" src="https://img.shields.io/badge/works-offline-818cf8?labelColor=1c2633"></a>
+</p>
+
+<p align="center">
+  <a href="#install"><b>Install</b></a> ·
+  <a href="#commands"><b>Commands</b></a> ·
+  <a href="#how-it-works"><b>How it works</b></a> ·
+  <a href="#the-offline-baseline"><b>Offline baseline</b></a> ·
+  <a href="#status"><b>Status</b></a> ·
+  <a href="#working-on-this-repo"><b>Working on this repo</b></a>
+</p>
+
+<p align="center">
+  <img src="docs/assets/pillars.svg" alt="Three things proto.pilot is. Verified by running: it boots the app, drives it and runs the smoke suite, and red gets a bounded repair loop, then a RUNBOOK. Two media, one pipeline: a Textual and SQLite app in your terminal by default, FastAPI and Postgres in Docker with the web target. Works offline: every pass has a deterministic twin, so CI runs the whole pipeline with no key and no Docker daemon." width="100%">
 </p>
 
 A framework for prototyping ideas with agents.
@@ -303,8 +318,8 @@ the marker-based test suites and the scheduled-job machinery are not local
 inventions — they are one shared shell, debugged once.
 
 ```bash
-python -m venv .venv && .venv/bin/pip install -r scripts/requirements.txt
-.venv/bin/pre-commit install --install-hooks
+python -m venv .venv && .venv/bin/pip install -r scripts/requirements.txt && .venv/bin/python scripts/install_project.py
+.venv/bin/pre-commit install --install-hooks && .venv/bin/python scripts/git/install_merge_drivers.py
 ./pp check pre-push      # every CI gate this host can run
 ./pp test unit           # the fast suite
 ```

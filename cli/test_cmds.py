@@ -145,6 +145,24 @@ def _pytest(marker: str, extra: tuple, ci: bool) -> int:
     return code
 
 
+#: The coverage budget key for every scheduled suite measured together: what the
+#: nightly measures, and what `pp test coverage` measures with no `--suite`.
+#: One name for one set; `unit` had meant two (stash.flow).
+SCHEDULED_KEY = "scheduled"
+
+
+def scheduled_suites() -> list[str]:
+    """The markers the automatic runs include, in the registry's order."""
+    return [marker for marker, suite in SUITES.items() if suite.scheduled]
+
+
+def coverage_selection(suites: tuple) -> tuple[str, str]:
+    """`(pytest marker expression, budget key)` for `suites`, or for every scheduled suite."""
+    if not suites:
+        return " or ".join(scheduled_suites()), SCHEDULED_KEY
+    return " or ".join(suites), "+".join(suites)
+
+
 @click.group(invoke_without_command=True)
 @click.pass_context
 def test(ctx: click.Context) -> None:
@@ -180,9 +198,24 @@ def all(ci: bool) -> None:
     sys.exit(summarize(results))
 
 
+@test.command(name="suites")
+@click.option("--scheduled", "only_scheduled", is_flag=True, help="only the suites the automatic runs include")
+def suites_cmd(only_scheduled: bool) -> None:
+    """Every suite's marker, one per line: what a workflow reads instead of a list of its own."""
+    for marker in scheduled_suites() if only_scheduled else list(SUITES):
+        click.echo(marker)
+
+
 @test.command()
 @click.option("-w", "--worst", default=20, show_default=True, help="how many modules to list")
-def coverage(worst: int) -> None:
+@click.option(
+    "--suite",
+    "suites",
+    multiple=True,
+    type=click.Choice(sorted(SUITES)),
+    help="measure these suites (budgeted as e.g. `unit+ui`); default: every scheduled one, as the nightly does",
+)
+def coverage(worst: int, suites: tuple) -> None:
     """Measure coverage and list the worst-covered modules.
 
     The list is the point: it tells you where a new test buys the most, which is
@@ -201,7 +234,14 @@ def coverage(worst: int) -> None:
     it looked. Both are one fix, and the second is why the first survived: with
     nothing to measure the ratchet never disagreed, so nothing ever tested
     whether disagreement was reported.
+
+    **The suite is a choice, and several can be measured as one.** It measured
+    `unit` alone, so a module only the `ui` suite exercises read as uncovered
+    own code and the ratchet went red on code that was tested (stash.flow, #3).
+    `--suite unit --suite ui` runs `-m "unit or ui"` against the budget key
+    `unit+ui`.
     """
+    marker, key = coverage_selection(suites)
     report = TMP_DIR / "coverage.xml"
     report.parent.mkdir(parents=True, exist_ok=True)
     code = run(
@@ -211,7 +251,7 @@ def coverage(worst: int) -> None:
             "pytest",
             "tests/",
             "-m",
-            "unit",
+            marker,
             "-q",
             "--cov",
             "--cov-report=term-missing",
@@ -219,5 +259,7 @@ def coverage(worst: int) -> None:
         ]
     ).returncode
     if code == 0:
-        code = run([sys.executable, "scripts/check_coverage_budget.py", "--xml", str(report)]).returncode
+        code = run(
+            [sys.executable, "scripts/check_coverage_budget.py", "--suite", key, "--xml", str(report)]
+        ).returncode
     sys.exit(code)

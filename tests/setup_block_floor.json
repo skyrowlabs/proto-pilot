@@ -1,0 +1,9 @@
+{
+  "_comment": [
+    "This tree's own floor for tests/test_setup_blocks_agree.py; it outranks",
+    "tests/setup_block_budget.json, which is the template's and is not edited here.",
+    "Raised 2 -> 4 on adoption (skeletor v0.6.2), 4 lines; re-measured in commands (one per && link) at skeletor v0.57.0, which changed the unit: AGENTS.md and README.md agree on 7. Measured with tests/test_setup_blocks_agree.py::shared_prefix, not chosen.",
+    "Moved here from setup_block_budget.json at skeletor v0.59.0, which split the two."
+  ],
+  "min_shared_prefix": 7
+}

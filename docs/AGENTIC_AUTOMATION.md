@@ -24,6 +24,7 @@ apart (`tests/test_reporting_jobs.py` asserts it).
 
 ```bash
 pp report cron --print    # emit the block for `crontab -e`
+pp report cron --install  # replace this tree's block; every other line is kept
 pp report cron --check    # does the LIVE crontab match the registry?
 pp report watch           # what ran recently, and what it decided
 ```
@@ -32,6 +33,55 @@ pp report watch           # what ran recently, and what it decided
 Never hand-copy a schedule from prose into a crontab, and remember that
 *registered* is not *installed in your crontab*. When the two disagree,
 `cron --check` tells you which one your machine is actually following.
+
+## The lane drainers, and standing down for free
+
+`agent-task` and `agent-fix` work the capture lanes `pp task` and `pp bug`
+file into: one issue per run, oldest first, on a branch named
+`agent/<lane>/<issue>`, opened as a **draft** pull request for a person to
+review. Both live in `scripts/reporting/drain.py`, and they ship switched off in
+`scripts/reporting_schedule_allowlist.yaml`. Turning one on means deciding who
+reviews its pull requests.
+
+Most nights a lane is empty, so the empty check runs before any agent and costs
+a `gh issue list`. An empty lane is `declined`, with a ledger row and a
+heartbeat; a lane GitHub could not answer for is `failed`, because "I could not
+look" is not "empty". An issue that already has an open draft from its drainer,
+or that has failed three times, is skipped. The attempt count is a marker comment
+on the issue itself.
+
+`dep-migrate` drains a different queue, and it also ships switched off.
+`dependabot-auto-merge.yml` merges patches, minors and dev-tool majors itself,
+and labels a runtime major it holds `dependabot-runtime-major`. Each night the
+job takes the oldest one, branches from Dependabot's head as
+`agent/migrate/<pr>`, and has the agent migrate the code, capped at
+`--max-turns`. Then the job runs `pp test unit` itself. Green opens a draft
+pull request linking Dependabot's, which stays open. Red opens nothing: it
+comments the agent's notes on Dependabot's pull request and labels it
+`migration-failed`. A bump that needs no change is labelled
+`migration-not-needed`. Either label takes the pull request out of the queue.
+
+Every agent runs as a **seat**, one of `SEATS` in `scripts/reporting/jobs.py`.
+The generated cron block sets `PP_SEAT`, and `cron --check` is
+red without it. `personal`, the only seat shipped, is whoever is logged into
+`claude` and `gh` on the host. An automation seat names the variables holding
+its Claude and GitHub tokens, and refuses to run when they are unset rather than
+falling back to `personal`. Each ledger row records the seat that ran.
+
+Every job starts `schedule_offset()` minutes after its slot, from a hash of the
+checkout's path, so checkouts sharing one host's crontab do not all start at
+once. Set `SCHEDULE_OFFSET_PINNED` in `jobs.py` to choose it, or 0 to turn it off.
+
+`pp report <key> --dry-run` runs any job's deterministic stage, says what
+the agent stage would do, and records nothing.
+
+`overnight` has no agent. Every night it writes `tmp/reporting/overnight.md`:
+what failed, what is overdue, or that the night was idle, because "no digest"
+reads the same as "the jobs died".
+
+`pp report status --json` is the machine view: every job's last result,
+its age, whether it is overdue against its cron schedule, and its next run.
+sky.boss reads that envelope, so adding a tree there is a `projects.toml` entry.
 
 ## The grid is load-bearing
 
@@ -118,8 +168,12 @@ shells out, through one argv template:
 
 ```bash
 # the default, and the only invocation tested here
-PP_AGENT_CMD='claude -p {prompt} --permission-mode acceptEdits'
+PP_AGENT_CMD='claude -p {prompt} --permission-mode acceptEdits --output-format json'
 ```
+
+`--output-format json` is what puts `cost_usd`, `num_turns` and `tokens` on each
+ledger row. An agent that prints anything else still runs; its rows carry
+`null` there, which reads as "not measured" rather than as free.
 
 `{prompt}` is replaced with the whole prompt and the argv is executed directly,
 never through a shell — so `codex exec {prompt}` and
@@ -150,10 +204,13 @@ exactly this reason; `tests/test_reporting_jobs.py` asserts it still does.
 ## Adding a job
 
 1. Add a `Job(...)` entry to `scripts/reporting/jobs.py`. **Decide its
-   `fix_policy` explicitly.** Name the prompt file after the module
-   (`prompts/<module>.md`) — that is how the policy is resolved.
+   `fix_policy` explicitly**, and if it writes a report, its `findings_sink`:
+   where a finding goes that the job may not fix. Name the prompt file after the
+   module (`prompts/<module>.md`) — that is how the policy is resolved.
 2. Write `scripts/reporting/<module>.py` with a `main()`: deterministic
-   collection, then `agent_runner.run_triage(<key>, collected)`.
+   collection, then `agent_runner.run_triage(<key>, collected)`. Shell out
+   through `scripts/reporting/shellout.py`: cron's `PATH` can lack the tool,
+   and a bare `subprocess.run` then raises instead of returning a code.
 3. Write `scripts/reporting/prompts/<module>.md`. State what **not** to write as
    explicitly as what to write — an unconstrained report is padded to look
    substantial and is not read next week either.
@@ -166,9 +223,10 @@ exactly this reason; `tests/test_reporting_jobs.py` asserts it still does.
    own leaves the rest claiming a refresh that never happened.
 6. If it should not be scheduled yet, add it to
    `scripts/reporting_schedule_allowlist.yaml` **with a reason**. Otherwise
-   re-run `pp report cron --print` and reinstall the crontab.
+   re-run `pp report cron --install`.
 
-Steps 1–5 are cross-checked by `tests/test_reporting_jobs.py`. Only step 6's
+Steps 1–5 are cross-checked by `tests/test_reporting_jobs.py`, and step 2's
+shell-outs by `tests/test_reporting_shellout.py`. Only step 6's
 crontab half is unenforceable from here — it is a change to a crontab on a host
 this repo cannot see.
 
