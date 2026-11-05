@@ -165,6 +165,14 @@ bump to one of them could never merge. Bump those by hand, in both files.
 Versioning is Conventional Commits → Release Please. Commit types decide the
 bump; `CHANGELOG.md` and `VERSION` are generated. **Never hand-edit either.**
 
+The release lands on `main`, so back-merge it. Until you do,
+`develop` does not contain the release commit, and `git describe` there
+names the release before this one (mind.head):
+
+```bash
+git switch develop && git merge --no-ff main && git push
+```
+
 A release closes the report window: in-flight reports under
 `docs/reports/regular/` freeze into `docs/reports/releases/<tag>/`. See
 [`docs/rules/docs.md`](rules/docs.md).
