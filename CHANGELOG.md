@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.2.1](https://github.com/skyrowlabs/proto-pilot/compare/v0.2.0...v0.2.1) (2026-11-05)
+
+
+### Fixed
+
+* **docs:** the Quick Start installs proto.pilot with every extra ([ff1332f](https://github.com/skyrowlabs/proto-pilot/commit/ff1332fc640f98558900e14174c3d79beec97fef))
+
+
+### Changed
+
+* **docs:** take skeletor's check_doc_tables byte for byte ([ef14963](https://github.com/skyrowlabs/proto-pilot/commit/ef149632878db58d34fccda065c6e7e43a83880a))
+
+
+### Documentation
+
+* **readme:** add the skyrow hero and theme ([1c185e7](https://github.com/skyrowlabs/proto-pilot/commit/1c185e7b948fe7e9da431b885065df8d900bad94))
+* **readme:** bring the badge row to the workspace standard ([2bf5ca7](https://github.com/skyrowlabs/proto-pilot/commit/2bf5ca7b2beb3436282c5274aee0868554699bcb))
+* **reports:** close the v0.2.0 report window ([af32686](https://github.com/skyrowlabs/proto-pilot/commit/af32686dfdf160929bbac9b045a42e1de2b6b9e5))
+* **reports:** record the v0.2.0 window that froze no reports ([8ac5800](https://github.com/skyrowlabs/proto-pilot/commit/8ac5800c8df88dedd6ba3c6b5a1c2cc3c3970bfd))
+* **reports:** refresh the repository report for v0.2.0..HEAD ([1c1a6db](https://github.com/skyrowlabs/proto-pilot/commit/1c1a6dbd9f89c19f9950c92168410216946cbeb9))
+* **reports:** refresh the repository report for v0.2.0..HEAD ([b4545f3](https://github.com/skyrowlabs/proto-pilot/commit/b4545f353bbfef645922f6d2bed7344575116d99))
+* **reports:** refresh the repository report for v0.2.0..HEAD ([4e056f2](https://github.com/skyrowlabs/proto-pilot/commit/4e056f248ba35692d9cfde7bac167a43989957dc))
+
 ## [0.2.0](https://github.com/skyrowlabs/proto-pilot/compare/v0.1.0...v0.2.0) (2026-10-03)
 
 
