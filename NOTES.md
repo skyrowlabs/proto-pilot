@@ -231,7 +231,7 @@ is only a pointer at it).
   `filesAnalyzed`; ours never had it.
 
   Not currently broken — 72 files analysed, genuinely clean. Held now by
-  `test_pyright_has_something_to_analyse`, which asserts the *precondition*
+  `tests/test_pyright_scope.py` (the template's, since 2026-11-05), which asserts the *precondition*
   (every `include` path resolves and holds at least one `.py`) rather than the
   result, so it stays fast and needs no pyright installed. The realistic way
   this empties is a directory that moved, which is what that catches.
@@ -706,6 +706,12 @@ is only a pointer at it).
   checked.
 
   Standing, unchanged: `tests/test_pyright_scope.py` stays deleted.
+
+- **2026-11-05 — `tests/test_pyright_scope.py` is the template's again.** It
+  adopted both of our pyright tests at skeletor v0.23.0 and adds a third, so our
+  copies at the end of `test_lint_tool_parity.py` were duplicates. Restored at the
+  v0.73.0 round, and the parity file and `pyrightconfig.json` were taken whole.
+  This tree now has no deletions from the manifest.
 
 - **2026-10-15 — `scripts/check_doc_tables.py` is the template's again, byte
   for byte.** The entry above kept ours for two rounds on the ground that the

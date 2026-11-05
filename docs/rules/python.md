@@ -50,16 +50,10 @@ The unit suite holds that rule: the config pins, **or** every caller passes
 `--pythonpath`. CI pins its dependency set in `.github/pyright-deps.txt`; keep that a
 superset of the unit-test job's installs.
 
-**That sentence was false here for a day, and the reason generalises.** The template ships
-the assertion in a scope file this tree deletes on purpose — its other half duplicates
-`test_pyright_has_something_to_analyse`. The v0.24.0 upgrade re-examined the deletion and
-held it, on the finding that the pre-flight wrapper covered the interpreter half. It does
-not: the wrapper prefers this pin and *falls through to `PATH`* when nothing pins, so its
-tests assert the resolution order rather than that this repository pins. Deleting the pin
-left all 725 unit tests green. **Centralising a decision is not making it** — and a
-centralised mechanism is the most convincing possible place to stop looking for the
-assertion. Re-derived beside the include-scope check, which is where this tree keeps its
-pyright rulings.
+`tests/test_pyright_scope.py` holds it, beside the include-scope check. Do not take the
+pre-flight wrapper as the gate: `scripts/lint_pyright_gate.py` prefers this pin and *falls
+through to `PATH`* when nothing pins, so its tests assert the resolution order, not that this
+repository pins. **Centralising a decision is not making it.**
 
 **`--pythonpath` does not override the pin, and the two are not interchangeable.** Measured
 on pyright 1.1.411: with `venvPath` + `venv` resolving, passing a deliberately

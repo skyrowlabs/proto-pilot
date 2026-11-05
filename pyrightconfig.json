@@ -16,17 +16,6 @@
   // and a comment naming the test that enforces it then names a file they
   // deleted on purpose. proto.pilot's, from a tree that had.
   //
-  // THIS TREE IS THAT TREE, and the rule was unheld here for a day. The
-  // template ships the assertion in the scope file we delete; at the v0.24.0
-  // upgrade that deletion was held on the finding that the pre-flight wrapper
-  // already covered the interpreter half. It does not. The wrapper prefers
-  // this pin and FALLS THROUGH to PATH when nothing pins, so its tests assert
-  // the resolution order, not that this repository pins — deleting the two
-  // lines below left all 725 unit tests green. Re-derived here as
-  // test_lint_tool_parity.py::test_no_pyright_caller_resolves_its_interpreter_from_path,
-  // beside the include-scope assertion, which is where this tree keeps its
-  // pyright rulings. Centralising a decision is not making it.
-  //
   // Safe where no virtualenv exists: pyright prints `venv .venv subdirectory not
   // found`, falls back to PATH, and leaves the exit code alone.
   //
