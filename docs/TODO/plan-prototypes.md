@@ -10,7 +10,7 @@ summary: "Add `proto plan`, which turns an idea into a researched, connected, or
 
 # Plan Prototypes and Dreaming
 
-> **Status**: 🔴 Planned — draft; three decisions ruled 2026-11-06, three still open
+> **Status**: 🔴 Planned — draft; all six decisions ruled 2026-11-06; Phase 1 confirms the research path
 > **Shelf-Status**: planned
 > **Priority**: Medium — a new capability; nothing existing is broken without it
 > **Updated**: 2026-11-06
@@ -145,7 +145,7 @@ config, deliberately, and `ClaudeLLM` sends no tools.
       example `stream-json` on the CLI). This decides how the *retrieved this run*
       check is built; the fallback is fetching each URL ourselves, which proves it
       exists but not that it was read
-- [ ] Record the result here and settle Decision 5
+- [ ] Record the result here and confirm or revise Decision 5
 
 ## Phase 2 — The model, the offline twin, the renderer
 
@@ -212,18 +212,20 @@ target showed cost more than the seam looks.
 
 ## Open decisions
 
-Rulings are Jeston's, 2026-11-06. The rest need one before this plan can be `ready`,
-and carry a recommendation.
+All six are Jeston's rulings, 2026-11-06. The fifth is provisional on Phase 1.
 
 1. **One document or a tree?** Ruled: a folder, with `PLAN.md` as the entry, so topics
    can grow alone. `proto plan export --single` flattens it for sharing.
-2. **Sibling pipeline or third target?** Sibling, for the reasons under *Approach*.
+2. **Sibling pipeline or third target?** Ruled: sibling, for the reasons under *Approach*.
 3. **Dreaming on by default?** Ruled: yes, at a small count. `--no-dream` turns it off.
 4. **Can a person edit the rendered markdown?** Ruled: no. `plan.json` is the truth and
    a re-render overwrites.
-5. **Which research path?** Waits on Phase 1. The expected answer is the CLI backend,
-   since this machine has a subscription and no API credit.
-6. **What is the command called?** `proto plan` and `proto dream`. "Plan" already means
+5. **Which research path?** Ruled, provisionally: the CLI backend with only `WebSearch`
+   and `WebFetch`, for the research pass alone, since this machine has a subscription and
+   no API credit. If `--json-schema` breaks with tools on, split research into a tool call
+   and a no-tools structuring call. Move to the API's web search only if retrieved URLs
+   cannot be read from the CLI. API-backend research can follow the first version.
+6. **What is the command called?** Ruled: `proto plan` and `proto dream`. "Plan" already means
    a `docs/TODO/` file in this repo, but only to people working on the repo.
 
 ## Acceptance
