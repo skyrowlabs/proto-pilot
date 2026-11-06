@@ -1,7 +1,7 @@
 ---
 title: "Plan Prototypes and Dreaming"
 slug: plan-prototypes
-shelf_status: planned
+shelf_status: ready
 priority: high
 updated: 2026-11-06
 tags: [plan, research, dreaming, pipeline]
@@ -10,11 +10,11 @@ summary: "Add `proto plan`, which turns an idea into a researched, connected, or
 
 # Plan Prototypes and Dreaming
 
-> **Status**: 🔴 Planned — draft; all six decisions ruled 2026-11-06; Phase 1 confirms the research path
-> **Shelf-Status**: planned
+> **Status**: 🟢 Ready — all six decisions ruled and Phase 1 measured, 2026-11-06
+> **Shelf-Status**: ready
 > **Priority**: High — this is now the product; see [plans-first](../ideas/plans-first.md)
 > **Updated**: 2026-11-06
-> **Queue-Order**: unset until it is `ready`
+> **Queue-Order**: 10
 
 ## Problem
 
@@ -91,7 +91,7 @@ plan is coherent and traceable, never that it is true.** The green line says so.
 - every topic is in the map; every edge names two topics that exist
 - `depends-on` has no cycles
 - every finding has a source in `sources.md`, or is labelled an assumption
-- every source was actually retrieved during this run, not typed by the model
+- every source was fetched with usable content during this run, not typed by the model
 - the first step in `start` has no unmet dependency
 - every dream has an anchor topic, a verdict, and fits its word cap
 - no dream text appears in a topic file
@@ -137,15 +137,36 @@ Research is the one capability the tool lacks. `structured()` is a single call w
 tools: `ClaudeCodeLLM` passes `ISOLATION`, which is `--tools ""` and an empty MCP
 config, deliberately, and `ClaudeLLM` sends no tools.
 
-- [ ] Run a throwaway research call on the CLI backend with only `WebSearch` and
+- [x] Run a throwaway research call on the CLI backend with only `WebSearch` and
       `WebFetch` allowed; record tokens, time and whether `--json-schema` holds
-- [ ] Same on the API backend with its server-side web search, noting that
-      `ANTHROPIC_API_KEY` needs real credit here
-- [ ] Establish whether the URLs actually retrieved can be read from the run (for
-      example `stream-json` on the CLI). This decides how the *retrieved this run*
-      check is built; the fallback is fetching each URL ourselves, which proves it
-      exists but not that it was read
-- [ ] Record the result here and confirm or revise Decision 5
+- [x] Establish whether the URLs actually retrieved can be read from the run
+- [x] Record the result here and confirm or revise Decision 5
+- [ ] Same on the API backend with its server-side web search, once there is API
+      credit to run it (~deferred)
+
+**Measured 2026-11-06:** two calls on one topic, one per output format, so a small sample.
+
+| | `json` | `stream-json` |
+| --- | --- | --- |
+| Time | 133s | 122s |
+| Turns | 16 | 15 |
+| Reported cost | $0.53 | $0.37 |
+| Valid structured output | yes | yes |
+
+- **`--json-schema` holds with tools on**, so research needs no split into two calls.
+- **`stream-json` shows every retrieval.** All six cited URLs in that run matched a
+  `WebFetch` that returned content, and the assumption was labelled. `json` output
+  cannot show this, so research must use `stream-json`.
+- **A failed fetch does not look failed.** A 403 and an unfollowed redirect both came
+  back with no error flag, as text in the result. The ledger must read that text, and
+  it is a heuristic.
+- **`WebFetch` returns a model's summary of the page, not the page.** So *retrieved
+  this run* proves the source was read through that summary, not that the claim is in
+  the original. The verifier's limit should say so.
+- **Budget:** about two minutes a topic, so 4–8 topics take 8–17 minutes in series.
+  The reported cost is what the run would be priced at, not a subscription charge.
+
+Decision 5 is confirmed.
 
 ## Phase 2 — The model, the offline twin, the renderer
 
@@ -212,7 +233,7 @@ target showed cost more than the seam looks.
 
 ## Open decisions
 
-All six are Jeston's rulings, 2026-11-06. The fifth is provisional on Phase 1.
+All six are Jeston's rulings, 2026-11-06.
 
 1. **One document or a tree?** Ruled: a folder, with `PLAN.md` as the entry, so topics
    can grow alone. `proto plan export --single` flattens it for sharing.
@@ -220,11 +241,9 @@ All six are Jeston's rulings, 2026-11-06. The fifth is provisional on Phase 1.
 3. **Dreaming on by default?** Ruled: yes, at a small count. `--no-dream` turns it off.
 4. **Can a person edit the rendered markdown?** Ruled: no. `plan.json` is the truth and
    a re-render overwrites.
-5. **Which research path?** Ruled, provisionally: the CLI backend with only `WebSearch`
-   and `WebFetch`, for the research pass alone, since this machine has a subscription and
-   no API credit. If `--json-schema` breaks with tools on, split research into a tool call
-   and a no-tools structuring call. Move to the API's web search only if retrieved URLs
-   cannot be read from the CLI. API-backend research can follow the first version.
+5. **Which research path?** Ruled, and confirmed by Phase 1: the CLI backend with only
+   `WebSearch` and `WebFetch`, for the research pass alone, using `stream-json`. API-backend
+   research can follow the first version.
 6. **What is the command called?** Ruled: `proto plan` and `proto dream`. "Plan" already means
    a `docs/TODO/` file in this repo, but only to people working on the repo.
 
