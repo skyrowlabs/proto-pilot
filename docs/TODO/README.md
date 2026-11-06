@@ -22,8 +22,7 @@ _Not started — intended future work._
 
 | Plan | Priority | Updated | Summary |
 | ---- | -------- | ------- | ------- |
-| [The Improvement Loop](improvement-loop.md) | high | 2026-09-03 | Let a prototype be told to keep getting better, with a ratchet that reverts any iteration leaving it less green than it found it. |
-| [Plan Prototypes and Dreaming](plan-prototypes.md) | medium | 2026-11-06 | Add `proto plan`, which turns an idea into a researched, connected, organised set of text plans, plus a dreaming step that collects, evaluates and proposes lighter extensions of the idea. |
+| [Plan Prototypes and Dreaming](plan-prototypes.md) | high | 2026-11-06 | Add `proto plan`, which turns an idea into a researched, connected, organised set of text plans, plus a dreaming step that collects, evaluates and proposes lighter extensions of the idea. |
 
 ## ⛔ Blocked
 
@@ -31,7 +30,8 @@ _Startable or code-complete, gated on an external prerequisite._
 
 | Gate | Plan | Priority | Updated | Summary |
 | ---- | ---- | -------- | ------- | ------- |
-| 🧭 Product decision | [Drawing Freedom](drawing-freedom.md) | high | 2026-09-03 | Raise the visual ceiling of a generated app by ranking display options on whether the verifier can tell they worked — not on what Docker permits. |
+| 🧭 Product decision | [Drawing Freedom](drawing-freedom.md) | low | 2026-11-06 | Raise the visual ceiling of a generated app by ranking display options on whether the verifier can tell they worked — not on what Docker permits. |
+| 🧭 Product decision | [The Improvement Loop](improvement-loop.md) | low | 2026-11-06 | Let a prototype be told to keep getting better, with a ratchet that reverts any iteration leaving it less green than it found it. |
 
 ---
 

@@ -1,5 +1,8 @@
 # Sketches, not scaffolds — the terminal pivot
 
+> **Decision 1 is superseded by [plans-first](plans-first.md) (2026-11-06).** The
+> terminal target stays in the tree, tabled. Decisions 2 and 3 still hold.
+>
 > **Status: a direction, decided.** Captured 2026-09-03. It supersedes
 > [hosted.md](hosted.md), which is now tabled.
 >
