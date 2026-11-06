@@ -115,6 +115,7 @@ back a link you click and a terminal app has no link.
 |---|---|
 | `proto new IDEA` | generate, boot, verify, hand it back |
 | `proto add CHANGE` | amend the spec, regenerate, re-verify |
+| `proto plan IDEA --offline` | write a generic, unresearched plan folder; the offline baseline is all that exists so far |
 | `proto up` / `down` / `logs` / `test` | the obvious things |
 | `proto spec` | what this project actually promised |
 | `proto archetypes` | what shapes this build can generate, and what each asks |

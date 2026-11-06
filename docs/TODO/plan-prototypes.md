@@ -170,13 +170,13 @@ Decision 5 is confirmed.
 
 ## Phase 2 — The model, the offline twin, the renderer
 
-- [ ] `protopilot/plan/model.py`: `Plan`, `Topic`, `Finding`, `Source`, `Edge`,
+- [x] `protopilot/plan/model.py`: `Plan`, `Topic`, `Finding`, `Source`, `Edge`,
       `Step`, `Dream`, pydantic, stored at `.protopilot/plan.json`
-- [ ] Deterministic baseline: `proto plan --offline` builds a generic topic skeleton
+- [x] Deterministic baseline: `proto plan --offline` builds a generic topic skeleton
       from the idea, with every finding labelled an assumption and the document
       stamped *not researched*
-- [ ] Renderer: `Plan` to the file tree, byte-stable for one input
-- [ ] `proto plan` command behind the job seam, so progress works like `proto new`
+- [x] Renderer: `Plan` to the file tree, byte-stable for one input
+- [x] `proto plan` command behind the job seam, so progress works like `proto new`
 
 ## Phase 3 — The passes and the checkpoint
 
