@@ -105,6 +105,10 @@ is only a pointer at it).
 
 ## Open — the direction
 
+**2026-11-06: the product is now planning; physical prototyping is tabled.** See
+[`docs/ideas/plans-first.md`](docs/ideas/plans-first.md). Items below about
+generated apps wait on that.
+
 - ~~**Archetypes and Theme is the next real piece of work.**~~ **Shipped
   2026-09-01**, all six phases, and filed at
   [docs/implementations/spec/](docs/implementations/spec/archetypes-and-theme.md).

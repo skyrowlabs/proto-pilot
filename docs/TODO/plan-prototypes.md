@@ -2,7 +2,7 @@
 title: "Plan Prototypes and Dreaming"
 slug: plan-prototypes
 shelf_status: planned
-priority: medium
+priority: high
 updated: 2026-11-06
 tags: [plan, research, dreaming, pipeline]
 summary: "Add `proto plan`, which turns an idea into a researched, connected, organised set of text plans, plus a dreaming step that collects, evaluates and proposes lighter extensions of the idea."
@@ -12,7 +12,7 @@ summary: "Add `proto plan`, which turns an idea into a researched, connected, or
 
 > **Status**: 🔴 Planned — draft; all six decisions ruled 2026-11-06; Phase 1 confirms the research path
 > **Shelf-Status**: planned
-> **Priority**: Medium — a new capability; nothing existing is broken without it
+> **Priority**: High — this is now the product; see [plans-first](../ideas/plans-first.md)
 > **Updated**: 2026-11-06
 > **Queue-Order**: unset until it is `ready`
 
@@ -35,7 +35,7 @@ pursuing are never collected.
 
 ## Approach
 
-A second kind of prototype: **a prototype of a plan.** It keeps the promise in
+The tool's main output becomes **a prototype of a plan.** It keeps the promise in
 [sketches-not-scaffolds](../ideas/sketches-not-scaffolds.md): the output is evidence
 about an idea, made to learn from. The medium changes from a running app to an
 organised set of text.

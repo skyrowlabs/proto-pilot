@@ -4,10 +4,10 @@
   "count": 3,
   "by_status": {
     "blocked": [
-      "drawing-freedom"
+      "drawing-freedom",
+      "improvement-loop"
     ],
     "planned": [
-      "improvement-loop",
       "plan-prototypes"
     ]
   },
@@ -18,10 +18,10 @@
       "title": "Drawing Freedom",
       "path": "docs/TODO/drawing-freedom.md",
       "shelf_status": "blocked",
-      "priority": "high",
+      "priority": "low",
       "queue_order": null,
       "blocked_on": "product-decision",
-      "updated": "2026-09-03",
+      "updated": "2026-11-06",
       "tags": [
         "ui",
         "verify",
@@ -37,11 +37,11 @@
       "slug": "improvement-loop",
       "title": "The Improvement Loop",
       "path": "docs/TODO/improvement-loop.md",
-      "shelf_status": "planned",
-      "priority": "high",
+      "shelf_status": "blocked",
+      "priority": "low",
       "queue_order": null,
-      "blocked_on": null,
-      "updated": "2026-09-03",
+      "blocked_on": "product-decision",
+      "updated": "2026-11-06",
       "tags": [
         "loop",
         "verify",
@@ -58,7 +58,7 @@
       "title": "Plan Prototypes and Dreaming",
       "path": "docs/TODO/plan-prototypes.md",
       "shelf_status": "planned",
-      "priority": "medium",
+      "priority": "high",
       "queue_order": null,
       "blocked_on": null,
       "updated": "2026-11-06",
