@@ -19,17 +19,28 @@ class PlanRefused(Exception):
     """The target cannot take a plan; the message says why, for a person."""
 
 
-def existing_plan(tree: Path) -> Plan | None:
-    """The plan `tree` already holds, None if `tree` is free, refused otherwise."""
+def existing_plan(tree: Path, idea: str, direction: str = "") -> Plan | None:
+    """The plan to re-render from `tree`, None if `tree` is free, refused otherwise.
+
+    A plan for anything but this idea and direction is refused: exiting 0 on it
+    would hand back somebody else's plan as the answer to what was asked.
+    """
     tree = Path(tree)
     if not tree.exists():
         return None
     if not plan_path(tree).exists():
         raise PlanRefused(f"{tree} already exists and holds no plan; refusing to overwrite it")
     try:
-        return Plan.load(tree)
+        plan = Plan.load(tree)
     except (OSError, ValueError) as exc:
         raise PlanRefused(f"{plan_path(tree)} cannot be read as a plan: {exc}") from exc
+    if (baseline.clean(idea), baseline.clean(direction)) != (plan.idea, plan.direction):
+        steer = f" with direction {plan.direction!r}" if plan.direction else " with no direction"
+        raise PlanRefused(
+            f"{tree} already holds a plan for {plan.idea!r}{steer}. "
+            "Pick another --dir, or rerun with that same idea and direction to re-render it."
+        )
+    return plan
 
 
 def _pass(job, name: str, index: int, of: int, work: Callable[[], list[str]]) -> None:
@@ -49,23 +60,14 @@ def _build(job, tree: Path) -> list[str]:
     return [str(plan.save(tree).relative_to(tree))]
 
 
-def _warn_if_ignored(job, plan: Plan, tree: Path) -> None:
-    """An idea that will not be planned is said out loud, never dropped."""
-    direction = baseline.clean(job.direction)
-    if baseline.clean(job.idea) != plan.idea or (direction and direction != plan.direction):
-        job.log(f"{tree} already holds a plan for {plan.idea!r}; re-rendering that, and ignoring what was asked now")
-
-
 def run_plan(job, tree: Path) -> None:
     """Build the offline plan into `tree`, or re-render the plan already there.
 
     plan.json lands first, so a render that dies leaves a tree that re-renders.
     """
     tree = Path(tree)
-    existing = existing_plan(tree)
+    existing = existing_plan(tree, job.idea, job.direction)
     job.project_dir = str(tree)
-    if existing is not None:
-        _warn_if_ignored(job, existing, tree)
 
     steps: list[tuple[str, Callable[[], list[str]]]] = [("render", lambda: render.write(Plan.load(tree), tree))]
     if existing is None:

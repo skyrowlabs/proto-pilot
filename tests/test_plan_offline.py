@@ -58,5 +58,17 @@ def test_a_rerender_restores_the_markdown_from_plan_json(tmp_path):
     before = snapshot(tree)
     (tree / "PLAN.md").write_text("hand edit")
     (tree / "topics" / "gone.md").write_text("stale")
-    assert plan("another idea", "--offline", "--dir", str(tree)).exit_code == 0
+    assert plan(IDEA, "--offline", "--dir", str(tree)).exit_code == 0
+    assert snapshot(tree) == before
+
+
+@pytest.mark.parametrize("asked", [("another idea",), (IDEA, "--direction", "two towns")])
+def test_a_plan_for_something_else_is_refused_and_left_alone(tmp_path, asked):
+    tree = tmp_path / "tree"
+    plan(IDEA, "--offline", "--dir", str(tree))
+    before = snapshot(tree)
+    result = plan(*asked, "--offline", "--dir", str(tree))
+    assert result.exit_code == 1
+    assert IDEA in " ".join(result.output.split())
+    assert "--dir" in result.output
     assert snapshot(tree) == before

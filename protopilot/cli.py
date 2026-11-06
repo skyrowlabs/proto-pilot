@@ -390,7 +390,7 @@ def plan_command(idea: str, directory: str | None, direction: str, offline: bool
 
     target = Path(directory).resolve() if directory else Path.cwd() / baseline.slug_for(idea)
     try:
-        pipeline.existing_plan(target)
+        pipeline.existing_plan(target, idea, direction)
     except pipeline.PlanRefused as exc:
         raise click.ClickException(str(exc)) from exc
 
