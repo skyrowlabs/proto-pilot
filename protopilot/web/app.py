@@ -237,7 +237,7 @@ def create_app(workspace: Path, backend: str | None = None, demo: bool = True) -
         entry = next((e for e in registry.load() if e.slug == slug), None)
         if entry is None:
             return RedirectResponse("/", status_code=303)
-        if entry.kind != registry.APP:
+        if registry.tree_kind(Path(entry.path)) != registry.APP:
             return RedirectResponse(f"/projects/{slug}", status_code=303)
         job = STORE.create(f"[change] {change.strip()}", "")
         STORE.run(
@@ -266,12 +266,15 @@ def create_app(workspace: Path, backend: str | None = None, demo: bool = True) -
         if entry is None:
             return RedirectResponse("/", status_code=303)
         root = Path(entry.path)
+        kind = registry.tree_kind(root)
+        if kind is None:
+            return RedirectResponse("/", status_code=303)  # gone, or never ours: nothing to show
         files = sorted(
             p.relative_to(root)
             for p in root.rglob("*")
             if p.is_file() and not {"__pycache__", ".git", ".pytest_cache"} & set(p.parts)
         )
-        if entry.kind != registry.APP:
+        if kind != registry.APP:
             return TEMPLATES.TemplateResponse(
                 request,
                 "plan.html",
@@ -302,9 +305,13 @@ def create_app(workspace: Path, backend: str | None = None, demo: bool = True) -
         entry = next((e for e in registry.load() if e.slug == slug), None)
         if entry is None:
             return RedirectResponse("/", status_code=303)
-        if entry.kind != registry.APP:
+        # The tree, never the entry, says what this is: an index can be stale or hand-edited.
+        kind = registry.tree_kind(Path(entry.path))
+        if kind == registry.PLAN:
             # Read-only here: a plan has no stack, and is deleted with `proto rm`.
             return RedirectResponse(f"/projects/{slug}", status_code=303)
+        if kind is None and action in ("up", "down", "purge"):
+            return RedirectResponse("/", status_code=303)  # nothing of ours is there to run
         if action == "up":
             _compose(entry, "up", "-d", "--build")
         elif action == "down":

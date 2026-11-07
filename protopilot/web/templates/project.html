@@ -22,7 +22,8 @@
       <div class="muted small">Stops it, drops its data, and deletes the whole tree. Cannot be undone.</div>
     </div>
     <form method="post" action="/projects/{{ entry.slug }}/delete"
-          onsubmit="return confirm('Delete {{ entry.name }} and everything in {{ entry.path }}?\n\nThis cannot be undone.')">
+          data-confirm="Delete {{ entry.name }} and everything in {{ entry.path }}?"
+          onsubmit="return confirm(this.dataset.confirm + '\n\nThis cannot be undone.')">
       <button type="submit" style="border-color:var(--bad);color:var(--bad)">delete</button>
     </form>
   </div>
