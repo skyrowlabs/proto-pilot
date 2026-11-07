@@ -159,7 +159,7 @@ rewrite the meaning of every spec on disk.
 ## The plan pipeline
 
 `proto plan "an idea" --offline` writes a folder of text instead of an app:
-`PLAN.md`, `topics/`, `dreams.md`, `sources.md` and `.protopilot/plan.json`. Why
+`PLAN.md`, `topics/`, `dreams.md`, `sources.md` and a stored `plan.json`. Why
 is [plans-first](ideas/plans-first.md); the design and what is still to build are
 [plan-prototypes](TODO/plan-prototypes.md).
 
@@ -274,8 +274,8 @@ path and not evidence that `paint` is broken.
   are argued in [`README.md`](../README.md#how-it-works).
 - **What is unfinished, and what bit us** — [`NOTES.md`](../NOTES.md), the live
   parking lot, including traps that are fixed but worth knowing.
-- **Planned work** — [`TODO/README.md`](TODO/README.md). The holding tank is
-  empty; the next plan goes there before any code does.
+- **Planned work** — [`TODO/README.md`](TODO/README.md). A new plan goes
+  there before any code does.
 - **Completed plans** — [`implementations/README.md`](implementations/README.md).
   [Archetypes and Theme](implementations/spec/archetypes-and-theme.md) is the
   first one filed, and the one to read before touching the spec: it is what
