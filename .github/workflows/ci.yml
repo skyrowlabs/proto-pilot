@@ -273,6 +273,17 @@ jobs:
       - name: black
         run: black --check --line-length=120 .
 
+      # The commit hook, run here too: a workflow edited without a commit through
+      # it (a hand-merge, an upgrade) otherwise reached CI unread (sky.boss).
+      # Through pre-commit so the hook's `rev:` stays the one version. This
+      # runner has shellcheck, so `run:` blocks are checked here and may not be
+      # on a machine without it.
+      - name: actionlint
+        run: |
+          if grep -qE '^\s*-\s*id:\s*actionlint\s*$' .pre-commit-config.yaml; then
+            pre-commit run actionlint --all-files
+          fi
+
       # Pyright resolves its interpreter from PATH, so the dependency set it
       # sees decides which errors exist. .github/pyright-deps.txt must stay a
       # SUPERSET of the unit-test job's installs — a leaner environment is not a
@@ -423,6 +434,21 @@ jobs:
         if: steps.node.outputs.present == 'true'
         run: npm run --if-present format:check
 
+      # The product's own scripts, by their conventional names. `--if-present` would
+      # let a deleted script pass, so `package.json`'s `skeletor.requiredScripts` names
+      # the ones that must exist. Skip ratchets over them stay the tree's.
+      - name: typecheck
+        if: steps.node.outputs.present == 'true'
+        run: node .github/scripts/node-gate.cjs typecheck
+
+      - name: test
+        if: steps.node.outputs.present == 'true'
+        run: node .github/scripts/node-gate.cjs test
+
+      - name: build
+        if: steps.node.outputs.present == 'true'
+        run: node .github/scripts/node-gate.cjs build
+
   # ── Unit tests ──────────────────────────────────────────────────────────
   # Ungated, by `docs_only` too: the host-side suite is minutes, and tests here
   # read `docs/` (plans, tables, references), so a docs-only change is exactly
@@ -550,10 +576,12 @@ jobs:
   # `docs/DEVELOPMENT.md` says the same to a reader deciding what to require.
   # It passes only when the matrix passed. The suite has no condition of its
   # own, so a skip means the gate failed, and a skip is never a pass.
+  # `!cancelled()` rather than `always()`: a failed gate still runs this and goes red, and a
+  # cancelled run reports `cancelled`, never `skipped`, where `always()` reported a failure.
   unit-tests-result:
     name: pytest
     needs: [gate, unit-tests]
-    if: always()
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
       - name: The matrix passed

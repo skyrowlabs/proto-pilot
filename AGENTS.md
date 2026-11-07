@@ -1,6 +1,6 @@
 # proto.pilot
 
-A framework for prototyping ideas with agents.
+A framework for planning ideas with agents.
 
 > **Before making changes**: load docs on-demand via `docs/README.md` or `.github/DOCS_INDEX.md`.
 > Never load the whole tree — a typical task needs one or two documents.
@@ -63,10 +63,24 @@ invariants below before changing anything under `skeleton/`.
 
 ## What this repo is
 
-`proto new "an idea"` turns a sentence into a running prototype: idea -> typed
-`spec.json` -> the target's skeleton copied -> five generation passes -> started
-and driven -> observed -> bounded repair loop -> a thing you can run. The output
-is something to look at this afternoon and throw away, explicitly not a
+**Planning is the product**, since 2026-11-06; the argument is in
+[`docs/ideas/plans-first.md`](docs/ideas/plans-first.md). `proto plan "an idea"`
+turns a sentence and a little direction into a folder of text plans: scope ->
+an outline a person reviews -> typed links between topics -> risks, unknowns and
+decisions -> first steps -> dreams -> checks on the structure, never the truth ->
+bounded repair -> a tree handed back green or with a `RUNBOOK.md`. `proto dream`
+adds to the pool of dreams and settles one. Research is the pass still to come,
+so every plan is stamped *Not researched*.
+
+**Dreams are guesses, not findings.** They stay in `dreams.md`, never in a topic
+file, and only a person promotes one, through `proto dream promote`. A dream
+never costs a plan, and it extends only a plan that is green.
+
+**`proto new` is tabled, not deleted.** It works, stays in CI and gets upkeep
+only. `proto new "an idea"` turns a sentence into a running prototype: idea ->
+typed `spec.json` -> the target's skeleton copied -> five generation passes ->
+started and driven -> observed -> bounded repair loop -> a thing you can run. The
+output is something to look at this afternoon and throw away, explicitly not a
 production starting point.
 
 **The default target is `tui`** since 2026-09-04 — a Textual + SQLite app in
@@ -75,10 +89,11 @@ medium and stays reachable, green and generated in CI, because it is the only
 control this repo has for telling a target regression apart from a change
 regression.
 
-**[`README.md`](README.md) is the design document.** It explains the five
-load-bearing decisions and why each exists. Read it before changing pipeline
-behaviour; the reasoning there is what keeps this from degenerating into a
-stack-picking code generator.
+**[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) holds the reasoning.**
+[The plan pipeline](docs/ARCHITECTURE.md#the-plan-pipeline) explains planning, and
+[How a prototype is built](docs/ARCHITECTURE.md#how-a-prototype-is-built) argues the
+five load-bearing decisions of `proto new`. Read the one you are changing first; the
+second is what keeps prototyping from degenerating into a stack-picking code generator.
 
 ### Naming: two "skeletons" in one tree
 
@@ -92,8 +107,8 @@ either to resolve it, and do not confuse `skeleton/` (product data) with
 
 ### Invariants — do not soften these
 
-These are the guarantees that make generated output trustworthy. Each was a
-deliberate decision, not an accident of implementation.
+These are the guarantees that make `proto new`'s generated output trustworthy.
+Each was a deliberate decision, not an accident of implementation.
 
 - **The model can only write a handful of paths**: on the web target `app/models.py`,
   `app/routes.py`, `app/seed.py`, `app/templates/*.html` (except `base.html`),
@@ -188,7 +203,8 @@ because the baseline cannot read a change request.
 | `protopilot/verify_tui.py` | **Terminal:** import, boot under `App.run_test`, smoke run, blank-screen check; `tui_probe.py` is the half that runs inside the tree |
 | `protopilot/baseline.py` | The deterministic offline implementation of every pass |
 | `protopilot/llm.py` | `LLM` Protocol + three backends |
-| `protopilot/registry.py` | Tracked prototypes — see the `prune()` trap in `NOTES.md` |
+| `protopilot/plan/` | `proto plan` and `proto dream`: a sibling pipeline to `Spec`, with no research yet. `passes/` holds its model passes, repair and the dream passes among them, and `pipeline.py` runs them; `model.py` is `plan.json`, the truth; `render.py` draws the markdown from it; `verify.py` checks structure, never truth, and a plan still red is handed back with a `RUNBOOK.md`; `lenses.py` is the fixed lenses as data, and `dreaming.py` is the pool's rules — see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#the-plan-pipeline) |
+| `protopilot/registry.py` | Tracked prototypes — see the `prune()` trap in `NOTES.md`. Plan trees are not in it |
 | `protopilot/targets/` | What medium a spec is built in — fifteen things, of which the plan predicted four; the contract is in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#what-a-target-owns) and a test recomputes it |
 | `skeleton/<target>/` | Copied byte-for-byte into every generated app; one tree per target |
 | `cli/`, `scripts/` | This repo's own tooling — never shipped to a user |
@@ -465,7 +481,7 @@ Load on-demand only. Full mapping in `.github/DOCS_INDEX.md`.
 | Unfinished work (the tank) | `docs/TODO/README.md`            |
 | Completed work (archive)   | `docs/implementations/README.md` |
 | Scheduled jobs / automation | `docs/AGENTIC_AUTOMATION.md`     |
-| The design argument        | `README.md`                      |
+| The design argument        | `docs/ARCHITECTURE.md`           |
 | Live parking lot           | `NOTES.md`                       |
 | Captured ideas (not scheduled) | `docs/ideas/README.md`       |
 | Reports (anchored to releases) | `docs/reports/README.md`     |

@@ -68,7 +68,7 @@ One generation, end to end. Every arrow is a place something can be refused.
 
 | Component | Responsibility | Talks to |
 | --------- | -------------- | -------- |
-| `protopilot/cli.py` | The `proto` command: generation and prototype lifecycle | everything below |
+| `protopilot/cli.py` | The `proto` command: generation, prototype lifecycle, `proto plan` and `proto dream` | everything below |
 | `protopilot/web/` | `proto serve` — a web face on `proto new`, **pinned to `--target web`** | the same functions the CLI calls |
 | `protopilot/spec.py` | **The contract.** The only thing downstream reads about user intent | every pass |
 | `protopilot/passes/` | One module per pass; prompt, JSON Schema, and the previous pass's source. `passes/tui/` is the terminal set | `llm.py`, `files.py` |
@@ -87,7 +87,8 @@ One generation, end to end. Every arrow is a place something can be refused.
 | `protopilot/render.py` | a target's skeleton ▶ a project directory, substituting `@@TOKEN@@` | `targets/`, `skeleton/` |
 | `protopilot/archetypes/` | What SHAPE a spec is: questions, screen rule, prompt fragment, baseline | `spec.py`, `baseline.py` |
 | `protopilot/targets/` | What MEDIUM it is built in — fifteen things, listed below | `passes/`, `verify.py`, `verify_tui.py` |
-| `protopilot/jobs.py` | In-process job store so the web front end can run work in the background | `web/` |
+| `protopilot/jobs.py` | In-process job store: the web front end runs generations on it in the background, and `proto plan` runs on it from the CLI | `web/`, `cli.py` |
+| `protopilot/plan/` | `proto plan` and `proto dream`, a sibling pipeline to `Spec` — [below](#the-plan-pipeline) | `jobs.py`, `llm.py`, `spec.py` |
 | `skeleton/` | The fixed application tree copied into every generated app, one directory per target. **Not generated** | — |
 | `cli/`, `scripts/` | This repo's own gates and jobs. Never shipped to a user | — |
 
@@ -154,6 +155,128 @@ They are separate constants and
 `tests/test_targets.py::test_the_cli_default_and_the_field_default_are_separate_constants`
 pins both literals. Collapsing them into one would make the next flip silently
 rewrite the meaning of every spec on disk.
+
+## The plan pipeline
+
+`proto plan "an idea"` writes a folder of text instead of an app:
+`PLAN.md`, `topics/`, `dreams.md`, `sources.md` and a stored `plan.json`, with a
+`RUNBOOK.md` when the plan ends red. Why is [plans-first](ideas/plans-first.md); the design and what is still to build are
+[plan-prototypes](TODO/plan-prototypes.md); flags are in [CLI.md](CLI.md#proto-plan), and
+`proto dream`'s [beside them](CLI.md#proto-dream).
+
+**It is a sibling of the `Spec` pipeline, not a third target.** It shares the job
+seam and its event vocabulary, the `.protopilot/` directory, the slug rule from
+`spec.py`, and the rule that a pass has an offline twin. It reads no `Spec`, no
+target and no skeleton, and the write guard does not apply: model output reaches
+`render.write` as text inside a page, never as a path. The one model value in a
+file name is a topic slug, which `model.py` checks, and `render.py` escapes any
+HTML opener in plan text.
+
+- **`plan.json` is the truth.** `model.py` defines it; every markdown file is
+  drawn from it, and a re-render overwrites them, so an edit belongs in `plan.json`.
+- **Rendering is deterministic.** `render.py` uses no model and no clock, so one
+  plan is one set of bytes; `tests/test_plan_render.py` holds that.
+- **A run is `scope`, `outline`, the review, `connect`, `consider`, `start`, `collect`,
+  `evaluate`, `propose`, verification, any repair, then render.** That is eight model
+  calls, five with `--no-dream`, and up to three repair calls, one module each in `protopilot/plan/passes/`. `pipeline.py` runs them on one job, in halves, so `proto plan` can stop for
+  scope's questions and the outline review. `--yes` skips both, and off a terminal
+  it is required, `--offline` included, because a prompt there cannot be answered.
+- **Nothing is researched yet.** No research pass exists, so every plan
+  is stamped not researched, green or red. A pass's `apply` reads only the fields it
+  names, so none can set `researched`, `sources` or a finding: a model run's topics
+  have no findings, and an offline run's have only the baseline's assumptions.
+  `apply` refuses what a plan cannot hold, such as an edge or a step naming a missing
+  topic. Order is the verifier's: a step ahead of its dependency lands in the plan and
+  goes red at `start_order`.
+- **Dreams are guesses, kept apart from the plan.** A `Dream` lives in `plan.json` and
+  draws to `dreams.md`, never to a topic page, and nothing in one is researched.
+  `lenses.py` is the six lenses as data, and `dreaming.py` is the pool's rules. `collect`
+  writes dreams with no verdict and numbers them itself; `evaluate`, a separate call so
+  nothing judges its own output, rates the fresh ones on `RUBRIC` and may only give
+  `proposed` or `set-aside`; `propose` chooses at most three of those and sets the rest
+  aside. `dropped` and `promoted` are a person's verdicts, and `evaluate` refuses them
+  from a model. A pass with nothing to read makes no call.
+- **The pool's cap is 44 words, and one bad dream costs only itself.** `DREAM_FIELD_WORDS`
+  gives the title 6, the what-if 26 and the takes 12, and `dream_words` counts them,
+  whatever joins the words. `admit` leaves out a dream that is over, blank, off its lens
+  or anchor, or a repeat; `settle` leaves out one with no verdict or one that copies a
+  topic. Each leaves a line, and a round cannot turn a good plan red. The `claude-code`
+  backend enforces the schema's word patterns, and the API backend cannot take them, so
+  `_without_patterns` turns them into descriptions and `admit` is what holds. That
+  backend has never been run for these passes.
+- **Dreaming cannot cost a plan.** `_guarded` turns a backend failure or bad output into
+  `DreamFailed`, and any other exception stays a bug. In `proto plan`,
+  `_dreamed_or_noted` keeps the plan as it stood, records `dream_failure` for `dreams.md`,
+  and carries on, so the exit code is the plan's own. In `dream_round` the same failure
+  is a refusal: the tree stays as it was and the CLI exits 1.
+- **`dream_round`, `promote` and `drop` extend a green plan or do nothing.** `_held` refuses
+  a red plan before any model call, and `_land` writes only a green result, and only if
+  `plan.json` has not moved meanwhile. A page edited by hand is drawn over, with a line
+  naming it. If the draw itself fails, `_put_back` restores the tree and says how far
+  that got. A round whose dreams all fall out still lands, with nothing added.
+- **Only `proto dream promote` turns a dream into a topic.** `dreaming.promoted` is called
+  from `pipeline.promote` and nowhere else. The topic goes last, one call in
+  `protopilot/plan/passes/promote.py` supplies its links and notes, and a link that does
+  not touch it is refused, so what the plan had settled stays settled. It writes no
+  finding, so the topic stays not researched. A promotion that stays red changes nothing.
+- **Verification proves structure, never truth.** `verify.py` has one check per bullet
+  of [What "verified" means](TODO/plan-prototypes.md#what-verified-means-for-text):
+  `topic_map`, `no_cycles`, `findings_traced`, `sources_fetched`, `start_order`,
+  `dreams_shaped` and `dreams_apart`. `dreams_apart` reads what a topic says, not what
+  every topic page draws, and catches a copy with a word or two changed; **a paraphrase
+  passes**. Each is a pure function of a plan and its pages,
+  so one check judges the pages drawn in memory and the pages read back from disk, and
+  all of them always run. A check ends passed, failed or no subject, and no subject
+  proved nothing. `green_line` builds its sentence from what held: *coherent and
+  traceable* needs `findings_traced` and `sources_fetched` both to hold, which no
+  run earns until research records a fetch, so green today says the structure holds
+  and that nothing traces to a source.
+- **Repair reaches links and steps, and nothing else.** On red, `repaired` runs
+  `protopilot/plan/passes/repair.py` up to three times, against pages drawn in memory,
+  so repair only ever edits data. Its `apply` is `connect`'s then `start`'s, and `FIXES`
+  names the two checks whose subject that is, `no_cycles` and `start_order`; any other
+  failure goes to the floor with no call made. A dream fault never reaches it from a
+  run, because `dreaming` removes the dream instead. `rejected` is the plan's shrink guard,
+  judged against the plan repair started from: it throws away a repair that removes an
+  edge on no loop, every link of a loop, or a healthy step, unless the step cap forced
+  that out for a step a kept one waits on. `worsened` throws away one that leaves more
+  wrong than it found. A thrown-away attempt counts, and its reason goes into the next.
+  A repair pass that fails or changes nothing stops the loop, and offline, where the
+  twin returns the plan as it stands, that is the first attempt. After a promotion
+  `unsettled` adds one rule: every link and step the plan held before stays as it was.
+- **The floor hands back a whole tree.** A plan still red is written anyway, with a
+  `RUNBOOK.md` from `verify.runbook`, a *Not verified* banner on `PLAN.md` and every
+  topic page, and no green line; `finished` says `ok=False` and the CLI exits 1, as
+  `proto new`'s floor does. `_hand_back` then judges what landed, so a plan green in
+  memory and red on disk takes the floor too. A failed plan pass is a different thing:
+  a pass that returns nothing a plan can hold leaves no tree at all.
+- **The baseline is the offline twin.** `baseline.py` builds a generic plan from the
+  idea's words, and each pass's `offline` slices it. It always has the same six
+  topics, so `--depth`, which asks for 4, 6 or 8, is refused on an offline backend.
+- **Nothing reaches disk until render.** `plan.json` saves atomically, then the pages
+  follow. In a fresh tree `PLAN.md` goes last, so holding it means holding every page;
+  over an old one a red plan draws it first, so a write that dies midway leaves it
+  marked. A failed plan pass leaves no tree, and a rerun starts from scope, losing any
+  review edits. A render that fails after that save keeps `plan.json`, so a rerun
+  redraws it. **That order covers `PLAN.md` alone:** a write dying mid-render can leave
+  old topic pages, unmarked, which is why `after_failure` says any page may be out of
+  date and points at the rerun.
+- **A rerun of a finished plan is a re-render, and it verifies.** No pass runs, and it
+  needs neither `--yes` nor a terminal. Another idea, direction or `--depth` is refused.
+  `plan.json` may be hand-edited, so `rerender` judges it as it stands, and red takes
+  the floor and exits 1. With no model there is no repair, so a red tree's rerun never
+  retries one: a fresh attempt means removing the tree.
+- **`render.write` never writes through what it did not make.** `_blockers` names a
+  link, dangling or not, at a page path or at `topics/`, a directory at a page path, a
+  read-only file, and a `RUNBOOK.md` that does not open with `RUNBOOK_MARK`, which is a person's. A
+  green plan that is blocked draws nothing. A red one draws every page it can reach,
+  so no old page goes on reading as verified, then refuses. Both refuse by name with
+  exit 1, nothing is written outside the tree, and a link is neither followed nor
+  removed. A green run removes a runbook only if it carries the mark, so a person's
+  stays.
+- **A plan tree is not a prototype.** It is not in the registry, so `proto ls`
+  omits it, and `proto rm`, `up` and the other app commands refuse it for having no
+  `spec.json`.
 
 ## Critical Patterns
 
@@ -242,15 +365,112 @@ nothing.
 Read in the other order this is a doc that mislabels which stage fires. The
 useful consequence: a blank-screen regression reported at `tests` is the normal
 path and not evidence that `paint` is broken.
+## How a prototype is built
+
+For `proto new`, which is tabled: it works and gets upkeep only.
+
+idea
+      -> spec.json          typed, small, reviewed by a human
+      -> the target's skeleton   copied, never generated
+      -> five passes        each fed the previous pass's real source
+      -> started and driven  observed, not assumed
+      -> repair loop        bounded, with a floor
+
+Five decisions carry most of the weight.
+
+**The stack is fixed, not chosen.** Per target, and never per idea. The
+terminal target is Textual over SQLAlchemy 2.0 and one SQLite file, in one
+process. The web target is FastAPI, server-rendered Jinja, SQLAlchemy 2.0,
+Postgres, and Pillow so a prototype can draw its own images instead of
+hotlinking one. Neither has a JS build step, a CDN or migrations. A generator
+that picks a stack per idea produces N unrunnable variants and you debug all of
+them.
+
+Everything in `skeleton/<target>/` is copied byte for byte into every app, so
+it is debugged once rather than once per prototype — the Dockerfile, the
+compose file and the stylesheet on the web side; `app/main.py`, `app/db.py`,
+`app/base.py` and the test harness on both. Which tree a spec gets is
+`spec.target`, and a target owns rather more than the tree — fifteen things,
+where the design predicted four. Six of the eleven it did not predict are
+sentences this tool prints about itself that turned out to be true only of
+Docker: a port, a URL, `make up`, "Container logs".
+[What a target owns](#what-a-target-owns) has the contract.
+
+**The model can only write a handful of paths**, and the list belongs to the
+target. On the web target: `app/models.py`, `app/routes.py`, `app/seed.py`,
+`app/templates/*.html` (except `base.html`), and `tests/test_smoke.py`. On the
+terminal target: `app/models.py`, `app/screens.py`, `app/seed.py`,
+`app/widgets.py`, `app/app.tcss` and `tests/test_smoke.py`. Everything else is
+refused by `files.py` before it reaches disk — and `files.py` holds no list of
+its own, so a second target cannot inherit the wrong one by default. Model
+output is data, not authority, and the parts of the tree that are known to work
+are the parts the model must not be able to touch.
+
+Enforcing that takes two guards. `files.py` decides what the model's *answer*
+may write, and `llm.ISOLATION` decides what the process producing that answer
+can do — the `claude-code` backend shells out to a CLI that has a filesystem
+and a shell by default, so without the second guard the first one is a rule
+about JSON rather than about the disk.
+
+**Tests are generated before the code they test.** The pass order is
+`schema -> smoke -> seed -> routes -> ui` on the web target and
+`schema -> smoke -> seed -> screens -> ui` on the terminal one. Smoke tests come
+second, generated from the spec, when nothing they test exists yet — so they
+describe what was asked for rather than what got built, and the fourth pass is
+handed them as its target. Tests written after the code describe whatever the
+code happened to do.
+
+**Each pass reads the previous pass's real source**, not a description of it.
+A routes pass told "there is a Trip model" invents a field name; one handed
+`models.py` does not. The UI pass goes last and gets `routes.py`, because a
+template referencing a context key no route passes is the single most common
+way a generated app 500s.
+
+**Nothing is handed back unobserved.** On the web target `verify.py` brings the
+stack up, waits on `/healthz` (which checks the database, so it stays red while
+Postgres is still coming up), runs the smoke suite inside the container, and
+captures the logs — `build -> health -> tests -> browser`. On the terminal
+target `verify_tui.py` imports the tree, starts it under `App.run_test`, drives
+it, runs the smoke suite and compares the rendered screen buffer to that of an
+application with nothing in it — `import -> boot -> tests -> paint`, with no
+daemon, no port and no health race. On red, the repair pass gets the stage, the
+output, whatever the app printed and every generated file, and returns a
+minimal patch. Three attempts.
+
+Then a floor: if it cannot get to green, the tree is handed back anyway with a
+`RUNBOOK.md` saying exactly which stage is red, what the last error was, and
+what was tried. A prototype whose broken shape you know beats a mystery, and
+both beat a loop that never terminates.
+
+One guard the prompt cannot enforce: if a repair shrinks the smoke suite, the
+file is reverted. Green because there is nothing left to fail is the only
+failure mode here that nobody would notice.
+
+The last stage exists because every other one is blind to what was drawn. On
+the web target `/healthz` returns 200 for a page that paints nothing and the
+smoke suite runs through an in-process client that never executes a script tag,
+so with the `browser` extra installed there is a stage that loads every screen
+for real; without Playwright it is skipped and reported as skipped, never as
+green. The terminal target's equivalent is two strings — the app's screen
+buffer against an empty application's — so it needs no extra, is never skipped,
+and is the same check on every machine.
+
+On the terminal target that last stage is a **backstop rather than the first
+line**, and it is worth knowing which fires. `skeleton/tui/tests/test_boots.py`
+already asserts a non-empty buffer, and it is skeleton, so every generated tree
+carries it — a blank app goes red at `tests`, one stage earlier. `paint` catches
+the case the tree's own suite cannot: an app that mounts, answers every query
+and shows nothing, with a smoke suite that never thought to look.
+
 ## Decisions and Their Reasons
 
 - **The five load-bearing decisions** — fixed stack, the write guard, tests
   before code, each pass reading real source, nothing handed back unobserved —
-  are argued in [`README.md`](../README.md#how-it-works).
+  are argued in [How a prototype is built](#how-a-prototype-is-built).
 - **What is unfinished, and what bit us** — [`NOTES.md`](../NOTES.md), the live
   parking lot, including traps that are fixed but worth knowing.
-- **Planned work** — [`TODO/README.md`](TODO/README.md). The holding tank is
-  empty; the next plan goes there before any code does.
+- **Planned work** — [`TODO/README.md`](TODO/README.md). A new plan goes
+  there before any code does.
 - **Completed plans** — [`implementations/README.md`](implementations/README.md).
   [Archetypes and Theme](implementations/spec/archetypes-and-theme.md) is the
   first one filed, and the one to read before touching the spec: it is what

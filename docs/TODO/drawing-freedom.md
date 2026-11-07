@@ -3,8 +3,8 @@ title: "Drawing Freedom"
 slug: drawing-freedom
 shelf_status: blocked
 blocked_on: product-decision
-priority: high
-updated: 2026-09-03
+priority: low
+updated: 2026-11-06
 tags: [ui, verify, skeleton, archetypes, prompts]
 summary: "Raise the visual ceiling of a generated app by ranking display options on whether the verifier can tell they worked — not on what Docker permits."
 ---
@@ -14,9 +14,8 @@ summary: "Raise the visual ceiling of a generated app by ranking display options
 > **Status**: ⛔ Blocked — designed and unreviewed, and now **target-scoped**
 > **Shelf-Status**: blocked
 > **Blocked-On**: product-decision
-> **Priority**: High — it is the difference between output that is correct and
-> output somebody wants to look at, and the cheapest rungs are blocked by our
-> own rules rather than by anything real
+> **Priority**: Low — tabled 2026-11-06 with physical prototyping; see
+> [plans-first](../ideas/plans-first.md)
 > **Queue-Order**: unset until it is `ready`
 
 ## Blocked 2026-09-03 — every rung below is a *web* rung

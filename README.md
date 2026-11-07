@@ -1,80 +1,86 @@
 <p align="center">
-  <img src="docs/assets/hero.svg" alt="proto.pilot, by SKYROW.LABS: a paper plane leaves a spark of an idea and dives into an open container box. Give it an idea and a little direction, and get back a prototype you can run, in your terminal or in Docker." width="100%">
+  <img src="docs/assets/hero.svg" alt="proto.pilot, by SKYROW.LABS: a paper plane leaves a spark of an idea and dives into an open box. Give it an idea and a little direction, and get back a plan: the topics that matter, how they connect, and where to start." width="100%">
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/repo-private-7a8fa8?labelColor=1c2633" alt="repo: private">
   <img src="https://img.shields.io/badge/stage-poc-818cf8?labelColor=1c2633" alt="stage: poc">
   <img alt="Python 3.11 to 3.14" src="https://img.shields.io/badge/python-3.11%E2%80%933.14-818cf8?labelColor=1c2633">
-  <a href="#the-offline-baseline"><img alt="works offline" src="https://img.shields.io/badge/works-offline-818cf8?labelColor=1c2633"></a>
+  <a href="#works-offline"><img alt="works offline" src="https://img.shields.io/badge/works-offline-818cf8?labelColor=1c2633"></a>
 </p>
 
 <p align="center">
   <a href="#install"><b>Install</b></a> ·
   <a href="#commands"><b>Commands</b></a> ·
-  <a href="#how-it-works"><b>How it works</b></a> ·
-  <a href="#the-offline-baseline"><b>Offline baseline</b></a> ·
+  <a href="#how-a-plan-is-made"><b>How a plan is made</b></a> ·
+  <a href="#prototypes-come-later"><b>Prototypes</b></a> ·
   <a href="#status"><b>Status</b></a> ·
   <a href="#working-on-this-repo"><b>Working on this repo</b></a>
 </p>
 
 <p align="center">
-  <img src="docs/assets/pillars.svg" alt="Three things proto.pilot is. Verified by running: it boots the app, drives it and runs the smoke suite, and red gets a bounded repair loop, then a RUNBOOK. Two media, one pipeline: a Textual and SQLite app in your terminal by default, FastAPI and Postgres in Docker with the web target. Works offline: every pass has a deterministic twin, so CI runs the whole pipeline with no key and no Docker daemon." width="100%">
+  <img src="docs/assets/pillars.svg" alt="Three things proto.pilot is. You steer it: you review the outline before the rest of the plan is written. Honest about its limits: every plan says what was not checked, and a model cannot claim otherwise. Works offline: every pass has a deterministic twin, so CI runs the whole pipeline with no key." width="100%">
 </p>
 
-A framework for prototyping ideas with agents.
+A framework for planning ideas with agents.
 
-Give it an idea and a little direction; get back a prototype you can run.
+Some ideas cannot be judged by building a quick version, because the unknowns are in
+the territory around them: what the deeper topics are, how they depend on each other,
+what could sink it, and where to begin. Give proto.pilot an idea and a little direction,
+and it works that out into an organised set of text plans.
 
 ```bash
-proto new "track camping gear across trips" --direction "make it feel like a checklist"
+proto plan "open a small bakery that only sells sourdough" --direction "one person, rented kitchen" --depth shallow
 ```
 
 ```
-intake...
+  pass scope...
+  pass outline...
+Open a small bakery that only sells sourdough
+  constraint: Rented kitchen — no owned or dedicated premises; access is on someone else's terms
+  constraint: Sourdough only — a single product category, with no other baked goods as a hedge
+  open question: Is this meant to replace a full-time income, or to run alongside other work?
+  depth: shallow (4 topics)
+  topics:
+    1. The fermentation clock vs. booked kitchen hours
+    2. Kitchen terms and who holds the obligations
+    3. What a loaf must earn, and how it reaches a buyer
+    4. Testing demand cheaply, and the conditions to stop
+Estimated model calls: 8 in all, 6 still to come (connect, consider, start, collect, evaluate, propose), plus 0 to 3 repair calls, only if verification finds something repair can fix. Research does not run in this build, so these numbers exclude it.
 
-Gear List (gear_list)
-  Track what gear goes on which trip, and what is still unpacked.
-  target: tui
-  archetype: crud
-  entities:
-    Trip
-      title: str
-      starts_on: date
-    Item (belongs to Trip)
-      name: str
-      packed?: bool
-  screens:
-    /                        custom   Home
-    /trips                   list     Trips
-    ...
+Write this plan? Enter accepts, or: add TITLE | drop N | rename N TITLE | quit:
 
-Generate this? [Y/n]
-
-rendering skeleton...   19 skeleton files
-  pass schema...   app/models.py
-  pass smoke...    tests/test_smoke.py
-  pass seed...     app/seed.py
-  pass screens...  app/screens.py
-  pass ui...       app/app.tcss
+  pass connect...
+  pass consider...
+  pass start...
+  pass collect...
+  pass evaluate...
+  pass propose...
   verify (attempt 1)...
-    failed at tests: the smoke tests failed
-  pass repair...
-    patched app/screens.py
-  verify (attempt 2)...
-    green -- HomeScreen painted 14 widget(s)
+  pass render...
+Not researched: nothing here was checked against a source.
+Green: this plan's structure holds, which is not the same as true. Nothing in it traces to a source.
 
-  Gear List is ready:  cd ./gear_list && make run
+Plan at open_small_bakery_that. Start with PLAN.md.
 ```
 
-The output is a small Textual + SQLite app you run in your terminal: one
-process, one file, no container. Not a starting point for production — a thing
-to look at this afternoon and throw away.
+That is a real run, shortened. It predates dreaming, so the call estimate and the three
+dream passes are what `proto plan` prints now, not what that run printed. You get a folder:
 
-`--target web` gives you the other medium instead: FastAPI + Postgres in
-Docker, opened in a browser. Both are first class and both are generated in CI;
-the terminal one is the default because it is the cheaper thing to look at and
-because nobody mistakes it for a product. `proto targets` lists them.
+```
+PLAN.md              the idea, the topic map, how topics connect, where to start
+topics/<topic>.md    one text plan per topic: why it matters, risks, unknowns, decisions
+dreams.md            guesses at what else the idea could be, kept apart from the plan
+sources.md           what research relied on (not built yet)
+```
+
+The links between topics are data, not prose, and they decide where the plan starts.
+In that run the bakery's first step was the kitchen's access terms, because every other
+topic depends on them and they are the one thing that could return a flat no. The bread
+comes second.
+
+A plan is not a finished answer. It is the cheapest way to see the shape of an idea
+before spending anything on it, and it is what a prototype should be built from later.
 
 ## Install
 
@@ -85,37 +91,156 @@ pip install -e ".[dev]"
 proto doctor          # what each target needs, the SDK, credentials, a port
 ```
 
+
 The virtualenv is not optional advice — on a distro whose Python is externally
 managed (Arch, and Debian since 3.11) a bare `pip install -e .` refuses to run.
 
-Needs Python 3.11 or newer and Claude credentials — either `ANTHROPIC_API_KEY`,
-or a Claude subscription driven through the Claude Code CLI. **Docker with
-Compose v2 is needed only for `--target web`**; the default target is one
-process and a SQLite file, so `proto doctor` reports a missing daemon as a
-limitation on one target rather than as a failure.
+Needs Python 3.11 or newer and Claude credentials: either `ANTHROPIC_API_KEY`, or a
+Claude subscription through the Claude Code CLI. The API is the default, and the tool
+never falls back from one to the other by itself, because they bill differently. To use
+a subscription, pass `--backend claude-code` or set `PROTOPILOT_LLM=claude-code`.
 
-**`textual` and `sqlalchemy` install with the tool, not as an extra.** The
-terminal target verifies **in process** — there is no container between
-proto.pilot and the tree it is checking, so a generated app's imports have to
-resolve in the interpreter running `proto`. That is a real cost of the default
-target and it is stated rather than hidden; the web target still needs neither
-at runtime, because its tree is built and tested inside Docker.
-
-Three optional extras: `dev` pulls the web target's stack too, because the
-end-to-end test runs a generated tree in process; `browser` adds Playwright, and
-without it the web target's browser verification stage is **skipped and reported
-as skipped, never as green** — the terminal target's equivalent needs no extra
-and is never skipped; `web` is the front end behind `proto serve`, which is
-**pinned to `--target web`** and does not follow the default, because it hands
-back a link you click and a terminal app has no link.
+Planning needs nothing else. Docker is only for `proto new --target web`.
 
 ## Commands
 
 | | |
 |---|---|
+| `proto plan IDEA` | scope it, outline it with you, connect the topics, weigh the risks, pick first steps, dream a little, check the structure, write the folder |
+| `proto dream [DIR]` / `dream promote ID` / `dream drop ID --why WHY` | run another round of dreams; turn one into a topic; rule one out, with the reason kept |
+| `proto doctor` | why it will not work here |
+
+Useful flags on `plan`: `--direction` (scope, emphasis, constraints), `--depth`
+(`shallow`, `standard` or `deep`: 4, 6 or 8 topics), `--dir`, `--backend`, `--offline`
+(no API calls, see below), `--yes` (skip the questions and the review), `--no-dream`
+(skip dreaming; `proto dream` can start the pool later).
+
+Off a terminal, `--yes` is required, so a script is refused rather than left waiting.
+Run on a folder that already holds a plan for the same idea and direction, it redraws
+the pages and checks the plan again with no model call, and exits 1 if the plan is red.
+
+**Rendered pages are not for editing.** The plan is stored as data in the folder, every
+page is drawn from it, and a re-render overwrites them.
+
+The prototype commands are under [Prototypes come later](#prototypes-come-later).
+
+## How a plan is made
+
+| Pass | Produces | |
+|---|---|---|
+| `scope` | goal, constraints, up to three questions for you | built |
+| `outline` | the topics, each with a reason it matters | built, and **you review it** |
+| `research` | findings per topic, each cited or labelled an assumption | coming |
+| `connect` | typed links: `depends-on`, `informs`, `conflicts-with` | built |
+| `consider` | per topic: risks, unknowns, decisions someone must make | built |
+| `start` | the first few steps, each with its reason | built |
+| `collect`, `evaluate`, `propose` | dreams: extensions of the idea, gathered, judged in a separate call, the top few kept | built |
+| `verify` | structural checks, with a bounded repair | built |
+| render | every page | built, no model call |
+
+**The review sits at the outline** because that is the last cheap place to fix a
+misreading. A topic list can be read in thirty seconds and a finished document cannot.
+Add, drop or rename topics there before the rest is written.
+
+**Where to start is checked, not just written.** The first step must have no unmet
+dependency, each later step must follow what it depends on, and `depends-on` links may
+not form a loop. Output naming a topic that does not exist is refused outright.
+
+**Verified means the structure holds, never that the plan is true.** The checks prove
+the topics, links and steps agree with each other, and the green line says only what
+held. A check with nothing to read reports that, and never counts as passed.
+
+**Red gets a bounded repair, then a floor.** Repair has three attempts and can only
+change links and steps. It cannot reword a healthy step, drop a real dependency or make
+things worse. If the plan is still red you get the whole folder anyway, with a
+`RUNBOOK.md` saying what is wrong, "Not verified" banners on the pages, and exit 1.
+
+**Model output is data, not authority.** A pass can only fill the fields it owns. It
+cannot mark a plan researched, add a source, promote a dream or remove the stamp, and the
+only model text that reaches a file name is a checked slug.
+
+**A plan pass that fails leaves no folder.** A rerun starts over from `scope`, and review
+edits are lost. A dream pass is the exception, below.
+
+### Dreaming
+
+Every other pass narrows, so this one widens. Six fixed lenses each ask what else the
+idea could be: who else, the opposite, ten times bigger, the smallest version, remove the
+main constraint, borrow from another field. A second call scores each dream, and a third
+keeps at most three, saying what would change if one were adopted. A plan dreams once
+through each lens. `proto dream` goes wider, and adds to the pool without rewriting it.
+
+**Dreams are guesses, not findings.** A dream is unresearched, at most 44 words across its
+title, what-if and what it would take, and lives in `dreams.md`, never in a topic file.
+From a real run on a community tool library, shortened:
+
+```
+### Six tools and a wall tally (d13)
+
+What if the first year were six tools and a chalked tally of everything townspeople asked for that the library did not have
+
+- Lens: the smallest version
+- Would take: One volunteer willing to say no and write it down
+- Scores: pull high, reach medium, cost low, fit high
+```
+
+**Only a person promotes.** `proto dream promote d13` makes that a topic, connected and
+checked, and still Not researched: a person chose it, nothing checked it. If the result
+stays red, nothing changes and it exits 1.
+
+**A dream never costs a plan.** If dreaming fails during `proto plan`, the plan is written
+anyway, a line says what stopped, and a green plan still exits 0. A failed `proto dream`
+round changes nothing and exits 1. A red plan is refused by all three verbs with no model
+call, because a dream extends a plan that holds.
+
+Two limits. The check that keeps dreams out of topic files catches copies and misses
+paraphrase. And the API backend has never been run for these passes.
+
+### What a plan does not know yet
+
+Nothing is researched today, so every plan is stamped **Not researched** and has no
+sourced findings. Treat what it says as a well-organised set of questions and reasoning,
+not as facts. Only the prompt stops a model stating a fact inside a risk or a reason, and
+the stamp is there for that.
+
+**Research** is next, in [the plan for this work](docs/TODO/plan-prototypes.md): one call
+per topic, with every source retrieved during the run.
+
+## Works offline
+
+Every plan pass has two implementations: a prompt and a deterministic twin. `--offline`
+runs the second: no API calls and no key, a generic topic skeleton with every finding
+labelled an assumption, dreams that are templates and say so, and the same bytes on every
+run.
+
+It is what the test suite runs, so the whole pipeline is exercised on every commit. A
+pipeline that can only be tested with a network call and a credit card stops being
+tested.
+
+## Prototypes come later
+
+proto.pilot started as a tool that turned an idea into a running app. That still works
+and gets upkeep, but no new features: a prototype is worth more once an idea is concrete
+enough to give agents something to build, and a plan is how it gets there.
+[`docs/ideas/plans-first.md`](docs/ideas/plans-first.md) has the reasoning, and a later
+step is to build a prototype from one topic of a plan.
+
+```bash
+proto new "a shared list of who has borrowed which tool" --direction "make it feel like a ledger"
+```
+
+It writes a small spec, shows it to you, generates the app, then boots and drives it
+rather than assuming it works. Red gets a bounded repair loop, and if that fails the tree
+comes back with a `RUNBOOK.md` saying what is broken. The result is something to look at
+and throw away, not a starting point for production. The default is a Textual and SQLite
+app in your terminal. `--target web` gives you FastAPI and Postgres in Docker, and needs
+Docker with Compose v2.
+
+| | |
+|---|---|
 | `proto new IDEA` | generate, boot, verify, hand it back |
 | `proto add CHANGE` | amend the spec, regenerate, re-verify |
-| `proto up` / `down` / `logs` / `test` | the obvious things |
+| `proto up` / `down` / `logs` / `test` | run a `--target web` prototype; a terminal one uses `make run` |
 | `proto spec` | what this project actually promised |
 | `proto archetypes` | what shapes this build can generate, and what each asks |
 | `proto targets` | what media it can generate into, and what each can build |
@@ -123,138 +248,16 @@ back a link you click and a terminal app has no link.
 | `proto rm` | delete one: containers, data and the tree |
 | `proto prune` | forget registry entries whose directory is gone |
 | `proto gc` | collect Docker resources a deleted tree left behind |
-| `proto doctor` | why it will not work here |
 
-`ls` is read-only, and `down --all` stops everything at once. `gc` exists
-because only `proto rm` cleans up after itself: a tree removed with `rm -rf`
-leaves a container, a volume, a network and an image with nothing on disk
-pointing at them. Every generated `compose.yml` stamps the tree's absolute path
-onto each resource as a Docker label, so those orphans stay findable by asking
-Docker — after the registry has been pruned, wiped, or never written.
+Three optional extras: `dev` pulls the web target's stack, `browser` adds Playwright (without
+it the web target's browser stage is reported as skipped, never as green), and `web` is
+the front end behind `proto serve`.
 
-`up`, `down`, `logs`, `test`, `reset` and `gc` are Docker verbs and apply to a
-`--target web` prototype. A terminal prototype has no container to start,
-detach or orphan, so those commands refuse it by name and say what to type
-instead — `make run` in the tree. There is nothing for `gc` to find either: a
-terminal verify writes its throwaway SQLite files into `<tree>/.dbs/`, inside
-the tree, so deleting the tree takes everything with it. `prune` is about the
-registry rather than Docker and applies to any prototype.
+Known gaps: `auth: "password"` is accepted by the spec and built by no pass, and `jobs`
+and `external_apis` are recorded and otherwise ignored.
 
-Useful flags on `new`: `--target` (which medium; default `tui`), `--offline`
-(no API calls, see below), `--no-verify` (generate without booting), `--port`,
-`--attempts N`, `--yes`.
-
-## How it works
-
-    idea
-      -> spec.json          typed, small, reviewed by a human
-      -> the target's skeleton   copied, never generated
-      -> five passes        each fed the previous pass's real source
-      -> started and driven  observed, not assumed
-      -> repair loop        bounded, with a floor
-
-Five decisions carry most of the weight.
-
-**The stack is fixed, not chosen.** Per target, and never per idea. The
-terminal target is Textual over SQLAlchemy 2.0 and one SQLite file, in one
-process. The web target is FastAPI, server-rendered Jinja, SQLAlchemy 2.0,
-Postgres, and Pillow so a prototype can draw its own images instead of
-hotlinking one. Neither has a JS build step, a CDN or migrations. A generator
-that picks a stack per idea produces N unrunnable variants and you debug all of
-them.
-
-Everything in `skeleton/<target>/` is copied byte for byte into every app, so
-it is debugged once rather than once per prototype — the Dockerfile, the
-compose file and the stylesheet on the web side; `app/main.py`, `app/db.py`,
-`app/base.py` and the test harness on both. Which tree a spec gets is
-`spec.target`, and a target owns rather more than the tree — fifteen things,
-where the design predicted four. Six of the eleven it did not predict are
-sentences this tool prints about itself that turned out to be true only of
-Docker: a port, a URL, `make up`, "Container logs".
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#what-a-target-owns) has the
-contract.
-
-**The model can only write a handful of paths**, and the list belongs to the
-target. On the web target: `app/models.py`, `app/routes.py`, `app/seed.py`,
-`app/templates/*.html` (except `base.html`), and `tests/test_smoke.py`. On the
-terminal target: `app/models.py`, `app/screens.py`, `app/seed.py`,
-`app/widgets.py`, `app/app.tcss` and `tests/test_smoke.py`. Everything else is
-refused by `files.py` before it reaches disk — and `files.py` holds no list of
-its own, so a second target cannot inherit the wrong one by default. Model
-output is data, not authority, and the parts of the tree that are known to work
-are the parts the model must not be able to touch.
-
-Enforcing that takes two guards. `files.py` decides what the model's *answer*
-may write, and `llm.ISOLATION` decides what the process producing that answer
-can do — the `claude-code` backend shells out to a CLI that has a filesystem
-and a shell by default, so without the second guard the first one is a rule
-about JSON rather than about the disk.
-
-**Tests are generated before the code they test.** The pass order is
-`schema -> smoke -> seed -> routes -> ui` on the web target and
-`schema -> smoke -> seed -> screens -> ui` on the terminal one. Smoke tests come
-second, generated from the spec, when nothing they test exists yet — so they
-describe what was asked for rather than what got built, and the fourth pass is
-handed them as its target. Tests written after the code describe whatever the
-code happened to do.
-
-**Each pass reads the previous pass's real source**, not a description of it.
-A routes pass told "there is a Trip model" invents a field name; one handed
-`models.py` does not. The UI pass goes last and gets `routes.py`, because a
-template referencing a context key no route passes is the single most common
-way a generated app 500s.
-
-**Nothing is handed back unobserved.** On the web target `verify.py` brings the
-stack up, waits on `/healthz` (which checks the database, so it stays red while
-Postgres is still coming up), runs the smoke suite inside the container, and
-captures the logs — `build -> health -> tests -> browser`. On the terminal
-target `verify_tui.py` imports the tree, starts it under `App.run_test`, drives
-it, runs the smoke suite and compares the rendered screen buffer to that of an
-application with nothing in it — `import -> boot -> tests -> paint`, with no
-daemon, no port and no health race. On red, the repair pass gets the stage, the
-output, whatever the app printed and every generated file, and returns a
-minimal patch. Three attempts.
-
-Then a floor: if it cannot get to green, the tree is handed back anyway with a
-`RUNBOOK.md` saying exactly which stage is red, what the last error was, and
-what was tried. A prototype whose broken shape you know beats a mystery, and
-both beat a loop that never terminates.
-
-One guard the prompt cannot enforce: if a repair shrinks the smoke suite, the
-file is reverted. Green because there is nothing left to fail is the only
-failure mode here that nobody would notice.
-
-The last stage exists because every other one is blind to what was drawn. On
-the web target `/healthz` returns 200 for a page that paints nothing and the
-smoke suite runs through an in-process client that never executes a script tag,
-so with the `browser` extra installed there is a stage that loads every screen
-for real; without Playwright it is skipped and reported as skipped, never as
-green. The terminal target's equivalent is two strings — the app's screen
-buffer against an empty application's — so it needs no extra, is never skipped,
-and is the same check on every machine.
-
-On the terminal target that last stage is a **backstop rather than the first
-line**, and it is worth knowing which fires. `skeleton/tui/tests/test_boots.py`
-already asserts a non-empty buffer, and it is skeleton, so every generated tree
-carries it — a blank app goes red at `tests`, one stage earlier. `paint` catches
-the case the tree's own suite cannot: an app that mounts, answers every query
-and shows nothing, with a smoke suite that never thought to look.
-
-## The offline baseline
-
-Every pass has two implementations — a prompt and a deterministic generator in
-`baseline.py`, plus `baseline_tui.py` for the three files whose content depends
-on the medium. `--offline` runs the second one: no API calls, no key, a plain
-CRUD app in whichever medium the target names.
-
-It exists for three reasons, in increasing order of importance. It is a fast
-free path to a working skeleton. It is the worked example each prompt is
-written against. And it is what the test suite runs, so the whole pipeline —
-skeleton, five passes, write guard, repair loop — is exercised on every commit
-with no key and no Docker daemon. A pipeline that can only be tested with a
-network call and a credit card stops being tested.
-
-`proto add` needs the model; the baseline cannot read a change request.
+How it all works, including what a target owns and why the model can write so few paths,
+is in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#how-a-prototype-is-built).
 
 ## Testing
 
@@ -262,53 +265,33 @@ network call and a credit card stops being tested.
 ./pp test unit          # or: python -m pytest -q
 ```
 
-The generated tree is the test, once per target. `tests/test_generate.py`
-generates a two-entity parent/child web app offline and runs *that app's own
-smoke suite* against SQLite in a subprocess; `tests/test_tui_target.py` does the
-same for a terminal app and then `tests/test_tui_verify.py` drives it through
-the real verifier, blank-screen check included. Both exercise the generated
-models, seed data and form coercion without needing Postgres, Docker or a
-browser.
-Docker and the API are faked (`tests/fakes.py`) so the verify and repair loops
-— the two parts most likely to be wrong and least likely to be covered by an
-end-to-end run — are tested directly.
+The unit suite needs no key, no network and no Docker daemon. Plans are tested through
+their offline twins and a fake model, with hostile model output as a first-class case.
+Prototypes are tested by generating a tree and running that tree's own smoke suite, with
+Docker and the API faked (`tests/fakes.py`) for the verify and repair loops.
 
 ## Model usage
 
-Claude Opus 5, adaptive thinking, `effort: high`, structured output against a
-JSON Schema per pass, streaming (code generation runs long enough that a
-non-streaming request trips the SDK's HTTP timeout). The stack brief is
-byte-identical across passes and repair attempts so it stays a cache prefix.
-Server-side refusal fallback is on by default, so a safety refusal on one pass
-does not abandon a generation that is most of the way done. Override with
-`PROTOPILOT_MODEL` / `PROTOPILOT_EFFORT`.
+Claude Opus 5, adaptive thinking, `effort: high`, structured output against a JSON Schema
+per pass. Override with `PROTOPILOT_MODEL` / `PROTOPILOT_EFFORT`.
 
 ## Status
 
-Early, and honest about it. Known gaps, in the order they will bite:
+**The direction changed on 2026-11-06:** planning is the product, and prototyping waits
+until a plan is concrete enough to feed it.
 
-- `auth: "password"` is accepted by the spec and not implemented by any pass.
-  Either it gets built or intake should reject it; silently accepting it is the
-  worst of the three.
-- `jobs` and `external_apis` are recorded and otherwise ignored — a spec that
-  needs either will generate an app that does not have it.
-
-(The third gap that used to be listed here — the offline baseline ignoring
-`spec.screens` — was closed on 2026-09-01. `spec.screens` is now authoritative
-and every custom screen gets a route, a template and a smoke test.)
-
-The prompts in `passes/` have been run against the live API; the baseline is
-what CI covers, for the reason given above. `NOTES.md` is the live parking lot —
-open items, what got resolved, and what is worth doing next.
+Early, and honest about it. `proto plan` runs against a real model today and writes a
+real plan with its structure checked and a pool of dreams beside it, with no research yet.
+`NOTES.md` is the live parking lot: open items, what got resolved, and what is worth doing next.
 
 ## Working on this repo
 
 Two command-line tools live here and they are deliberately not the same thing.
 **`proto` is the product** — installed onto your PATH, run from wherever you
-want a prototype. **`./pp` is this repository's own tooling** — its gates,
+want a plan. **`./pp` is this repository's own tooling** — its gates,
 generators and scheduled jobs, run from the repo root and never shipped to a
-user. One `--help` serving a person generating an app and a person maintaining
-the generator would serve neither.
+user. One `--help` serving a person planning an idea and a person maintaining
+the tool would serve neither.
 
 The repo shell is generated by **skeletor** — a sibling checkout, not part of
 this repository — at the `agentic` tier;
