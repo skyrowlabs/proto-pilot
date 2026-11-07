@@ -90,7 +90,7 @@ def topic_research(plan: Plan, topic: Topic) -> tuple[bool, str]:
     if record is not None and record.state == "researched":
         return True, ""
     if record is not None and record.state == "failed":
-        return False, f"Research for this topic failed: {record.failure.rstrip('.')}."
+        return False, f"Research for this topic failed: {md_text(record.failure).rstrip('.')}."
     if record is not None:
         return False, "Research ran and cited no page it fetched."
     if any(dream.promoted_to == topic.slug for dream in plan.dreams):
@@ -162,7 +162,7 @@ def _finding_line(finding: Finding, known_sources: set[str]) -> str:
     cited = f" (sources: {', '.join(finding.source_ids)})" if finding.source_ids else ""
     backed = known_sources.intersection(finding.source_ids)
     label = "**Assumption:** " if finding.assumption or not backed else ""
-    return f"{label}{finding.text}{cited}"
+    return f"{label}{md_text(finding.text)}{cited}"
 
 
 def _topic_page(plan: Plan, topic: Topic, verified: bool) -> str:
@@ -253,9 +253,25 @@ def _source_order(source: Source) -> tuple[int, str, str]:
     return (len(source.id), *_whole_record(source))
 
 
+#: What markdown reads as syntax inside a line of text.
+MARKDOWN_SYNTAX = re.compile(r"([\\`*_\[\]<>!|])")
+#: What would end or break a link target, or an inline code span.
+URL_UNSAFE = {" ": "%20", "(": "%28", ")": "%29", "<": "%3C", ">": "%3E", "`": "%60", "[": "%5B", "]": "%5D"}
+
+
+def md_text(value: str) -> str:
+    """Research-derived text as one line of plain markdown: no syntax survives it."""
+    return MARKDOWN_SYNTAX.sub(r"\\\1", " ".join(value.split()))
+
+
 def _link_target(url: str) -> str:
-    """A URL that cannot close or break the markdown link it sits in."""
-    return url.replace(" ", "%20").replace("(", "%28").replace(")", "%29").replace("<", "%3C").replace(">", "%3E")
+    """A URL that cannot close or break the markdown link it sits in, on one line."""
+    return "".join(URL_UNSAFE.get(char, char) for char in "%20".join(url.split()))
+
+
+def _code(value: str) -> str:
+    """A URL shown and never linked: inline code cannot carry a link or a heading."""
+    return f"`{_link_target(value)}`"
 
 
 def _sources_page(plan: Plan) -> str:
@@ -265,18 +281,18 @@ def _sources_page(plan: Plan) -> str:
         for source_id in dict.fromkeys(i for finding in topic.findings for i in finding.source_ids):
             citing.setdefault(source_id, []).append(topic.title)
     sources = [
-        f"{s.id}: [{s.title}]({_link_target(s.url)})"
+        f"{s.id}: [{md_text(s.title)}]({_link_target(s.url)})"
         + (f", cited by {', '.join(citing[s.id])}" if s.id in citing else "")
         for s in sorted(plan.sources, key=_source_order)
     ]
     blocks = [_bullets(sources, empty="No sources.")]
     unfetched = [
-        f"{titles.get(r.topic, r.topic)}: {url}"
+        f"{titles.get(r.topic, r.topic)}: {_code(url)}"
         for r in sorted(plan.research, key=lambda r: r.topic)
         for url in r.unfetched
     ]
     failed = [
-        f"{titles.get(r.topic, r.topic)}: {f.url} ({f.why})"
+        f"{titles.get(r.topic, r.topic)}: {_code(f.url)} ({md_text(f.why)})"
         for r in sorted(plan.research, key=lambda r: r.topic)
         for f in r.fetches
         if not f.usable
