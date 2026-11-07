@@ -150,6 +150,7 @@ def write(plan: Plan, tree: Path) -> list[str]:
     for stale in topics.glob("*.md"):
         if stale.is_file() and f"{TOPICS_DIR}/{stale.name}" not in pages:
             stale.unlink()
-    for name, text in pages.items():
-        (Path(tree) / name).write_text(text, encoding="utf-8")
+    # The entry page goes last, so a fresh tree holding PLAN.md holds every page.
+    for name in sorted(pages, key=lambda page: page == PLAN_FILE):
+        (Path(tree) / name).write_text(pages[name], encoding="utf-8")
     return list(pages)
