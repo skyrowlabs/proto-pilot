@@ -48,3 +48,42 @@ PP_PYTHON=.venv-ci/bin/python ./pp check pre-push
 
 A broken override fails loudly rather than falling back. Silently running the
 diverged default interpreter is the exact false negative the override removes.
+
+## `proto plan`
+
+`proto` is the product, not this repository's tooling, so `./pp` does not reach it.
+`proto plan --help` lists the same flags.
+
+```bash
+proto plan "start a community tool library" --direction "one town, volunteer run"
+proto plan "start a community tool library" --offline --yes
+```
+
+| Flag | What it does |
+| ---- | ------------ |
+| `--dir` | Target directory; the default is `./<slug>` |
+| `--direction` | Extra steer, kept as a constraint |
+| `--depth` | Topics in the outline: `shallow` 4, `standard` 6, `deep` 8. The default is `standard`, and it is refused on an offline backend |
+| `--backend` | `api` bills API credit, `claude-code` a Claude subscription, `offline` calls no model. Beats `PROTOPILOT_LLM`; with neither set, `api` is used |
+| `--offline` | The deterministic baseline with no model call. Beats `--backend` |
+| `--yes`, `-y` | Skip scope's questions, which stay open in `PLAN.md`, and the outline review |
+
+A run calls a model by default: `scope`, `outline`, the review, `connect`, `consider`,
+`start`, then render. **It does no research, dreaming or verification yet**, so every
+plan is stamped *Not researched* and holds no findings beyond the offline baseline's
+assumptions.
+
+At the review, Enter accepts, `add TITLE`, `drop N` and `rename N TITLE` edit, and
+`quit` stops with nothing written. Edits can leave the outline anywhere from four to
+eight topics, whatever `--depth` asked for.
+
+**Off a terminal it needs `--yes`, even with `--offline`.** Without it the command
+refuses before calling a model.
+
+**A failed model pass leaves no tree.** A rerun starts from scope, and any review
+edits are lost. A render that fails after saving `plan.json` keeps it, so a rerun
+redraws it with no model call.
+
+**Rerunning a finished plan re-renders it.** It calls no model and needs neither
+`--yes` nor a terminal. The same target with another idea or direction is refused, as
+is a `--depth` other than the plan's.

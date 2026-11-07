@@ -88,7 +88,7 @@ One generation, end to end. Every arrow is a place something can be refused.
 | `protopilot/archetypes/` | What SHAPE a spec is: questions, screen rule, prompt fragment, baseline | `spec.py`, `baseline.py` |
 | `protopilot/targets/` | What MEDIUM it is built in — fifteen things, listed below | `passes/`, `verify.py`, `verify_tui.py` |
 | `protopilot/jobs.py` | In-process job store: the web front end runs generations on it in the background, and `proto plan` runs on it from the CLI | `web/`, `cli.py` |
-| `protopilot/plan/` | `proto plan`, a sibling pipeline to `Spec` — [below](#the-plan-pipeline) | `jobs.py`, `spec.py` |
+| `protopilot/plan/` | `proto plan`, a sibling pipeline to `Spec` — [below](#the-plan-pipeline) | `jobs.py`, `llm.py`, `spec.py` |
 | `skeleton/` | The fixed application tree copied into every generated app, one directory per target. **Not generated** | — |
 | `cli/`, `scripts/` | This repo's own gates and jobs. Never shipped to a user | — |
 
@@ -158,24 +158,45 @@ rewrite the meaning of every spec on disk.
 
 ## The plan pipeline
 
-`proto plan "an idea" --offline` writes a folder of text instead of an app:
+`proto plan "an idea"` writes a folder of text instead of an app:
 `PLAN.md`, `topics/`, `dreams.md`, `sources.md` and a stored `plan.json`. Why
 is [plans-first](ideas/plans-first.md); the design and what is still to build are
-[plan-prototypes](TODO/plan-prototypes.md).
+[plan-prototypes](TODO/plan-prototypes.md); flags are in [CLI.md](CLI.md#proto-plan).
 
 **It is a sibling of the `Spec` pipeline, not a third target.** It shares the job
 seam and its event vocabulary, the `.protopilot/` directory, the slug rule from
 `spec.py`, and the rule that a pass has an offline twin. It reads no `Spec`, no
-target and no skeleton, and the write guard does not apply: no model output
-reaches `render.write`.
+target and no skeleton, and the write guard does not apply: model output reaches
+`render.write` as text inside a page, never as a path. The one model value in a
+file name is a topic slug, which `model.py` checks, and `render.py` escapes any
+HTML opener in plan text.
 
 - **`plan.json` is the truth.** `model.py` defines it; every markdown file is
   drawn from it, and a re-render overwrites them, so an edit belongs in `plan.json`.
 - **Rendering is deterministic.** `render.py` uses no model and no clock, so one
   plan is one set of bytes; `tests/test_plan_render.py` holds that.
-- **The baseline is all that exists.** `baseline.py` builds a generic plan from the
-  idea's words, with every finding an assumption and every page stamped not
-  researched. Without `--offline` the command refuses and calls no model.
+- **A run is `scope`, `outline`, the review, `connect`, `consider`, `start`, then
+  render.** That is five model calls, one per module in `protopilot/plan/passes/`.
+  `pipeline.py` runs them on one job, in halves, so `proto plan` can stop for
+  scope's questions and the outline review. `--yes` skips both, and off a terminal
+  it is required, `--offline` included, because a prompt there cannot be answered.
+- **Nothing is researched or verified yet.** No research, dreaming or verification
+  pass exists, so every plan is stamped not researched. A pass's `apply` reads only
+  the fields it names, so none can set `researched`, `sources` or a finding: a model
+  run's topics have no findings, and an offline run's have only the baseline's
+  assumptions. `apply` refuses output it cannot use, such as an edge to a missing
+  topic or a step ahead of its dependency, which is not the verifier.
+- **The baseline is the offline twin.** `baseline.py` builds a generic plan from the
+  idea's words, and each pass's `offline` slices it. It always has the same six
+  topics, so `--depth`, which asks for 4, 6 or 8, is refused on an offline backend.
+- **Nothing reaches disk until render.** `plan.json` saves atomically, then the pages
+  follow with `PLAN.md` last. A failed model pass leaves no tree, and a rerun starts
+  from scope, losing any review edits. A render that fails after that save keeps
+  `plan.json`, so a rerun redraws it.
+- **A rerun of a finished plan is a re-render.** No pass runs, and it needs neither
+  `--yes` nor a terminal. Another idea, direction or `--depth` is refused. A directory
+  where a page belongs fails the render with a raw `IsADirectoryError`, and the
+  printed advice to rerun fails the same way until that directory is moved.
 - **A plan tree is not a prototype.** It is not in the registry, so `proto ls`
   omits it, and `proto rm`, `up` and the other app commands refuse it for having no
   `spec.json`.

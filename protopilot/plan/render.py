@@ -8,6 +8,7 @@ it is wrong is the verifier's job, and a renderer that crashed would hide it.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from protopilot.plan.model import Dream, Edge, Finding, Plan, Source, Topic
@@ -20,6 +21,28 @@ TOPICS_DIR = "topics"
 HEADER = "<!-- Rendered from .protopilot/plan.json. A re-render overwrites this file: do not edit it. -->"
 NOT_RESEARCHED = "> **Not researched.** Nothing here was checked against a source; every finding is an assumption."
 UNSET = "Not established."
+
+#: What opens an HTML block in CommonMark, whose types 1 to 6 this lists: a comment or
+#: `<details>` in plan text would hide the page after it. `<tags>` is not on the list
+#: and is left alone, because a person's idea can hold one.
+HTML_OPENER = re.compile(
+    r"<(?=[!?]|/?(?:address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details"
+    r"|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html"
+    r"|iframe|legend|li|link|main|menu|menuitem|meta|nav|noframes|ol|optgroup|option|p|param|pre|script|search"
+    r"|section|style|summary|table|tbody|td|textarea|tfoot|th|thead|title|tr|track|ul)(?![a-z0-9-]))",
+    re.IGNORECASE,
+)
+
+
+def _inert(value: object) -> object:
+    """`value` with every HTML opener in its strings escaped, however deeply nested."""
+    if isinstance(value, str):
+        return HTML_OPENER.sub("&lt;", value)
+    if isinstance(value, list):
+        return [_inert(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _inert(item) for key, item in value.items()}
+    return value
 
 
 def _page(*blocks: str) -> str:
@@ -135,6 +158,7 @@ def _sources_page(plan: Plan) -> str:
 
 def render(plan: Plan) -> dict[str, str]:
     """Every markdown file, by path relative to the tree."""
+    plan = Plan.model_validate(_inert(plan.model_dump()))
     pages = {PLAN_FILE: _plan_page(plan)}
     pages.update({f"{TOPICS_DIR}/{t.slug}.md": _topic_page(plan, t) for t in plan.topics})
     pages[DREAMS_FILE] = _dreams_page(plan)
@@ -150,6 +174,7 @@ def write(plan: Plan, tree: Path) -> list[str]:
     for stale in topics.glob("*.md"):
         if stale.is_file() and f"{TOPICS_DIR}/{stale.name}" not in pages:
             stale.unlink()
-    for name, text in pages.items():
-        (Path(tree) / name).write_text(text, encoding="utf-8")
+    # The entry page goes last, so a fresh tree holding PLAN.md holds every page.
+    for name in sorted(pages, key=lambda page: page == PLAN_FILE):
+        (Path(tree) / name).write_text(pages[name], encoding="utf-8")
     return list(pages)

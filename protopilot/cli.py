@@ -2,7 +2,7 @@
 
 proto new "an app for tracking camping gear across trips"
 proto add "let people mark items as packed"
-proto plan "start a community tool library" --offline
+proto plan "start a community tool library"
 proto up | down | logs | test | spec | doctor
 """
 
@@ -14,6 +14,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
 import click
 
@@ -22,12 +23,17 @@ from protopilot import build as builder
 from protopilot import containers, registry
 from protopilot.llm import ClaudeCodeLLM, ClaudeLLM, LLMError, build_llm
 from protopilot.passes import PassContext, clarify
+from protopilot.plan.model import DEFAULT_DEPTH, TOPIC_COUNTS
 from protopilot.render import render_skeleton
 from protopilot.runner import SubprocessRunner, docker_available
 from protopilot.spec import SPEC_DIR, SPEC_FILENAME, Spec, Theme
 
+if TYPE_CHECKING:
+    from protopilot.plan.model import Depth
+
 PORT_RANGE = range(8080, 8180)
 FOLLOW_INTERVAL = 0.02
+PLAN_REVIEW_PROMPT = "Write this plan? Enter accepts, or: add TITLE | drop N | rename N TITLE | quit"
 
 
 def _echo(message: str) -> None:
@@ -355,9 +361,8 @@ def new(
     _finish(spec, ctx, llm, target, attempts)
 
 
-def _follow(job) -> None:
-    """Print a job's log as it grows, until the job has finished."""
-    shown = 0
+def _follow(job, shown: int = 0) -> None:
+    """Print a job's log from line `shown` as it grows, until the job has finished."""
     while True:
         # Read before draining: `finished_at` is set last, so nothing logged is missed.
         finished = bool(job.finished_at)
@@ -370,35 +375,155 @@ def _follow(job) -> None:
         time.sleep(FOLLOW_INTERVAL)
 
 
+def _stdin_is_terminal() -> bool:
+    return bool(sys.stdin and sys.stdin.isatty())
+
+
+def _plan_step(job, target: Path, work):
+    """One half of a plan on its job, followed to the end; returns what `work` returned."""
+    from protopilot.jobs import STORE
+    from protopilot.plan import pipeline
+
+    produced: list = []
+    refused: list[str] = []
+
+    def run(j) -> None:
+        try:
+            produced.append(work(j))
+        except pipeline.PlanRefused as exc:
+            refused.append(str(exc))
+            raise
+
+    shown = len(job.lines)
+    job.finished_at = ""  # the halves share a job, and `_follow` waits on this
+    STORE.run(job, run)
+    _follow(job, shown)
+    if refused:
+        raise click.ClickException(refused[0])  # it says all there is: this run wrote nothing
+    if job.status != "done":
+        raise click.ClickException(f"{job.error}\n  {pipeline.after_failure(target)}")
+    return produced[0]
+
+
+def _ask_questions(plan):
+    """Scope's questions, one prompt each; Enter leaves one open for `PLAN.md` to list."""
+    from protopilot.plan.passes import scope
+
+    answers = {}
+    for question in plan.questions:
+        answers[question] = click.prompt(f"{question} (Enter leaves it open)", default="", show_default=False)
+    return scope.answered(plan, answers)
+
+
+def _review_edit(plan, line: str):
+    """One line of the review, applied; a bad one raises `ValueError` with the reason."""
+    from protopilot.plan.passes import outline
+
+    verb, _, rest = line.partition(" ")
+    rest = rest.strip()
+    if verb == "add":
+        if not rest:
+            raise ValueError("add needs a title: add TITLE")
+        outline.addable(plan, rest)
+        return outline.add(plan, rest, click.prompt("Why does it matter?", default="", show_default=False))
+    if verb == "drop":
+        return outline.drop(plan, rest)
+    if verb == "rename":
+        which, _, title = rest.partition(" ")
+        return outline.rename(plan, which, title)
+    raise ValueError(f"not a review command: {verb!r}")
+
+
+def _review_outline(plan):
+    """The checkpoint: edit until a person accepts, as `proto new`'s `[Y/n]` accepts a spec."""
+    while True:
+        line = click.prompt(PLAN_REVIEW_PROMPT, default="", show_default=False).strip()
+        if line.lower() in ("", "y", "yes"):
+            return plan
+        if line.lower() in ("n", "no", "quit"):
+            raise click.Abort()
+        try:
+            plan = _review_edit(plan, line)
+        except ValueError as exc:
+            _echo(f"  {exc}")
+            continue
+        _echo(plan.summary())
+
+
 @main.command(name="plan")
 @click.argument("idea")
 @click.option("--dir", "directory", default=None, help="Target directory (default: ./<slug>).")
 @click.option("--direction", default="", help="Extra steer: scope, emphasis, constraints.")
-@click.option("--offline", is_flag=True, help="Deterministic baseline; no API calls. The only mode so far.")
-@click.option("--yes", "-y", is_flag=True, help="Accepted for scripts; there is no review checkpoint yet.")
-def plan_command(idea: str, directory: str | None, direction: str, offline: bool, yes: bool) -> None:
-    """Turn IDEA into an organised set of text plans."""
+@click.option(
+    "--depth",
+    type=click.Choice(list(TOPIC_COUNTS)),
+    default=None,
+    help=f"Topic count, and the research effort recorded for later (default: {DEFAULT_DEPTH}). Needs the model.",
+)
+@click.option("--offline", is_flag=True, help="Deterministic baseline; no API calls.")
+@click.option(
+    "--backend",
+    type=click.Choice(["api", "claude-code", "offline"]),
+    default=None,
+    help="api bills API credit; claude-code bills a Claude subscription.",
+)
+@click.option("--yes", "-y", is_flag=True, help="Skip scope's questions and the outline review.")
+def plan_command(
+    idea: str,
+    directory: str | None,
+    direction: str,
+    depth: str | None,
+    offline: bool,
+    backend: str | None,
+    yes: bool,
+) -> None:
+    """Turn IDEA into an organised set of text plans. Research does not run yet."""
     from protopilot.jobs import STORE
     from protopilot.plan import baseline, pipeline
 
-    if not offline:
-        raise click.ClickException(
-            "only the offline baseline of `proto plan` exists so far; pass --offline. No model was called."
-        )
     if not baseline.clean(idea):
         raise click.ClickException("`proto plan` needs an idea; it was given an empty one")
 
     target = Path(directory).resolve() if directory else Path.cwd() / baseline.slug_for(idea)
     try:
-        pipeline.existing_plan(target, idea, direction)
+        existing = pipeline.existing_plan(target, idea, direction)
     except pipeline.PlanRefused as exc:
         raise click.ClickException(str(exc)) from exc
 
+    if existing is not None:
+        if depth and depth != existing.depth:
+            raise click.ClickException(
+                f"{target} already holds this plan at depth {existing.depth or 'none (offline baseline)'}, "
+                "and a re-render cannot change that. Drop --depth, or pick another --dir."
+            )
+        _plan_step(STORE.create(idea, direction), target, lambda j: pipeline.rerender(j, target))
+        return
+
+    if not yes and not _stdin_is_terminal():
+        # `click.prompt` would abort on EOF, and wait forever on a pipe nobody writes to.
+        raise click.ClickException(
+            "`proto plan` reviews the outline at a prompt, and stdin is not a terminal. "
+            "Pass --yes to accept the outline as written. No model was called."
+        )
+    try:
+        llm = build_llm(offline=offline, backend=backend)
+    except LLMError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if llm.offline and depth:
+        raise click.ClickException(
+            "--depth needs the model, and the backend for this run is offline, which always writes "
+            "the same six topics. Drop --depth, or choose a backend that calls the model."
+        )
+
     job = STORE.create(idea, direction)
-    STORE.run(job, lambda j: pipeline.run_plan(j, target))
-    _follow(job)
-    if job.status != "done":
-        raise click.ClickException(job.error)
+    draft = _plan_step(job, target, lambda j: pipeline.scoped(j, llm, cast("Depth | None", depth)))
+    if not yes:
+        draft = _ask_questions(draft)
+    draft = _plan_step(job, target, lambda j: pipeline.outlined(j, llm, draft))
+    _echo(f"\n  -> {target}\n")
+    if not yes:
+        draft = _review_outline(draft)
+    _plan_step(job, target, lambda j: pipeline.build(j, target, draft, llm))
 
 
 @main.command()
