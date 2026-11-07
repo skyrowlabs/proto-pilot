@@ -294,12 +294,12 @@ def test_a_step_with_nothing_to_say_is_refused(tmp_path, field):
 LOOP = {"edges": [edge("lending", "space"), edge("space", "lending"), edge("tools", "lending")]}
 
 
-def test_a_partial_cycle_is_kept_for_the_verifier_but_no_step_can_enter_it(tmp_path):
+def test_a_partial_cycle_is_kept_for_the_verifier_and_only_the_walk_keeps_steps_out(tmp_path):
     plan = run(tmp_path / "tree", connect=LOOP)
     assert len(plan.edges) == 3
     assert [t.slug for t in start.ready(plan)] == ["members", "money", "safety"]
     enum = start.schema(plan)["properties"]["steps"]["items"]["properties"]["topic"]["enum"]
-    assert enum == ["members", "money", "safety"]
+    assert enum == SLUGS
 
 
 @pytest.mark.parametrize("topic", ["lending", "space", "tools"])
@@ -566,10 +566,12 @@ def test_the_same_topic_twice_in_start_is_refused(tmp_path):
     assert "step 3 (members) repeats a topic" in said
 
 
-def test_start_is_asked_for_no_more_steps_than_there_are_ready_topics():
-    plan = baseline.build_plan(IDEA)
-    assert start.schema(plan)["properties"]["steps"]["maxItems"] == len(start.ready(plan)) == 2
-    assert "at most 2 steps" in start.build(plan)[1]
+@pytest.mark.parametrize(("count", "most"), [(4, 4), (6, 5)])
+def test_start_is_asked_for_at_most_five_steps_and_never_more_than_the_topics(count, most):
+    whole = baseline.build_plan(IDEA)
+    plan = whole.revised(topics=whole.topics[:count], edges=[])
+    assert start.schema(plan)["properties"]["steps"]["maxItems"] == most
+    assert f"at most {most} steps" in start.build(plan)[1]
 
 
 @pytest.mark.parametrize("opener", ["<!-- gone", "<!DOCTYPE x", "<?php", "<script>", "<STYLE>", "<details>", "</div>"])
@@ -637,3 +639,26 @@ def test_after_failure_says_so_when_a_tree_holds_no_plan(tmp_path):
     said = pipeline.after_failure(tmp_path)
     assert "holds no plan" in said and "refused" in said
     assert "Nothing was written" not in said
+
+
+class HoldsToItsSchema(FakeLLM):
+    """A fake that refuses, as a real backend would, a `start` its schema does not allow."""
+
+    def structured(self, *, system: str, user: str, schema: dict, label: str) -> dict:
+        response = super().structured(system=system, user=user, schema=schema, label=label)
+        if label == "start":
+            steps = schema["properties"]["steps"]
+            allowed = steps["items"]["properties"]["topic"]["enum"]
+            assert len(response["steps"]) <= steps["maxItems"]
+            assert all(row["topic"] in allowed for row in response["steps"])
+        return response
+
+
+def test_a_chain_graph_gets_more_than_one_step(tmp_path):
+    chain = {"edges": [edge(a, b) for a, b in zip(SLUGS[1:], SLUGS)]}
+    order = SLUGS[:4]
+    llm = HoldsToItsSchema(script(connect=chain, start={"steps": [step(t) for t in order]}))
+    pipeline.run_plan(job_for(), tmp_path / "tree", llm)
+    assert [s.topic for s in Plan.load(tmp_path / "tree").steps] == order
+    shown = llm.calls[-1]["user"]
+    assert "- lending depends on: members" in shown and "- members depends on: nothing" in shown

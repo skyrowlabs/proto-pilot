@@ -1,9 +1,9 @@
 """The graph -> an ordered first few steps, each with its reason.
 
-The model writes the reasoning and the graph constrains the choice. It is shown
-only `ready` topics. `apply` then walks the steps, twin's included: a step needs
-every topic it depends on covered by an earlier step, so a first step must be
-ready, and the baseline's later steps may build on the ones before them.
+The model writes the reasoning and the graph constrains the choice. It is offered
+every topic with its `depends-on`, so a chain still yields several steps. `apply`
+then walks the steps, twin's included: a step needs every topic it depends on
+covered by an earlier step, so a first step must be ready, and a repeat is refused.
 """
 
 from __future__ import annotations
@@ -16,12 +16,17 @@ NAME = "start"
 MAX_STEPS = 5
 
 SYSTEM = BRIEF + """
-Say where to begin. You are given only the topics that depend on nothing, so every
-one of them can be started now. Prefer whichever retires the riskiest unknown soonest.
+Say where to begin. Prefer whichever step retires the riskiest unknown soonest.
 
-Return an ordered list of steps, no more than you are told, and never name a topic
-twice. Each names one of those topics, an `action` someone could take this week, and
-a `why` that says why it comes at this point.
+The order is a hard rule, and a list that breaks it is refused:
+
+- The first step must name a topic that depends on nothing.
+- A later step may name a topic only if every topic it depends on was named by an
+  earlier step.
+- Never name a topic twice.
+
+Return an ordered list of steps, no more than you are told. Each names a topic, an
+`action` someone could take soon, and a `why` that says why it comes at this point.
 """
 
 
@@ -41,7 +46,7 @@ def ready(plan: Plan) -> list[Topic]:
 
 
 def _most_steps(plan: Plan) -> int:
-    return min(MAX_STEPS, len(ready(plan)))
+    return min(MAX_STEPS, len(plan.topics))
 
 
 def schema(plan: Plan) -> dict:
@@ -55,7 +60,7 @@ def schema(plan: Plan) -> dict:
                 "items": {
                     "type": "object",
                     "properties": {
-                        "topic": {"type": "string", "enum": [topic.slug for topic in ready(plan)]},
+                        "topic": {"type": "string", "enum": [topic.slug for topic in plan.topics]},
                         "action": {"type": "string"},
                         "why": {"type": "string"},
                     },
@@ -70,11 +75,13 @@ def schema(plan: Plan) -> dict:
 
 
 def build(plan: Plan) -> tuple[str, str]:
-    topics = ready(plan)
-    if not topics:
+    if not ready(plan):
         raise PlanPassError("every topic depends on another, so `depends-on` has a cycle and nothing can go first")
-    block = topics_block(topics, "risks", "unknowns")
-    return SYSTEM, f"{scope_block(plan)}\n\n{block}\n\nReturn at most {_most_steps(plan)} steps."
+    needs = _needs(plan)
+    waits = [f"- {t.slug} depends on: {', '.join(sorted(needs[t.slug])) or 'nothing'}" for t in plan.topics]
+    block = topics_block(plan.topics, "risks", "unknowns")
+    graph = "## What each topic depends on\n\n" + "\n".join(waits)
+    return SYSTEM, f"{scope_block(plan)}\n\n{block}\n\n{graph}\n\nReturn at most {_most_steps(plan)} steps."
 
 
 def offline(plan: Plan) -> dict:

@@ -136,17 +136,17 @@ def test_a_consider_row_for_a_ghost_or_missing_topic_is_refused(tmp_path):
     assert "consider" in fail_at(tmp_path / "b", consider={"topics": ghost})
 
 
-def test_start_is_shown_only_ready_topics(tmp_path):
+def test_start_is_shown_every_topic_and_what_each_depends_on(tmp_path):
     llm = FakeLLM(script())
     pipeline.run_plan(job_for(), tmp_path / "tree", llm)
     shown = llm.calls[-1]["user"]
-    assert '"slug": "members"' in shown and '"slug": "lending"' not in shown
+    assert '"slug": "lending"' in shown and "- lending depends on: members" in shown
 
 
-def test_start_schema_allows_only_ready_topics():
+def test_start_schema_offers_every_topic():
     plan = baseline.build_plan(IDEA)
     enum = start.schema(plan)["properties"]["steps"]["items"]["properties"]["topic"]["enum"]
-    assert enum == ["audience", "risks"]
+    assert enum == [topic.slug for topic in plan.topics]
 
 
 @pytest.mark.parametrize(
