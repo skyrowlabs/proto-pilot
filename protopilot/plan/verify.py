@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from difflib import SequenceMatcher
 from typing import NamedTuple
 
-from protopilot.plan import render
+from protopilot.plan import ledger, render
 from protopilot.plan.model import DREAM_WORD_CAP, UNSPACED, Dream, Edge, Plan, dream_words
 from protopilot.verify import VerifyResult
 
@@ -196,15 +196,38 @@ def findings_traced(plan: Plan, pages: Pages) -> CheckResult:
     return _judged("findings_traced", subject, problems, advice, "The plan has no findings to trace.")
 
 
+def _borrowed(plan: Plan) -> list[str]:
+    """Each cited finding whose source its own topic's research never fetched. No ledger, no subject."""
+    if not plan.research:
+        return []
+    urls = {source.id: ledger.normal(source.url) for source in plan.sources}
+    problems = []
+    for topic in plan.topics:
+        record = plan.research_of(topic.slug)
+        own = {ledger.normal(f.url) for f in record.fetches if f.usable} if record else set()
+        for finding in topic.findings:
+            stray = sorted(i for i in finding.source_ids if not finding.assumption and i in urls and urls[i] not in own)
+            if stray:
+                problems.append(f"topic {topic.slug} cites {', '.join(stray)}, which its own research never fetched")
+    return problems
+
+
 def sources_fetched(plan: Plan, pages: Pages) -> CheckResult:
-    """Every source was fetched with usable content during this run, not typed by the model."""
-    problems = [
-        f"source {source.id} ({source.url}) was never fetched with usable content"
-        for source in plan.sources
-        if not source.fetched
-    ]
+    """Every source was fetched with usable content during this run, not typed by the model.
+
+    The evidence is the research ledger, never `Source.fetched`, so typing `true` there earns
+    nothing. The pipeline redraws the ledger from the run's transcripts before a loaded plan
+    is checked, so typing a fetch into the ledger earns nothing either.
+    """
+    usable = ledger.usable_urls(plan)
+    problems = []
+    for source in plan.sources:
+        if ledger.normal(source.url) not in usable:
+            typed = ", though plan.json marks it fetched" if source.fetched else ""
+            problems.append(f"source {source.id} ({source.url}) has no usable fetch in this run's ledger{typed}")
     if plan.researched and not plan.sources:
         problems.append("the plan says it was researched, and it holds no source")
+    problems += _borrowed(plan)
     advice = "Only a research run can record a fetch, so remove the source or research it."
     return _judged("sources_fetched", plan.sources, problems, advice, "The plan has no sources to check.")
 
@@ -381,7 +404,8 @@ def green_line(results: Iterable[CheckResult]) -> str:
         parts.append(f"Dreams are guesses, not findings: their checks read {' and '.join(read)}.")
     if "sources_fetched" in held:
         parts.append(
-            "A source retrieved this run proves a summary of it was read, not that a claim is in the original."
+            "Every source was fetched this run and read through a summary of the page, which is not the page: "
+            "a citation shows that summary was read, never that the claim is in the source."
         )
     return " ".join(parts)
 

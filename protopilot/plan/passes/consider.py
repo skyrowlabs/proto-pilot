@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from protopilot.plan import baseline
 from protopilot.plan.model import Plan
-from protopilot.plan.passes import BRIEF, lines, scope_block, topics_block
+from protopilot.plan.passes import BRIEF, findings_block, lines, scope_block, topics_block
 
 NAME = "consider"
 FIELDS = ("risks", "unknowns", "decisions")
@@ -50,8 +50,9 @@ def schema(plan: Plan) -> dict:
 
 def build(plan: Plan) -> tuple[str, str]:
     connections = [f"- {e.from_topic} {e.kind} {e.to_topic}" for e in plan.edges]
+    blocks = [scope_block(plan), topics_block(plan.topics), findings_block(plan)]
     return SYSTEM, "\n\n".join(
-        [scope_block(plan), topics_block(plan.topics), "## How they connect", "\n".join(connections) or "No links."]
+        [*(block for block in blocks if block), "## How they connect", "\n".join(connections) or "No links."]
     )
 
 

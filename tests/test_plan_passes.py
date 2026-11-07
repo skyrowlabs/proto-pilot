@@ -12,6 +12,7 @@ import pytest
 from click.testing import CliRunner
 from fakes import FakeLLM
 from plan_script import PASS_NAMES, script
+from research_script import ResearchingLLM
 
 from protopilot import cli
 from protopilot.jobs import Job
@@ -198,11 +199,22 @@ def test_a_render_that_dies_leaves_no_entry_page_on_a_fresh_tree(tmp_path, monke
     assert "whole plan" in pipeline.after_failure(tree)
 
 
-def test_the_estimate_counts_what_runs_and_says_research_is_excluded():
-    said = pipeline.call_estimate(FakeLLM([]))
+def test_the_estimate_says_research_will_not_run_on_a_backend_without_it():
+    said = pipeline.call_estimate(FakeLLM([]), topics=6)
     assert "8 in all" in said and "6 still to come (connect, consider, start, collect, evaluate, propose)" in said
     assert "plus 0 to 3 repair calls" in said
-    assert "exclude" in said and "Research" in said
+    assert "Research will not run (this backend has no research call)" in said
+
+
+def test_the_estimate_counts_one_research_call_a_topic_with_its_measured_cost():
+    said = pipeline.call_estimate(ResearchingLLM([]), topics=4)
+    assert "12 in all" in said and "10 still to come (research, connect," in said
+    assert "about 8 minutes and $1.60" in said and "not a subscription charge" in said
+
+
+def test_the_estimate_says_research_is_off_when_it_is():
+    said = pipeline.call_estimate(ResearchingLLM([]), researching=False, topics=4)
+    assert "8 in all" in said and "Research is off for this run" in said
 
 
 # -- the review -----------------------------------------------------------
@@ -295,7 +307,7 @@ def test_yes_runs_the_model_with_no_prompt(tmp_path, monkeypatch):
     tree = tmp_path / "tree"
     result = invoke(IDEA, "--yes", "--depth", "standard", "--dir", str(tree))
     assert result.exit_code == 0, result.output
-    assert "8 in all" in result.output and "exclude it" in result.output
+    assert "8 in all" in result.output and "Research will not run" in result.output
     plan = Plan.load(tree)
     assert (plan.depth, plan.questions, plan.dream_failure) == ("standard", ["Who runs it?"], "")
     assert llm.responses == []

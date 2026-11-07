@@ -3,7 +3,7 @@ title: "Plan Prototypes and Dreaming"
 slug: plan-prototypes
 shelf_status: ready
 priority: high
-updated: 2026-11-06
+updated: 2026-11-07
 tags: [plan, research, dreaming, pipeline]
 summary: "Add `proto plan`, which turns an idea into a researched, connected, organised set of text plans, plus a dreaming step that collects, evaluates and proposes lighter extensions of the idea."
 ---
@@ -13,7 +13,7 @@ summary: "Add `proto plan`, which turns an idea into a researched, connected, or
 > **Status**: 🟢 Ready — all six decisions ruled and Phase 1 measured, 2026-11-06
 > **Shelf-Status**: ready
 > **Priority**: High — this is now the product; see [plans-first](../ideas/plans-first.md)
-> **Updated**: 2026-11-06
+> **Updated**: 2026-11-07
 > **Queue-Order**: 10
 
 ## Problem
@@ -201,18 +201,43 @@ Comes before research because it needs no tools and can be judged on offline out
 - [x] `proto dream [dir]`, `--lens`, merging into the existing pool
 - [x] `proto dream promote <id>` and `proto dream drop <id> --why "…"`
 - [x] `--no-dream` on `proto plan`
-- [ ] Judge one real idea by hand: are the lenses producing different dreams, and does
-      the evaluation separate them? (~operator)
+- [x] Judge one real idea by hand: are the lenses producing different dreams, and does
+      the evaluation separate them? (~operator) Ruled 2026-11-07 by Jeston, on the tool
+      library run (17 dreams): the lenses differ, and the evaluation separates them.
 
 ## Phase 6 — Research
 
-- [ ] The tool-using call on the `LLM` protocol, as Phase 1 decided; `structured()` and
+- [x] The tool-using call on the `LLM` protocol, as Phase 1 decided; `structured()` and
       `ISOLATION` stay untouched for every other pass
-- [ ] `research` pass, one call per topic, resumable so one failure does not cost the
+- [x] `research` pass, one call per topic, resumable so one failure does not cost the
       topics already done
-- [ ] Source ledger feeding `sources.md` and the verifier
-- [ ] Page text is untrusted input: it reaches later passes only as cited findings, and
+- [x] Source ledger feeding `sources.md` and the verifier
+- [x] Page text is untrusted input: it reaches later passes only as cited findings, and
       the research call holds no write or shell tools
+- [ ] API-backend research, with its server-side web search (~deferred): it refuses in a
+      sentence until it can be run
+
+**Built 2026-11-07.** How it works is in
+[ARCHITECTURE.md](../ARCHITECTURE.md#the-plan-pipeline). Choices this phase made:
+
+- **Placement:** after the review and before `connect`, as the pipeline table says.
+- **A failed topic is recorded and the run goes on**; a stopped run resumes from
+  `.protopilot/research/`, so both kinds of failure keep the topics already done.
+- **The CLI does send a status code.** Phase 1 read the text; `tool_use_result.code` is
+  there too. The ledger reads both, and the text check stays because the field is not
+  a documented contract.
+- **The ledger is redrawn from transcripts on every load**, which closes the hand-typed
+  `fetched: true` hole. A forged transcript is out of reach and the code says so.
+- **A topic is researched only if it cites a page it fetched**; a call that cites nothing
+  is recorded `nothing cited`, so `researched` never claims a plan with no source.
+- **URL matching errs toward an assumption:** http and https, `www.` and `:443` count as
+  different pages, so a citation spelt unlike its fetch is labelled an assumption.
+
+**Run once, 2026-11-07,** on the README's bakery idea at `--depth shallow`, `claude-code`:
+764s end to end, research 352s for 4 topics (64–105s each). Green, every check held.
+14 fetches, 11 judged usable (one tool error, one 404, one PDF whose summary said it read
+nothing); 12 findings cited 10 sources, every cited URL matched a usable fetch, and 4
+findings were labelled assumptions. A re-render from disk stayed green.
 
 ## Phase 7 — The surfaces that assume an app
 

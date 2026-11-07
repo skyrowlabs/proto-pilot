@@ -460,7 +460,10 @@ def _review_outline(plan):
     "--depth",
     type=click.Choice(list(TOPIC_COUNTS)),
     default=None,
-    help=f"Topic count, and the research effort recorded for later (default: {DEFAULT_DEPTH}). Needs the model.",
+    help=(
+        f"Topic count, and research effort: how many findings and pages each topic gets (default: {DEFAULT_DEPTH}). "
+        "Needs the model."
+    ),
 )
 @click.option("--offline", is_flag=True, help="Deterministic baseline; no API calls.")
 @click.option(
@@ -471,6 +474,11 @@ def _review_outline(plan):
 )
 @click.option("--yes", "-y", is_flag=True, help="Skip scope's questions and the outline review.")
 @click.option("--no-dream", is_flag=True, help="Skip dreaming; `proto dream` can start the pool later.")
+@click.option(
+    "--no-research",
+    is_flag=True,
+    help="Skip research, which takes minutes a topic; the plan is stamped Not researched.",
+)
 def plan_command(
     idea: str,
     directory: str | None,
@@ -480,8 +488,14 @@ def plan_command(
     backend: str | None,
     yes: bool,
     no_dream: bool,
+    no_research: bool,
 ) -> None:
-    """Turn IDEA into an organised set of text plans, and dream a little. Research does not run yet."""
+    """Turn IDEA into an organised set of text plans, research each topic on the web, and dream a little.
+
+    Research runs on the claude-code backend, one call per topic, and a run that stops
+    during it resumes when rerun. Offline, or with --no-research, the plan is stamped
+    Not researched.
+    """
     from protopilot.jobs import STORE
     from protopilot.plan import baseline, pipeline
 
@@ -491,6 +505,7 @@ def plan_command(
     target = Path(directory).resolve() if directory else Path.cwd() / baseline.slug_for(idea)
     try:
         existing = pipeline.existing_plan(target, idea, direction)
+        draft = None if existing else pipeline.resumable(target, idea, direction)
     except pipeline.PlanRefused as exc:
         raise click.ClickException(str(exc)) from exc
 
@@ -502,6 +517,10 @@ def plan_command(
             )
         result = _plan_step(STORE.create(idea, direction), target, lambda j: pipeline.rerender(j, target))
         sys.exit(0 if result.ok else 1)
+
+    if draft is not None:
+        _resume(target, draft, depth, offline, backend, not no_dream, not no_research)
+        return
 
     if not yes and not _stdin_is_terminal():
         # `click.prompt` would abort on EOF, and wait forever on a pipe nobody writes to.
@@ -518,19 +537,53 @@ def plan_command(
             "--depth needs the model, and the backend for this run is offline, which always writes "
             "the same six topics. Drop --depth, or choose a backend that calls the model."
         )
+    researching = not no_research
+    _refuse_unresearchable(llm, researching)
 
     job = STORE.create(idea, direction)
     dream = not no_dream
-    draft = _plan_step(job, target, lambda j: pipeline.scoped(j, llm, cast("Depth | None", depth), dream))
+    plan = _plan_step(job, target, lambda j: pipeline.scoped(j, llm, cast("Depth | None", depth), dream, researching))
     if not yes:
-        draft = _ask_questions(draft)
-    draft = _plan_step(job, target, lambda j: pipeline.outlined(j, llm, draft, dream))
+        plan = _ask_questions(plan)
+    plan = _plan_step(job, target, lambda j: pipeline.outlined(j, llm, plan, dream, researching))
     _echo(f"\n  -> {target}\n")
     if not yes:
-        draft = _review_outline(draft)
-    result = _plan_step(job, target, lambda j: pipeline.build(j, target, draft, llm, dream))
+        plan = _review_outline(plan)
+    result = _plan_step(job, target, lambda j: pipeline.build(j, target, plan, llm, dream, researching))
     if not result.ok:
         sys.exit(1)  # the tree is handed back, as `proto new`'s floor hands one back
+
+
+def _refuse_unresearchable(llm, researching: bool) -> None:
+    """A backend that cannot research is refused before any call, rather than billed for a stamped plan."""
+    # Only a backend that says it cannot is refused here. One with no research call at all is
+    # labelled by the pipeline instead, and runs unresearched.
+    refusal = str(getattr(llm, "research_refusal", "")) if researching and not llm.offline else ""
+    if refusal:
+        raise click.ClickException(f"{refusal} No model was called.")
+
+
+def _resume(target: Path, draft, depth: str | None, offline: bool, backend: str | None, dream: bool, researching: bool):
+    """A run that stopped after its review, picked up where it stopped, with no question asked again."""
+    from protopilot.jobs import STORE
+    from protopilot.plan import pipeline
+
+    # The pipeline holds the same guard, so no caller can land an unresearched plan over it.
+    asked = cast("Depth | None", depth)
+    refusal = pipeline.resume_refusal(target, draft, None, researching, asked)
+    if refusal:
+        raise click.ClickException(refusal)  # before any backend is built
+    try:
+        llm = build_llm(offline=offline, backend=backend)
+    except LLMError as exc:
+        raise click.ClickException(str(exc)) from exc
+    refusal = pipeline.resume_refusal(target, draft, llm, researching, asked)
+    if refusal:
+        raise click.ClickException(refusal)
+    job = STORE.create(draft.idea, draft.direction)
+    result = _plan_step(job, target, lambda j: pipeline.resume(j, target, draft, llm, dream, researching))
+    if not result.ok:
+        sys.exit(1)
 
 
 DREAM_ROUND = "round"

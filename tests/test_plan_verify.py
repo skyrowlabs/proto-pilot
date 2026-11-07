@@ -13,8 +13,8 @@ IDEA = "start a community tool library"
 WHAT_IF = "the library lent seeds as well as saws"
 
 
-def source(fetched: bool = True) -> Source:
-    return Source(id="s1", title="A study", url="https://example.com", fetched=fetched)
+def source(fetched: bool = True, url: str = "https://example.com") -> Source:
+    return Source(id="s1", title="A study", url=url, fetched=fetched)
 
 
 def dream(**changes: object) -> Dream:
@@ -39,7 +39,13 @@ def full() -> Plan:
     """A plan every check has a subject in, so a planted failure has a pass to turn red."""
     sourced = Finding(text="Lending works.", assumption=False, source_ids=["s1"])
     plan = with_finding(baseline.build_plan(IDEA), sourced)
-    return plan.revised(researched=True, sources=[source()], dreams=[dream()])
+    return plan.revised(researched=True, sources=[source()], dreams=[dream()], research=[fetched_record()])
+
+
+def fetched_record(usable: bool = True) -> dict:
+    """The ledger's record of a usable fetch of `source()`'s page, as a research run writes one."""
+    fetch = {"url": "https://example.com/", "usable": usable, "why": "" if usable else "HTTP 403"}
+    return {"topic": "audience", "state": "researched", "fetches": [fetch]}
 
 
 def judged(plan: Plan, pages: dict[str, str] | None = None) -> verify.PlanVerdict:
@@ -104,11 +110,13 @@ PLANTS = {
         ),
     },
     "sources_fetched": {
-        "typed-by-the-model": lambda: full().revised(sources=[source(fetched=False)]),
+        "typed-by-the-model": lambda: full().revised(sources=[source(url="https://example.com/typed")]),
         "field-absent-from-plan-json": lambda: full().revised(
-            sources=[Source(id="s1", title="A study", url="https://example.com")]
+            sources=[Source(id="s1", title="A study", url="https://example.com/typed")]
         ),
         "researched-with-no-source": lambda: baseline.build_plan(IDEA).revised(researched=True),
+        "fetched-typed-with-no-ledger": lambda: full().revised(research=[]),
+        "ledger-fetch-was-a-403": lambda: full().revised(research=[fetched_record(usable=False)]),
     },
     "start_order": {
         "first-step-waits": lambda: steps("scope", "audience"),
@@ -236,7 +244,7 @@ def test_a_plan_with_no_topics_has_nothing_mapped_and_is_still_red():
 def test_the_green_line_states_the_limit_in_words():
     line = judged(full()).summary
     assert "coherent and traceable" in line and "not the same as true" in line
-    assert "a summary of it was read, not that a claim is in the original" in line
+    assert "read through a summary of the page" in line and "never that the claim is in the source" in line
 
 
 def test_the_green_line_keeps_what_held_apart_from_what_had_no_subject():
@@ -356,8 +364,17 @@ def test_an_edge_from_a_ghost_cannot_make_a_real_step_wait():
 
 
 def test_a_finding_citing_a_source_the_plan_holds_but_never_fetched_is_red_at_the_source():
-    plan = full().revised(sources=[source(fetched=False)])
+    plan = full().revised(sources=[source(url="https://example.com/never")])
     assert judged(plan).named(verify.FAILED) == ["sources_fetched"]
+
+
+def test_a_hand_typed_fetched_flag_is_named_as_such():
+    said = judged(full().revised(research=[])).report()
+    assert "has no usable fetch in this run's ledger, though plan.json marks it fetched" in said
+
+
+def test_the_ledger_not_the_flag_is_the_evidence():
+    assert judged(full().revised(sources=[source(fetched=False)])).ok
 
 
 def test_the_green_line_is_absent_from_a_red_verdict():

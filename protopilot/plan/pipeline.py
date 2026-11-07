@@ -7,9 +7,10 @@ for the reason `generation.py` gives.
 
 Three halves, as `generation` has two, so a front end can stop between them:
 `scoped`, then its questions, `outlined`, then the review, then `build`. They run
-on one job and share one event list. Nothing reaches disk until every pass has
-worked, so a failed pass leaves no tree: `existing_plan` treats any plan.json as
-finished, and only a whole one is ever written.
+on one job and share one event list. Only research reaches disk before every pass
+has worked: the reviewed outline and each topic's transcript, under
+`.protopilot/research/`, so a run that stops resumes there and asks no topic twice.
+`existing_plan` treats any plan.json as finished, and only a whole one is written.
 
 `repaired` verifies before the render, against pages drawn in memory, so repair
 only ever edits data. `_hand_back` writes, then reads the tree and checks again. A
@@ -24,31 +25,38 @@ plan that is already green, and change nothing unless the result is green too.
 
 from __future__ import annotations
 
+import re
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TypeVar
 
-from protopilot.llm import LLM, LLMError, OfflineLLM
-from protopilot.plan import baseline, dreaming, render, verify
+from protopilot.llm import LLM, LLMError, OfflineLLM, ResearchUnavailable, research_result
+from protopilot.plan import baseline, dreaming, ledger, render, verify
 from protopilot.plan.lenses import LENSES, Lens
-from protopilot.plan.model import DEFAULT_DEPTH, Depth, Dream, Plan, plan_path
+from protopilot.plan.model import DEFAULT_DEPTH, Depth, Dream, Plan, Topic, TopicResearch, plan_path
 from protopilot.plan.passes import (
     PlanPassError,
     collect,
     connect,
     consider,
     evaluate,
+    misshapen,
     outline,
 )
 from protopilot.plan.passes import promote as promote_pass
-from protopilot.plan.passes import propose, repair, run_pass, scope, start
+from protopilot.plan.passes import propose, repair, research, run_pass, scope, start
 
-#: Every model call a run makes, in order; the review sits after `BEFORE_REVIEW`.
+#: Every model call a run makes, in order; the review sits after `BEFORE_REVIEW`. Research,
+#: one call per topic, runs between the review and `connect`, so links rest on findings.
 PLAN_PASSES = (scope, outline, connect, consider, start)
 DREAM_PASSES = (collect, evaluate, propose)
 PASSES = (*PLAN_PASSES, *DREAM_PASSES)
 BEFORE_REVIEW = (scope, outline)
+#: As measured once, on one topic, 2026-11-06 (docs/TODO/plan-prototypes.md, Phase 1).
+MINUTES_PER_TOPIC = 2
+REPORTED_USD_PER_TOPIC = 0.4
 RENDER = "render"
 T = TypeVar("T")
 #: A model's error can be a page of text, and it lands in `dreams.md`.
@@ -73,8 +81,33 @@ class Checked:
     tried: list[str]
 
 
+def _same_ask(plan: Plan, idea: str, direction: str) -> bool:
+    return (baseline.clean(idea), baseline.clean(direction)) == (plan.idea, plan.direction)
+
+
+def _steer(plan: Plan) -> str:
+    return f" with direction {plan.direction!r}" if plan.direction else " with no direction"
+
+
+def resumable(tree: Path, idea: str, direction: str = "") -> Plan | None:
+    """The reviewed outline a stopped run left in `tree`, None if it left none, refused if it is another plan's."""
+    tree = Path(tree)
+    if plan_path(tree).exists():
+        return None
+    try:
+        draft = ledger.draft(tree)
+    except (OSError, ValueError) as exc:
+        raise PlanRefused(f"{ledger.research_dir(tree) / ledger.DRAFT_FILE} cannot be read: {exc}") from exc
+    if draft is not None and not _same_ask(draft, idea, direction):
+        raise PlanRefused(
+            f"{tree} holds research in progress for {draft.idea!r}{_steer(draft)}. "
+            "Pick another --dir, or rerun with that same idea and direction to resume it."
+        )
+    return draft
+
+
 def existing_plan(tree: Path, idea: str, direction: str = "") -> Plan | None:
-    """The plan to re-render from `tree`, None if `tree` is free, refused otherwise.
+    """The plan to re-render from `tree`, None if `tree` is free or resumable, refused otherwise.
 
     A plan for anything but this idea and direction is refused: exiting 0 on it
     would hand back somebody else's plan as the answer to what was asked.
@@ -83,15 +116,16 @@ def existing_plan(tree: Path, idea: str, direction: str = "") -> Plan | None:
     if not tree.exists():
         return None
     if not plan_path(tree).exists():
+        if resumable(tree, idea, direction) is not None:
+            return None
         raise PlanRefused(f"{tree} already exists and holds no plan; refusing to overwrite it")
     try:
         plan = Plan.load(tree)
     except (OSError, ValueError) as exc:
         raise PlanRefused(f"{plan_path(tree)} cannot be read as a plan: {exc}") from exc
-    if (baseline.clean(idea), baseline.clean(direction)) != (plan.idea, plan.direction):
-        steer = f" with direction {plan.direction!r}" if plan.direction else " with no direction"
+    if not _same_ask(plan, idea, direction):
         raise PlanRefused(
-            f"{tree} already holds a plan for {plan.idea!r}{steer}. "
+            f"{tree} already holds a plan for {plan.idea!r}{_steer(plan)}. "
             "Pick another --dir, or rerun with that same idea and direction to re-render it."
         )
     return plan
@@ -117,42 +151,138 @@ def _passes(dream: bool) -> tuple:
     return PASSES if dream else PLAN_PASSES
 
 
-def _names(dream: bool = True) -> list[str]:
-    return [*(module.NAME for module in _passes(dream)), RENDER]
+def _names(dream: bool = True, researching: bool = True) -> list[str]:
+    names = [module.NAME for module in _passes(dream)]
+    if researching:
+        names.insert(names.index(connect.NAME), research.NAME)
+    return [*names, RENDER]
 
 
 def _model_pass(job, module, plan: Plan, llm: LLM, names: list[str]) -> Plan:
     return _pass(job, module.NAME, names, lambda: (run_pass(module, plan, llm), []))
 
 
-def call_estimate(llm: LLM, dream: bool = True) -> str:
-    """The model calls this run makes, counted from the passes it runs, for the checkpoint."""
-    excluded = "Research does not run in this build, so these numbers exclude it."
+def research_refusal(llm: LLM) -> str:
+    """Why `llm` cannot research, or an empty string. Offline is no refusal: the twin runs."""
     if llm.offline:
-        return f"Estimated model calls: 0, because this run is offline. {excluded}"
+        return ""
+    if not callable(getattr(llm, "research", None)):
+        return "this backend has no research call"
+    return str(getattr(llm, "research_refusal", ""))
+
+
+def _research_line(llm: LLM, researching: bool, topics: int) -> str:
+    if not researching:
+        return "Research is off for this run, so the plan is stamped Not researched."
+    if llm.offline:
+        return "Research does not run offline, so the plan is stamped Not researched."
+    refusal = research_refusal(llm)
+    if refusal:
+        return f"Research will not run ({refusal.rstrip('.')}), so the plan is stamped Not researched."
+    minutes, usd = MINUTES_PER_TOPIC * topics, REPORTED_USD_PER_TOPIC * topics
+    return (
+        f"Research is {topics} of those calls, one per topic: about {MINUTES_PER_TOPIC} minutes and "
+        f"${REPORTED_USD_PER_TOPIC:.2f} reported cost each as measured once, so about {minutes} minutes and "
+        f"${usd:.2f} here. The reported cost is what the run would be priced at, not a subscription charge."
+    )
+
+
+def call_estimate(llm: LLM, dream: bool = True, researching: bool = True, topics: int = 0) -> str:
+    """The model calls this run makes, counted from the passes it runs, for the checkpoint."""
+    said = _research_line(llm, researching, topics)
+    if llm.offline:
+        return f"Estimated model calls: 0, because this run is offline. {said}"
     passes = _passes(dream)
+    calls = topics if researching and not research_refusal(llm) else 0
     ahead = [module.NAME for module in passes if module not in BEFORE_REVIEW]
+    ahead = [research.NAME, *ahead] if calls else ahead
     repairs = f"plus 0 to {repair.ATTEMPTS} repair calls, only if verification finds something repair can fix"
-    still = f"{len(ahead)} still to come ({', '.join(ahead)})"
-    return f"Estimated model calls: {len(passes)} in all, {still}, {repairs}. {excluded}"
+    still = f"{len(passes) - len(BEFORE_REVIEW) + calls} still to come ({', '.join(ahead)})"
+    return f"Estimated model calls: {len(passes) + calls} in all, {still}, {repairs}. {said}"
 
 
-def scoped(job, llm: LLM, depth: Depth | None = None, dream: bool = True) -> Plan:
+def scoped(job, llm: LLM, depth: Depth | None = None, dream: bool = True, researching: bool = True) -> Plan:
     """The plan's scope, with any questions still open. Writes no files."""
-    job.event("plan", passes=_names(dream))
+    names = _names(dream, researching)
+    job.event("plan", passes=names)
     plan = scope.seed(job.idea, job.direction, None if llm.offline else depth or DEFAULT_DEPTH)
-    return _model_pass(job, scope, plan, llm, _names(dream))
+    return _model_pass(job, scope, plan, llm, names)
 
 
-def outlined(job, llm: LLM, plan: Plan, dream: bool = True) -> Plan:
+def outlined(job, llm: LLM, plan: Plan, dream: bool = True, researching: bool = True) -> Plan:
     """The topics, ready to review. Writes no files; the summary is the checkpoint's."""
-    plan = _model_pass(job, outline, plan, llm, _names(dream))
+    plan = _model_pass(job, outline, plan, llm, _names(dream, researching))
     plan = outline.with_assumptions(plan) if llm.offline else plan
-    estimate = call_estimate(llm, dream)
+    estimate = call_estimate(llm, dream, researching, len(plan.topics))
     job.log(plan.summary())
     job.log(estimate)
     job.event("outline", topics=[t.slug for t in plan.topics], depth=plan.depth, estimate=estimate)
     return plan
+
+
+def _short(exc: BaseException) -> str:
+    return baseline.clean(str(exc))[:MOST_FAILURE_CHARS].rstrip(" .") or type(exc).__name__
+
+
+def _research_topic(job, plan: Plan, llm, tree: Path, topic: Topic) -> Plan:
+    """One topic researched, or recorded as failed. A transcript already on disk is replayed, not paid for again."""
+    label = f"{research.NAME} {topic.slug}"
+    stored = ledger.read_transcript(tree, topic.slug)
+    started = time.monotonic()
+    try:
+        if stored is None:
+            system, user = research.build(plan, topic)
+            got = llm.research(system=system, user=user, schema=research.schema(plan), label=label)
+            transcript, data = got.transcript, got.data
+        else:
+            transcript, data = stored, research_result(stored, label)
+        fault = misshapen(research.schema(plan), data)
+        if fault:
+            raise PlanPassError(f"pass {label!r} returned output that cannot be used: {fault}")
+        after, record = research.apply(plan, topic.slug, data, ledger.fetches(transcript))
+    except ResearchUnavailable:
+        raise
+    except (LLMError, PlanPassError, ValueError) as exc:
+        failure = _short(exc)
+        job.log(f"    {topic.slug}: research failed, and the topic goes on unresearched: {failure}")
+        job.event("research_failed", topic=topic.slug, error=failure)
+        record = TopicResearch(topic=topic.slug, state="failed", failure=failure)
+        return plan.revised(research=[*plan.research, record])
+    name = (
+        ledger.write_transcript(tree, topic.slug, transcript) if stored is None else ledger.transcript_name(topic.slug)
+    )
+    record = record.model_copy(update={"transcript": name, "sha256": ledger.digest(transcript)})
+    usable = sum(fetch.usable for fetch in record.fetches)
+    cited = sum(not finding.assumption for t in after.topics if t.slug == topic.slug for finding in t.findings)
+    how = "replayed from its transcript" if stored is not None else f"{time.monotonic() - started:.0f}s"
+    job.log(f"    {topic.slug}: {cited} cited finding(s), {usable} of {len(record.fetches)} fetch(es) usable ({how})")
+    job.event("researched", topic=topic.slug, state=record.state, cited=cited, fetched=usable)
+    return after.revised(research=[*after.research, record])
+
+
+def _researched(job, plan: Plan, llm: LLM, tree: Path, names: list[str]) -> Plan:
+    """Every topic in turn, each saved as it lands; a topic that fails costs only itself."""
+
+    def work() -> tuple[Plan, list[str]]:
+        if llm.offline:
+            job.log("    offline, so nothing is read and nothing is researched")
+            return research.offline(plan), []
+        refusal = research_refusal(llm)
+        if refusal:
+            job.log(f"    research did not run: {refusal}")
+            return plan.revised(research_failure=refusal), []
+        ledger.save_draft(tree, plan)
+        current = plan
+        for topic in plan.topics:
+            try:
+                current = _research_topic(job, current, llm, tree, topic)
+            except ResearchUnavailable as exc:
+                job.log(f"    research did not run: {exc}")
+                return current.revised(research_failure=str(exc)), []
+        files = [f"{ledger.RESEARCH_DIR}/{record.transcript}" for record in current.research if record.transcript]
+        return current, files
+
+    return _pass(job, research.NAME, names, work)
 
 
 def _refuse_if_taken(job, tree: Path) -> None:
@@ -249,10 +379,13 @@ def _hand_back(job, tree: Path, names: list[str], checked: Checked, save: bool) 
 
     def written() -> tuple[None, list[str]]:
         saved = [str(plan.save(tree).relative_to(tree))] if save else []
+        if save:
+            ledger.forget_draft(tree)
         return None, [*saved, *_drawn(plan, tree, runbook(checked.verdict))]
 
     _pass(job, RENDER, names, written)
-    landed = verify.verdict(plan, render.read(tree))
+    # The ledger as its transcripts on disk tell it, so a fetch typed into plan.json earns nothing.
+    landed = verify.verdict(ledger.reconciled(plan, tree), render.read(tree))
     if checked.verdict.ok and not landed.ok:
         job.log(f"    the written tree failed at {landed.stage}: {landed.summary}")
         job.event("verify_failed", attempt=checked.attempts, stage=landed.stage, summary=landed.summary)
@@ -320,13 +453,15 @@ def _dreamed_or_noted(job, plan: Plan, llm: LLM, names: list[str]) -> Plan:
     return plan.revised(dream_failure=reason)
 
 
-def build(job, tree: Path, plan: Plan, llm: LLM, dream: bool = True) -> verify.PlanVerdict:
+def build(job, tree: Path, plan: Plan, llm: LLM, dream: bool = True, researching: bool = True) -> verify.PlanVerdict:
     """Everything after the review, whether a person approved it or nobody was asked."""
     tree = Path(tree)
     _refuse_if_taken(job, tree)
     job.project_dir = str(tree)
-    names = _names(dream)
+    names = _names(dream, researching)
 
+    if researching:
+        plan = _researched(job, plan, llm, tree, names)
     for module in (connect, consider, start):
         plan = _model_pass(job, module, plan, llm, names)
     if dream:
@@ -338,9 +473,22 @@ def build(job, tree: Path, plan: Plan, llm: LLM, dream: bool = True) -> verify.P
     return _hand_back(job, tree, names, checked, save=True)
 
 
-def _finish(job, tree: Path, plan: Plan, result: verify.PlanVerdict, attempts: int) -> None:
+def _research_account(plan: Plan) -> list[str]:
+    """The run's last word on research, topic by topic where it differs."""
     if not plan.researched:
-        job.log("Not researched: nothing here was checked against a source.")
+        why = [f"Research did not run: {plan.research_failure}"] if plan.research_failure else []
+        return ["Not researched: nothing here was checked against a source.", *why]
+    done = [t.title for t in plan.topics if render.topic_research(plan, t)[0]]
+    left = [t.title for t in plan.topics if not render.topic_research(plan, t)[0]]
+    said = (
+        f"Researched {len(done)} of {len(plan.topics)} topics, citing {len(plan.sources)} source(s) fetched this run."
+    )
+    return [said, *([f"Not researched: {', '.join(left)}."] if left else [])]
+
+
+def _finish(job, tree: Path, plan: Plan, result: verify.PlanVerdict, attempts: int) -> None:
+    for line in _research_account(plan):
+        job.log(line)
     if result.ok:
         job.log(result.summary)
     if plan.dream_failure:
@@ -353,29 +501,94 @@ def _finish(job, tree: Path, plan: Plan, result: verify.PlanVerdict, attempts: i
     job.event("finished", ok=result.ok, attempts=attempts, project_dir=str(tree), run_hint="")
 
 
+#: The numbered lines under a runbook's "What was tried", as `verify.runbook` writes them.
+TRIED = re.compile(r"## What was tried\n\n(.*?)\n\n## ", re.DOTALL)
+RERENDER_TRIED = "A re-render calls no model, so no repair ran."
+
+
+def _tried_before(tree: Path) -> list[str]:
+    """What the runbook this tool last wrote says was tried, so a re-render keeps the history."""
+    path = tree / render.RUNBOOK_FILE
+    if not render.is_ours(path):
+        return []
+    found = TRIED.search(path.read_text(encoding="utf-8", errors="replace"))
+    lines = [re.sub(r"^\d+\. ", "", line) for line in found.group(1).splitlines()] if found else []
+    return [line for line in lines if line and line != "No repair ran."]
+
+
 def rerender(job, tree: Path) -> verify.PlanVerdict:
-    """Verify the plan already in `tree` and draw it again. No model, so no repair: plan.json may be hand-edited."""
+    """Verify the plan already in `tree` and draw it again. No model, so no repair: plan.json may be hand-edited.
+
+    The ledger is read from the transcripts on disk, so a hand edit cannot make a source fetched.
+    """
     tree = Path(tree)
     job.project_dir = str(tree)
     job.log(f"{tree} already holds this plan; checking it and drawing it again, with no model call.")
     job.event("plan", passes=[RENDER])
-    plan = Plan.load(tree)
+    plan = ledger.reconciled(Plan.load(tree), tree)
     result = _verified(job, plan, 1, 1)
-    tried = [] if result.ok else ["A re-render calls no model, so no repair ran."]
+    earlier = _tried_before(tree)
+    tried = [] if result.ok else [*earlier, *([] if earlier[-1:] == [RERENDER_TRIED] else [RERENDER_TRIED])]
     if not result.ok:
         job.event("exhausted", attempts=1, stage=result.stage)
     return _hand_back(job, tree, [RENDER], Checked(plan, result, 1, tried), save=False)
 
 
-def run_plan(
-    job, tree: Path, llm: LLM | None = None, depth: Depth | None = None, dream: bool = True
+def resume_refusal(
+    tree: Path, draft: Plan, llm: LLM | None, researching: bool = True, depth: Depth | None = None
+) -> str:
+    """Why this run may not resume `draft`, or an empty string. A resume that skipped research would delete it.
+
+    With no `llm`, only what needs no backend is judged, so a caller can refuse before building one.
+    """
+    if not researching:
+        return f"{tree} holds research in progress. Rerun without --no-research to resume it, or pick another --dir."
+    if depth and depth != draft.depth:
+        return (
+            f"{tree} holds research in progress at depth {draft.depth}, and a resumed run keeps it. "
+            "Drop --depth, or pick another --dir."
+        )
+    if llm is None:
+        return ""
+    if llm.offline:
+        return f"{tree} holds research in progress, and offline cannot research. Resume with a model backend."
+    refusal = research_refusal(llm)
+    return f"{tree} holds research in progress, and this backend cannot resume it: {refusal}" if refusal else ""
+
+
+def resume(
+    job,
+    tree: Path,
+    draft: Plan,
+    llm: LLM,
+    dream: bool = True,
+    researching: bool = True,
+    depth: Depth | None = None,
 ) -> verify.PlanVerdict:
-    """Every half with nobody asked, or a re-render of the plan already in `tree`."""
+    """Pick up a run that stopped after its review: topics with a transcript are replayed, the rest researched."""
+    tree = Path(tree)
+    refusal = resume_refusal(tree, draft, llm, researching, depth)
+    if refusal:
+        raise PlanRefused(refusal)
+    done = [t.slug for t in draft.topics if ledger.read_transcript(tree, t.slug) is not None]
+    job.log(f"{tree} holds a reviewed outline; resuming, with {len(done)} of {len(draft.topics)} topics researched.")
+    job.event("plan", passes=_names(dream))
+    return build(job, tree, draft, llm, dream)
+
+
+def run_plan(
+    job, tree: Path, llm: LLM | None = None, depth: Depth | None = None, dream: bool = True, researching: bool = True
+) -> verify.PlanVerdict:
+    """Every half with nobody asked, a resumed run, or a re-render of the plan already in `tree`."""
     tree = Path(tree)
     if existing_plan(tree, job.idea, job.direction) is not None:
         return rerender(job, tree)
     llm = llm or OfflineLLM()
-    return build(job, tree, outlined(job, llm, scoped(job, llm, depth, dream), dream), llm, dream)
+    draft = resumable(tree, job.idea, job.direction)
+    if draft is not None:
+        return resume(job, tree, draft, llm, dream, researching, depth)
+    plan = outlined(job, llm, scoped(job, llm, depth, dream, researching), dream, researching)
+    return build(job, tree, plan, llm, dream, researching)
 
 
 def _refuse_if_blocked(plan: Plan, tree: Path) -> None:
@@ -385,13 +598,17 @@ def _refuse_if_blocked(plan: Plan, tree: Path) -> None:
 
 
 def _held(tree: Path) -> Plan:
-    """The plan in `tree`, refused unless green: a dream extends a plan that holds, so fix that first."""
+    """The plan in `tree`, refused unless green: a dream extends a plan that holds, so fix that first.
+
+    It is the plan as its transcripts tell it, so a verb that saves never writes back a forged state.
+    """
     if not plan_path(tree).exists():
         raise PlanRefused(f"{tree} holds no plan. `proto plan` makes one; a dream needs a plan to extend.")
     try:
         plan = Plan.load(tree)
     except (OSError, ValueError) as exc:
         raise PlanRefused(f"{plan_path(tree)} cannot be read as a plan: {exc}") from exc
+    plan = ledger.reconciled(plan, tree)
     result = verify.verdict(plan, render.render(plan))
     if not result.ok:
         raise PlanRefused(
@@ -427,7 +644,7 @@ def _land(job, tree: Path, before: Plan, checked: Checked, names: list[str]) -> 
             f"Nothing was changed, because the result failed its checks.\n{checked.verdict.report()}{tried}"
         )
     try:
-        moved = Plan.load(tree) != before
+        moved = ledger.reconciled(Plan.load(tree), tree) != before
     except (OSError, ValueError):
         moved = True
     if moved:
@@ -510,6 +727,11 @@ def after_dream_failure(tree: Path) -> str:
 
 def after_failure(tree: Path) -> str:
     """What a failed run left in `tree`, and what running the command again does."""
+    if not plan_path(tree).exists() and (ledger.research_dir(tree) / ledger.DRAFT_FILE).is_file():
+        return (
+            f"{tree} keeps the reviewed outline and the research done so far. Rerun the same command to "
+            "resume: no topic already researched is asked again."
+        )
     if plan_path(tree).exists():
         return (
             f"{tree} holds the whole plan but maybe not every page. Any page there may be out of date. "

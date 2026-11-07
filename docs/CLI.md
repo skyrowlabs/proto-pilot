@@ -63,17 +63,37 @@ proto plan "start a community tool library" --offline --yes
 | ---- | ------------ |
 | `--dir` | Target directory; the default is `./<slug>` |
 | `--direction` | Extra steer, kept as a constraint |
-| `--depth` | Topics in the outline: `shallow` 4, `standard` 6, `deep` 8. The default is `standard`, and it is refused on an offline backend |
+| `--depth` | Topics in the outline: `shallow` 4, `standard` 6, `deep` 8, and research effort: 3–4, 4–6 or 6–8 findings a topic, reading at most 3, 5 or 8 pages. A topic answering with more findings than that fails. The default is `standard`, and it is refused on an offline backend |
 | `--backend` | `api` bills API credit, `claude-code` a Claude subscription, `offline` calls no model. Beats `PROTOPILOT_LLM`; with neither set, `api` is used |
 | `--offline` | The deterministic baseline with no model call. Beats `--backend` |
 | `--yes`, `-y` | Skip scope's questions, which stay open in `PLAN.md`, and the outline review |
 | `--no-dream` | Skip dreaming. `dreams.md` says it has not run, and `proto dream` can start the pool later |
+| `--no-research` | Skip research, for a plan made in a minute or two. It is stamped *Not researched* |
 
-A run calls a model by default: `scope`, `outline`, the review, `connect`, `consider`,
-`start`, `collect`, `evaluate`, `propose`, verification, any repair, then render. The
-checkpoint estimates 8 calls, or 5 with `--no-dream`, and a dream pass with nothing to
-read makes none. **It does no research yet**, so every plan is stamped *Not researched*
-and holds no findings beyond the offline baseline's assumptions.
+A run calls a model by default: `scope`, `outline`, the review, `research`, `connect`,
+`consider`, `start`, `collect`, `evaluate`, `propose`, verification, any repair, then
+render. The checkpoint estimates 8 calls plus one research call per topic, or 5 with
+`--no-dream`, and a dream pass with nothing to read makes none. It also prints the
+research time and reported cost, from one measured topic: about two minutes and $0.40
+each, the price the run would carry, not a subscription charge.
+
+**Research runs on `--backend claude-code` only.** Each topic gets one call holding web
+search and web fetch and nothing else. A finding is cited only if this run fetched its
+page with usable content, which is judged by a heuristic, and anything else is labelled
+an assumption; `sources.md` lists what was cited and not fetched, and every fetch that
+failed, as plain text and never as a link. A fetched page is read
+through a model's summary of it, so a citation shows the summary was read, not that the
+claim is in the page. With `--backend api` the command refuses before any call unless
+`--no-research` is given. Offline, nothing is researched. A topic whose research fails
+says so on its page and costs nothing else; `PLAN.md` names every topic not researched.
+
+**A run that stops during research, or after it, resumes.** Rerun the same command: the
+reviewed outline and each researched topic's transcript are kept in
+`.protopilot/research/`, and no topic already done is asked again. The transcripts stay
+after the plan lands, as the evidence a rerun checks sources against. A resume is refused
+with `--no-research`, with a `--depth` other than the outline's, offline, and on a
+backend that cannot research, because finishing there would drop the research already
+done.
 
 **Dreaming runs by default, at a small count:** one dream through each of the six
 lenses, of which at most three are proposed. Dreams are guesses, not findings, and they
@@ -99,7 +119,7 @@ eight topics, whatever `--depth` asked for.
 **Off a terminal it needs `--yes`, even with `--offline`.** Without it the command
 refuses before calling a model.
 
-**A failed model pass leaves no tree.** A rerun starts from scope, and any review
+**A failed model pass leaves no tree**, unless research had begun, which resumes as above. Otherwise a rerun starts from scope, and any review
 edits are lost. A failed repair pass is not one of these: it ends repair, and the tree
 is written as above. **Nor is a failed dream pass:** the plan is written without
 dreams, `dreams.md` and a closing line say what stopped, and the run exits as the plan's
@@ -109,7 +129,9 @@ behind, and the error says any page may be out of date until that rerun.
 
 **Rerunning a finished plan verifies it again and re-renders it.** It calls no model
 and needs neither `--yes` nor a terminal. It exits 1 if the plan is red, with the same
-runbook and banners, so it is how a hand edit to `plan.json` gets checked. With no
+runbook and banners, so it is how a hand edit to `plan.json` gets checked. A source
+marked fetched by hand stays red: the check reads the run's transcripts, not the flag. A
+topic whose transcript is missing, renamed or edited is shown as failed research. With no
 model there is no repair: to have one try again, remove the directory and start over.
 The same target with another idea or direction is refused, as is a `--depth` other
 than the plan's.
@@ -168,7 +190,8 @@ why, and costs only itself. Offline, a dream is a template that says so, its rat
 included, and no pass can do it. The links and notes come from one call, and every link
 must touch the new topic. Offline it depends on the dream's anchor and has no risks,
 unknowns or decisions. Repair may mend only what touches the new topic, because what the
-plan held before is settled. The topic is stamped *Not researched* like every other.
+plan held before is settled. The topic is not researched, and on a researched plan its
+page and `PLAN.md` say it was promoted from a dream.
 
 **Exit codes.** Each command changes nothing and exits 1 when:
 

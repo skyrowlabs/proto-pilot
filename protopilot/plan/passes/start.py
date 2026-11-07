@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from protopilot.plan import baseline
 from protopilot.plan.model import Plan, Step, Topic
-from protopilot.plan.passes import BRIEF, PlanPassError, scope_block, text, topics_block
+from protopilot.plan.passes import BRIEF, PlanPassError, findings_block, scope_block, text, topics_block
 
 NAME = "start"
 MAX_STEPS = 5
@@ -75,6 +75,8 @@ def build(plan: Plan) -> tuple[str, str]:
     waits = [f"- {t.slug} depends on: {', '.join(sorted(needs[t.slug])) or 'nothing'}" for t in plan.topics]
     block = topics_block(plan.topics, "risks", "unknowns")
     graph = "## What each topic depends on\n\n" + "\n".join(waits)
+    found = findings_block(plan)
+    block = f"{block}\n\n{found}" if found else block
     return SYSTEM, f"{scope_block(plan)}\n\n{block}\n\n{graph}\n\nReturn at most {_most_steps(plan)} steps."
 
 

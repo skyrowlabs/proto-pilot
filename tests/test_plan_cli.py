@@ -12,6 +12,7 @@ import pytest
 from click.testing import CliRunner
 from fakes import FakeLLM
 from plan_script import GOOD, IDEA, PASS_NAMES, PLAN_PASS_NAMES, SLUGS, consider_of, edge, outline_of, script, step
+from research_script import URL, transcript
 
 from protopilot import cli
 from protopilot import llm as llm_module
@@ -188,10 +189,13 @@ SHIM = """#!{python}
 import json, pathlib, sys
 log = pathlib.Path({log!r})
 responses = json.loads(pathlib.Path({responses!r}).read_text())
-done = len(log.read_text().splitlines()) if log.exists() else 0
+earlier = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
 with log.open("a") as out:
     out.write(json.dumps(sys.argv[1:]) + "\\n")
-print(json.dumps({{"subtype": "success", "structured_output": responses[done]}}))
+if "stream-json" in sys.argv:
+    print({research!r}, end="")
+else:
+    print(json.dumps({{"subtype": "success", "structured_output": responses[sum("stream-json" not in c for c in earlier)]}}))
 """
 
 
@@ -199,7 +203,8 @@ def claude_shim(tmp_path: Path, monkeypatch) -> Path:
     """A `claude` binary on the real `ClaudeCodeLLM` path; returns the log of its calls."""
     log, responses, shim = tmp_path / "calls.log", tmp_path / "responses.json", tmp_path / "claude"
     responses.write_text(json.dumps(script()))
-    shim.write_text(SHIM.format(python=sys.executable, log=str(log), responses=str(responses)))
+    said = transcript()
+    shim.write_text(SHIM.format(python=sys.executable, log=str(log), responses=str(responses), research=said))
     shim.chmod(shim.stat().st_mode | stat.S_IXUSR)
     monkeypatch.setenv("PROTOPILOT_CLAUDE_BIN", str(shim))
     return log
@@ -209,12 +214,19 @@ def test_backend_claude_code_drives_the_real_client_through_every_pass(tmp_path,
     log = claude_shim(tmp_path, monkeypatch)
     result = invoke(IDEA, "--yes", "--backend", "claude-code", "--dir", str(tmp_path / "tree"))
     assert result.exit_code == 0, result.output
-    calls = [json.loads(line) for line in log.read_text().splitlines()]
+    every = [json.loads(line) for line in log.read_text().splitlines()]
+    calls = [call for call in every if "stream-json" not in call]
     assert len(calls) == len(PASS_NAMES)
+    assert len(every) - len(calls) == len(SLUGS), "one research call per topic"
     schemas = [json.loads(call[call.index("--json-schema") + 1]) for call in calls]
     assert schemas[1]["properties"]["topics"]["maxItems"] == 6
     assert schemas[2]["properties"]["edges"]["items"]["properties"]["to_topic"]["enum"] == SLUGS
-    assert [t.slug for t in Plan.load(tmp_path / "tree").topics] == SLUGS
+    plan = Plan.load(tmp_path / "tree")
+    assert [t.slug for t in plan.topics] == SLUGS
+    assert plan.researched and [s.url for s in plan.sources] == [URL]
+    assert sorted(p.name for p in (tmp_path / "tree" / ".protopilot" / "research").iterdir()) == sorted(
+        f"{slug}.jsonl" for slug in SLUGS
+    )
 
 
 # -- off a terminal -------------------------------------------------------

@@ -434,6 +434,7 @@ def test_a_runbook_with_nothing_empty_says_none():
             "edges": [{"from_topic": "a", "to_topic": "a", "kind": "depends-on"}],
             "steps": [{"topic": "a", "action": "Do.", "why": "Now."}],
             "sources": [{"id": "s1", "title": "S", "url": "u", "fetched": True}],
+            "research": [{"topic": "a", "state": "researched", "fetches": [{"url": "u", "usable": True}]}],
             "dreams": [
                 {
                     "id": "d",
@@ -830,7 +831,8 @@ def test_coherent_and_traceable_is_said_only_once_findings_and_sources_held():
     ]
     line = verify.green_line(held)
     assert line.startswith("Green: this plan is coherent and traceable, which is not the same as true.")
-    assert "a summary of it was read, not that a claim is in the original" in line
+    assert "read through a summary of the page, which is not the page" in line
+    assert "never that the claim is in the source" in line
     assert "Nothing in it traces" not in line
 
 

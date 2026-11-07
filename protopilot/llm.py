@@ -3,12 +3,18 @@
 One method, `structured()`: a system prompt, a user prompt, a JSON Schema, and
 a validated dict back. Every pass in this tool is that shape, so the retry,
 caching, and refusal handling live here once.
+
+`research()` is the one exception: the plan's research pass, the only call that
+holds tools, and only on the CLI backend. The api backend refuses it.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import tempfile
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Protocol
 
 DEFAULT_MODEL = "claude-opus-5"
@@ -33,10 +39,28 @@ class Refused(LLMError):
         self.explanation = explanation
 
 
+class ResearchUnavailable(LLMError):
+    """This backend cannot make a research call; the message says what to use instead."""
+
+
+@dataclass(frozen=True)
+class Researched:
+    """A research call's validated object, and the raw stream-json it came in: the evidence."""
+
+    data: dict
+    transcript: str
+
+
 class LLM(Protocol):
     offline: bool
 
     def structured(self, *, system: str, user: str, schema: dict, label: str) -> dict: ...
+
+
+class Researcher(LLM, Protocol):
+    """A backend that can also make the one tool-using call, `research`. Only the CLI backend can."""
+
+    def research(self, *, system: str, user: str, schema: dict, label: str) -> Researched: ...
 
 
 class OfflineLLM:
@@ -81,8 +105,16 @@ def _without_patterns(schema: Any) -> Any:
     return kept
 
 
+API_RESEARCH = (
+    "Research runs only on the claude-code backend so far: the api backend's web search has never "
+    "been run here. Pass --backend claude-code, or --no-research for a plan stamped Not researched."
+)
+
+
 class ClaudeLLM:
     offline = False
+    #: Read before any call, so a plan is refused rather than billed and then stamped.
+    research_refusal = API_RESEARCH
 
     def __init__(
         self,
@@ -136,6 +168,10 @@ class ClaudeLLM:
             # are ordinary outcomes of talking to an API, and they should read
             # like one rather than like proto-pilot itself crashing.
             raise LLMError(f"pass {label!r} failed: {_api_message(exc)}") from exc
+
+    def research(self, *, system: str, user: str, schema: dict, label: str) -> Researched:
+        """Refused, not attempted: untested web-search code would be a claim nobody checked."""
+        raise ResearchUnavailable(API_RESEARCH)
 
     def _structured(self, *, system: str, user: str, schema: dict, label: str) -> dict:
         with self._client.beta.messages.stream(
@@ -214,6 +250,82 @@ ISOLATION = (
 )
 
 
+#: The research call's tools: the web, read only. Never a write, a shell or an MCP server.
+RESEARCH_TOOLS = ("WebSearch", "WebFetch")
+RESEARCH_ISOLATION = (
+    "--tools",
+    ",".join(RESEARCH_TOOLS),
+    "--allowedTools",
+    ",".join(RESEARCH_TOOLS),
+    "--strict-mcp-config",
+    "--mcp-config",
+    '{"mcpServers":{}}',
+)
+#: All a research session may report holding; `StructuredOutput` is how `--json-schema` answers.
+RESEARCH_HELD = frozenset({"StructuredOutput", *RESEARCH_TOOLS})
+
+
+def stream_events(transcript: str) -> list[dict]:
+    """One dict per line of `--output-format stream-json`; a line that is not JSON is an error."""
+    events = []
+    for number, line in enumerate(transcript.splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise LLMError(f"line {number} of the research stream is not JSON") from exc
+        if isinstance(event, dict):
+            events.append(event)
+    return events
+
+
+def _tool_uses(events: list[dict]) -> list[dict]:
+    """Every `tool_use` block an assistant event holds, whatever its name."""
+    blocks = []
+    for event in events:
+        content = (event.get("message") or {}).get("content") if event.get("type") == "assistant" else None
+        if isinstance(content, list):
+            blocks += [b for b in content if isinstance(b, dict) and b.get("type") == "tool_use"]
+    return blocks
+
+
+def research_result(transcript: str, label: str) -> dict:
+    """The structured object a research stream ends on, refused unless the session held only its tools.
+
+    The tools are read from the stream's own `init` events and from every tool it used, so
+    a flag that stopped working is caught on the run it stopped working on, not by a test.
+    """
+    events = stream_events(transcript)
+    inits = [e for e in events if e.get("type") == "system" and e.get("subtype") == "init"]
+    if not inits:
+        raise LLMError(f"pass {label!r}: the research stream has no init event, so its tools are unknown")
+    for init in inits:
+        tools = init.get("tools")
+        servers = init.get("mcp_servers")
+        if not isinstance(tools, list) or not all(isinstance(tool, str) for tool in tools):
+            raise LLMError(f"pass {label!r}: an init event does not list its tools, so they are unknown")
+        if not isinstance(servers, list):
+            raise LLMError(f"pass {label!r}: an init event does not list its MCP servers, so they are unknown")
+        extra = sorted(set(tools) - RESEARCH_HELD)
+        if extra or servers:
+            held = ", ".join(extra) or "an MCP server"
+            raise LLMError(f"pass {label!r}: the research session held {held}, so its answer was not used")
+    used = sorted({str(block.get("name")) for block in _tool_uses(events)} - RESEARCH_HELD)
+    if used:
+        raise LLMError(f"pass {label!r}: the research session used {', '.join(used)}, so its answer was not used")
+    result = next((e for e in reversed(events) if e.get("type") == "result"), None)
+    if result is None:
+        raise LLMError(f"pass {label!r}: the research stream ended without a result")
+    if result.get("is_error") or result.get("subtype") != "success":
+        detail = result.get("result") or result.get("api_error_status") or result.get("subtype") or "unknown"
+        raise LLMError(f"pass {label!r} failed: {detail}")
+    data = result.get("structured_output")
+    if not isinstance(data, dict):
+        raise LLMError(f"pass {label!r}: no structured output (stop_reason {result.get('stop_reason')!r})")
+    return data
+
+
 class ClaudeCodeLLM:
     """Claude via the Claude Code CLI, billed to a subscription.
 
@@ -233,6 +345,7 @@ class ClaudeCodeLLM:
     """
 
     offline = False
+    research_refusal = ""
 
     def __init__(
         self,
@@ -296,6 +409,31 @@ class ClaudeCodeLLM:
         if data is None:
             raise LLMError(f"pass {label!r}: no structured output " f"(stop_reason {envelope.get('stop_reason')!r})")
         return data
+
+    def research(self, *, system: str, user: str, schema: dict, label: str) -> Researched:
+        """One tool-using call: the web only, `stream-json` so every fetch is on the record.
+
+        Run from an empty directory, so no project file reaches the session. `structured`
+        and `ISOLATION` are untouched: this is the only call that holds a tool.
+        """
+        argv = [
+            self.binary,
+            "--print",
+            f"{system}\n\n---\n\n{user}",
+            "--model",
+            self.model,
+            "--json-schema",
+            json.dumps(schema),
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            *RESEARCH_ISOLATION,
+        ]
+        with tempfile.TemporaryDirectory(prefix="protopilot-research-") as empty:
+            result = self._runner.run(argv, cwd=Path(empty), timeout=self.timeout)
+        if not result.ok:
+            raise LLMError(f"pass {label!r} failed: {result.output[-500:] or 'no output'}")
+        return Researched(research_result(result.stdout, label), result.stdout)
 
 
 def _api_errors() -> tuple[type[BaseException], ...]:

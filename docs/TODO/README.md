@@ -22,7 +22,7 @@ _Every decision made and the spec complete — ready to hand to an agent end to 
 
 | Queue | Plan | Priority | Updated | Summary |
 | ----- | ---- | -------- | ------- | ------- |
-| 10 | [Plan Prototypes and Dreaming](plan-prototypes.md) | high | 2026-11-06 | Add `proto plan`, which turns an idea into a researched, connected, organised set of text plans, plus a dreaming step that collects, evaluates and proposes lighter extensions of the idea. |
+| 10 | [Plan Prototypes and Dreaming](plan-prototypes.md) | high | 2026-11-07 | Add `proto plan`, which turns an idea into a researched, connected, organised set of text plans, plus a dreaming step that collects, evaluates and proposes lighter extensions of the idea. |
 
 > Lower `Queue-Order` runs earlier; `—` means unnumbered, which sorts last.
 

@@ -69,8 +69,9 @@ turns a sentence and a little direction into a folder of text plans: scope ->
 an outline a person reviews -> typed links between topics -> risks, unknowns and
 decisions -> first steps -> dreams -> checks on the structure, never the truth ->
 bounded repair -> a tree handed back green or with a `RUNBOOK.md`. `proto dream`
-adds to the pool of dreams and settles one. Research is the pass still to come,
-so every plan is stamped *Not researched*.
+adds to the pool of dreams and settles one. Research runs one web-only call per topic
+on the `claude-code` backend; a source counts only if the run's own transcript shows it
+fetched, and a plan made without research is stamped *Not researched*.
 
 **Dreams are guesses, not findings.** They stay in `dreams.md`, never in a topic
 file, and only a person promotes one, through `proto dream promote`. A dream
@@ -130,6 +131,9 @@ Each was a deliberate decision, not an accident of implementation.
   and the caller's working directory unless told otherwise — so the guarantee
   above held for the `api` backend and was false for the other one. The second
   guard is `llm.ISOLATION`. A change to either half is a change to this rule.
+  The plan's research call is the one exception, and holds `RESEARCH_ISOLATION`:
+  web search and fetch, no write, no shell, no MCP, checked against every init event
+  and every tool use in the stream. It writes no file; its output is findings, which are data.
 - **The stack is fixed, not chosen.** Textual over SQLAlchemy 2.0 and one
   SQLite file on the terminal target; FastAPI, server-rendered Jinja,
   SQLAlchemy 2.0 and Postgres on the web one. Neither has a JS build step, a
@@ -203,7 +207,7 @@ because the baseline cannot read a change request.
 | `protopilot/verify_tui.py` | **Terminal:** import, boot under `App.run_test`, smoke run, blank-screen check; `tui_probe.py` is the half that runs inside the tree |
 | `protopilot/baseline.py` | The deterministic offline implementation of every pass |
 | `protopilot/llm.py` | `LLM` Protocol + three backends |
-| `protopilot/plan/` | `proto plan` and `proto dream`: a sibling pipeline to `Spec`, with no research yet. `passes/` holds its model passes, repair and the dream passes among them, and `pipeline.py` runs them; `model.py` is `plan.json`, the truth; `render.py` draws the markdown from it; `verify.py` checks structure, never truth, and a plan still red is handed back with a `RUNBOOK.md`; `lenses.py` is the fixed lenses as data, and `dreaming.py` is the pool's rules — see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#the-plan-pipeline) |
+| `protopilot/plan/` | `proto plan` and `proto dream`: a sibling pipeline to `Spec`. `passes/` holds its model passes, research, repair and the dream passes among them, and `pipeline.py` runs them; `model.py` is `plan.json`, the truth; `render.py` draws the markdown from it; `verify.py` checks structure, never truth, and a plan still red is handed back with a `RUNBOOK.md`; `lenses.py` is the fixed lenses as data, `dreaming.py` is the pool's rules, and `ledger.py` reads what research fetched from its transcripts — see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#the-plan-pipeline) |
 | `protopilot/registry.py` | Tracked prototypes — see the `prune()` trap in `NOTES.md`. Plan trees are not in it |
 | `protopilot/targets/` | What medium a spec is built in — fifteen things, of which the plan predicted four; the contract is in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#what-a-target-owns) and a test recomputes it |
 | `skeleton/<target>/` | Copied byte-for-byte into every generated app; one tree per target |
