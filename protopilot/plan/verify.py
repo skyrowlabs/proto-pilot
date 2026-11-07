@@ -6,18 +6,25 @@ what landed. A check ends in one of three states, and `NO_SUBJECT` is not a pass
 it had nothing to look at, proved nothing, and the green line names it apart.
 
 Green proves structure, never truth, and `green_line` claims only what held.
+
+`dreams_apart` reads what a topic says, not what every topic page draws, and only
+dreams still on offer: a person has settled the others. It catches a copy, a changed
+word or two included. A paraphrase passes, and so does a script written without
+spaces outside Han and kana, whose text it cannot split into words.
 """
 
 from __future__ import annotations
 
 import html
 import re
+import unicodedata
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
+from difflib import SequenceMatcher
 from typing import NamedTuple
 
 from protopilot.plan import render
-from protopilot.plan.model import DREAM_WORD_CAP, Edge, Plan
+from protopilot.plan.model import DREAM_WORD_CAP, UNSPACED, Dream, Edge, Plan, dream_words
 from protopilot.verify import VerifyResult
 
 PASSED = "passed"
@@ -26,8 +33,12 @@ NO_SUBJECT = "no subject"
 
 #: Below this a dream's words are too common to call a copy, so only longer text is compared.
 MIN_LEAK_CHARS = 16
+#: From this length one word in this many may differ and still be a copy; shorter text must match.
+WORDS_PER_CHANGE = 6
 LEAK_FIELDS = ("title", "what_if", "takes", "reason", "if_adopted")
 CAPPED_FIELDS = ("title", "what_if", "takes")
+#: Settled by a person, so no longer on offer: a promoted dream's words are the topic's now.
+SETTLED = ("dropped", "promoted")
 
 Pages = dict[str, str]
 
@@ -232,40 +243,91 @@ def start_order(plan: Plan, pages: Pages) -> CheckResult:
     return _judged("start_order", plan.steps, problems, advice, "")
 
 
+def dream_length(dream: Dream) -> int:
+    return sum(dream_words(getattr(dream, field)) for field in CAPPED_FIELDS)
+
+
 def dreams_shaped(plan: Plan, pages: Pages) -> CheckResult:
-    """Every dream has an anchor topic, a verdict, and fits its word cap."""
+    """Every dream has an anchor topic, a verdict, and fits its word cap, and one id means one dream."""
     known = {topic.slug for topic in plan.topics}
-    problems = []
+    ids = [dream.id for dream in plan.dreams]
+    problems = [
+        f"more than one dream has the id {repeated}" for repeated in sorted({i for i in ids if ids.count(i) > 1})
+    ]
     for dream in plan.dreams:
-        words = sum(len(getattr(dream, field).split()) for field in CAPPED_FIELDS)
+        words = dream_length(dream)
         if dream.anchor not in known:
             problems.append(f"dream {dream.id} is anchored to {dream.anchor!r}, which is not a topic")
         if dream.verdict is None:
             problems.append(f"dream {dream.id} has no verdict")
+        if (dream.verdict == "promoted") != (dream.promoted_to in known):
+            problems.append(f"dream {dream.id} is {dream.verdict}, and names the topic {dream.promoted_to!r}")
         if words > DREAM_WORD_CAP:
             problems.append(f"dream {dream.id} runs to {words} words, past the cap of {DREAM_WORD_CAP}")
     advice = "Anchor it to a real topic, give it a verdict, and cut it to the cap; one that needs more is a topic."
     return _judged("dreams_shaped", plan.dreams, problems, advice, "The plan has no dreams.")
 
 
-def _plain(text: str) -> str:
-    """Words alone, so a copy with other case, punctuation or escaping still reads as a copy."""
-    return " ".join(re.findall(r"\w+", html.unescape(text).casefold()))
+def plain(text: str) -> str:
+    """Words alone, so a copy in other case, accents, punctuation or escaping still reads as one."""
+    folded = unicodedata.normalize("NFKD", html.unescape(text)).casefold()
+    bare = "".join(char for char in folded if not unicodedata.combining(char))
+    spaced = UNSPACED.sub(lambda char: f" {char.group()} ", bare)
+    return " ".join(re.findall(r"[^\W_]+", spaced))
+
+
+def copied(words: str, line: str) -> bool:
+    """Is `words` in `line` as whole words, allowing a changed word per `WORDS_PER_CHANGE`?"""
+    if f" {words} " in f" {line} ":
+        return True
+    ours, theirs = words.split(), line.split()
+    slack = len(ours) // WORDS_PER_CHANGE
+    if not slack or len(set(ours) & set(theirs)) < len(set(ours)) - slack:
+        return False
+    blocks = [block for block in SequenceMatcher(None, ours, theirs, False).get_matching_blocks() if block.size]
+    if not blocks:
+        return False
+    matched = sum(block.size for block in blocks)
+    spread = blocks[-1].b + blocks[-1].size - blocks[0].b
+    return len(ours) - matched <= slack and spread - matched <= slack
+
+
+class Leak(NamedTuple):
+    dream: str
+    field: str
+    page: str
+
+
+def leaks(plan: Plan, pages: Pages) -> tuple[list[Leak], bool]:
+    """Every copy of an offered dream's text in what a topic says, and whether anything was long enough to compare."""
+    own = render.furniture(plan)
+    topics = {
+        name: [plain(line) for line in page.splitlines() if line not in own.get(name, ())]
+        for name, page in pages.items()
+        if name.startswith(f"{render.TOPICS_DIR}/")
+    }
+    # A dream may repeat the plan's own name: a topic quoting it is not quoting the dream.
+    names = {plain(plan.title), plain(plan.idea), plain(plan.direction)}
+    found, compared = [], False
+    for dream in plan.dreams:
+        if dream.verdict in SETTLED:
+            continue
+        for field in LEAK_FIELDS:
+            words = plain(getattr(dream, field))
+            if len(words) >= MIN_LEAK_CHARS and words not in names:
+                compared = True
+                found += [
+                    Leak(dream.id, field, name)
+                    for name, lines in topics.items()
+                    if any(copied(words, line) for line in lines)
+                ]
+    return found, compared
 
 
 def dreams_apart(plan: Plan, pages: Pages) -> CheckResult:
-    """No dream text appears in a topic file. Text too short to compare is no subject."""
-    topics = {name: _plain(page) for name, page in pages.items() if name.startswith(f"{render.TOPICS_DIR}/")}
-    problems = []
-    compared = False
-    for dream in plan.dreams:
-        for field in LEAK_FIELDS:
-            words = _plain(getattr(dream, field))
-            if len(words) >= MIN_LEAK_CHARS:
-                compared = True
-                problems += [
-                    f"{name} repeats the {field} of dream {dream.id}" for name, page in topics.items() if words in page
-                ]
+    """No dream text appears in what a topic says. Text too short to compare is no subject."""
+    found, compared = leaks(plan, pages)
+    problems = [f"{leak.page} repeats the {leak.field} of dream {leak.dream}" for leak in found]
     advice = "A dream must not read as a finding: take its words out of the topic."
     return _judged("dreams_apart", compared, problems, advice, "The plan has no dream text long enough to compare.")
 
@@ -305,6 +367,8 @@ def green_line(results: Iterable[CheckResult]) -> str:
     parts.append(f"Held: {_listed(held)}.")
     if empty:
         parts.append(f"No subject, so these proved nothing: {_listed(empty)}.")
+    if {"dreams_shaped", "dreams_apart"} & set(held):
+        parts.append("Dreams are guesses, not findings: their checks read their shape and that they stay apart.")
     if "sources_fetched" in held:
         parts.append(
             "A source retrieved this run proves a summary of it was read, not that a claim is in the original."

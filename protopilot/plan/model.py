@@ -4,12 +4,14 @@ Validators here refuse only what is unsafe to store: a topic slug becomes a
 filename, so it is checked, and two topics sharing one would lose a file.
 Coherence (dangling edges, unlabelled findings, cycles) stays representable,
 because the verifier has to load a broken plan to name what is wrong with it.
+A dream's cap is coherence too: over it, a dream stays loadable and goes red.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import re
 import uuid
 from contextlib import suppress
 from pathlib import Path
@@ -24,7 +26,13 @@ PLAN_FILENAME = "plan.json"
 MAX_SLUG_LENGTH = 64
 
 EdgeKind = Literal["depends-on", "informs", "conflicts-with"]
-Verdict = Literal["proposed", "set-aside"]
+#: `proposed` and `set-aside` are a model's to give; `dropped` and `promoted` only a person's.
+Verdict = Literal["proposed", "set-aside", "dropped", "promoted"]
+MODEL_VERDICTS: tuple[Verdict, ...] = ("proposed", "set-aside")
+#: `not judged` is the offline twin's, which cannot rank anything.
+Rating = Literal["low", "medium", "high", "not judged"]
+MODEL_RATINGS = ("low", "medium", "high")
+RUBRIC = ("pull", "reach", "cost", "fit")
 Depth = Literal["shallow", "standard", "deep"]
 
 #: The topics an outline holds at each `--depth`. Depth is also the research effort.
@@ -32,8 +40,17 @@ TOPIC_COUNTS: dict[str, int] = {"shallow": 4, "standard": 6, "deep": 8}
 DEFAULT_DEPTH = "standard"
 MIN_TOPICS = min(TOPIC_COUNTS.values())
 MAX_TOPICS = max(TOPIC_COUNTS.values())
-#: The words a dream's title, what-if and what-it-takes may spend between them.
-DREAM_WORD_CAP = 60
+#: A title, one sentence, and a phrase. Unconstrained dreams measured a median of 42
+#: words and a maximum of 51, so a cap above that would never bind; a dream that wants
+#: more is a topic. The fields are the budget, so a dream the schema allows fits the cap.
+DREAM_FIELD_WORDS = {"title": 6, "what_if": 26, "takes": 12}
+DREAM_WORD_CAP = sum(DREAM_FIELD_WORDS.values())
+#: What ends a word, in the schema's pattern and in `dream_words` alike. A model held
+#: to `\S+` joined 28 words with hyphens, so a hyphen has to break one.
+WORD_BREAK = r"\s/_\u2013\u2014-"
+#: Han and kana, which are written without spaces, so no space can end a word in them.
+UNSPACED = re.compile("[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\U00020000-\U0002fa1f]")
+DREAM_ID = re.compile(r"[a-z][a-z0-9_-]{0,31}")
 
 
 def _checked_slug(value: str) -> str:
@@ -42,6 +59,22 @@ def _checked_slug(value: str) -> str:
     if len(value) > MAX_SLUG_LENGTH:
         raise ValueError(f"slug must be at most {MAX_SLUG_LENGTH} characters: {value!r}")
     return value
+
+
+def _checked_dream_id(value: str) -> str:
+    if not DREAM_ID.fullmatch(value):
+        raise ValueError(f"a dream id must be a short lowercase name: {value!r}")
+    return value
+
+
+def _checked_topic_link(value: str) -> str:
+    return _checked_slug(value) if value else value
+
+
+def dream_words(text: str) -> int:
+    """Words in `text`: what `WORD_BREAK` separates, with two unspaced characters as one."""
+    parts = [part for part in re.split(f"[{WORD_BREAK}]+", text) if any(char.isalnum() for char in part)]
+    return sum(max(1, (len(UNSPACED.findall(part)) + 1) // 2) for part in parts)
 
 
 class _Record(BaseModel):
@@ -100,6 +133,15 @@ class Dream(_Record):
     verdict: Verdict | None = None
     reason: str = ""
     if_adopted: str = ""
+    # Four answers, never summed: one number would hide why a dream ranked where it did.
+    pull: Rating | None = None
+    reach: Rating | None = None
+    cost: Rating | None = None
+    fit: Rating | None = None
+    promoted_to: str = Field(default="", description="The topic a person turned this dream into")
+
+    _id = field_validator("id")(_checked_dream_id)
+    _promoted_to = field_validator("promoted_to")(_checked_topic_link)
 
 
 class Plan(_Record):
@@ -121,6 +163,9 @@ class Plan(_Record):
     edges: list[Edge] = Field(default_factory=list)
     steps: list[Step] = Field(default_factory=list)
     dreams: list[Dream] = Field(default_factory=list)
+    # Why the run's dreaming stopped, for `dreams.md`. Empty is the usual case, and then
+    # plan.json omits the key. A failed dream costs the extras, never the plan.
+    dream_failure: str = ""
     sources: list[Source] = Field(default_factory=list)
 
     _slug = field_validator("slug")(_checked_slug)
@@ -170,6 +215,8 @@ class Plan(_Record):
         data = self.model_dump(mode="json")
         if self.depth is None:
             del data["depth"]
+        if not self.dream_failure:
+            del data["dream_failure"]
         absent = [folder for folder in (path.parent, *path.parent.parents) if not folder.exists()]
         temp = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
         try:

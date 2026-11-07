@@ -375,3 +375,124 @@ def test_a_loop_of_three_names_all_three_links_and_nothing_else():
     on_the_ring = {("risks", "operations"), ("operations", "first_test"), ("first_test", "risks")}
     assert on_the_ring <= looped
     assert all(a in {"risks", "operations", "first_test"} for a, _ in looped)
+
+
+# -- dreams_apart: what a topic says, not what its page draws --------------
+
+
+def furniture_dream(field: str, text: str) -> Plan:
+    return full().revised(dreams=[dream(**{field: text})])
+
+
+@pytest.mark.parametrize(
+    ("field", "text"),
+    [
+        ("title", "Start a community tool library"),
+        ("reason", "every finding is an assumption"),
+        ("takes", "Decisions to make"),
+        ("title", "The cheapest way to learn"),
+        ("reason", "Rendered from .protopilot/plan.json"),
+        ("takes", "What is in and what is out depends on Who it is for"),
+    ],
+    ids=["plan-title", "stamp", "heading", "topic-title", "header", "connection"],
+)
+def test_page_furniture_is_not_a_leak(field, text):
+    assert states(judged(furniture_dream(field, text)))["dreams_apart"] != verify.FAILED
+
+
+def test_the_idea_quoted_in_a_topic_is_not_a_dream_repeated_there():
+    plan = baseline.build_plan(IDEA).revised(dreams=[dream(reason=IDEA)])
+    assert IDEA in render.render(plan)["topics/audience.md"]
+    assert states(judged(plan))["dreams_apart"] != verify.FAILED
+
+
+def test_the_stamp_is_furniture_on_a_page_that_failed_verification_too():
+    plan = furniture_dream("reason", "This plan failed its checks")
+    pages = render.render(plan, runbook="x")
+    assert "failed its checks" in pages["topics/audience.md"]
+    assert states(judged(plan, pages))["dreams_apart"] != verify.FAILED
+
+
+def test_a_dream_matches_whole_words_and_never_the_middle_of_one():
+    assert judged(leaked("the library lent seeds as well", what_if="he library lent seeds")).ok
+
+
+def test_furniture_is_only_what_the_page_draws_itself():
+    plan = full()
+    pages = render.render(plan)
+    pages["topics/audience.md"] += f"\nDecisions to make {WHAT_IF}\n"
+    assert judged(plan, pages).stage == "dreams_apart"
+
+
+# -- dreams_apart: a copy dressed up --------------------------------------
+
+
+@pytest.mark.parametrize(
+    "copy",
+    [
+        "the library lent _seeds_ as well as saws",
+        "THE LIBRARY LENT SEEDS, AS WELL AS SAWS!",
+        "the library lent free seeds as well as saws",
+        "the library lent seeds as well as tools",
+        "the library lent seeds as well saws",
+    ],
+    ids=["underscores", "case-and-punctuation", "one-word-inserted", "one-word-changed", "one-word-missing"],
+)
+def test_a_copy_with_a_word_or_its_dressing_changed_is_still_a_copy(copy):
+    assert judged(leaked(copy)).stage == "dreams_apart"
+
+
+def test_decomposed_accents_cannot_hide_a_copy():
+    composed = "le caf\u00e9 pr\u00eate des graines et des scies"
+    decomposed = "le cafe\u0301 pre\u0302te des graines et des scies"
+    assert judged(leaked(decomposed, what_if=composed)).stage == "dreams_apart"
+
+
+def test_a_short_sentence_in_a_script_without_spaces_is_long_enough_to_compare():
+    sentence = "\u56f3\u66f8\u9928\u306f\u7a2e\u3082\u30ce\u30b3\u30ae\u30ea\u3082\u8cb8\u305b\u308b"
+    assert len(sentence) == 14
+    assert judged(leaked(f"\u524d{sentence}\u5f8c", what_if=sentence)).stage == "dreams_apart"
+
+
+def test_a_short_text_changed_by_one_word_is_not_called_a_copy():
+    assert judged(leaked("seed swap and shelf", what_if="seed swap shelf night")).ok
+
+
+def test_a_paraphrase_passes_and_that_is_the_stated_limit():
+    assert judged(leaked("saws and seeds can both be borrowed from the library")).ok
+
+
+# -- dreams_apart and dreams_shaped: what a person settled -----------------
+
+
+@pytest.mark.parametrize("verdict", ["promoted", "dropped"])
+def test_a_dream_a_person_settled_is_no_longer_compared(verdict):
+    link = {"promoted_to": "audience"} if verdict == "promoted" else {}
+    assert states(judged(leaked(WHAT_IF, verdict=verdict, **link)))["dreams_apart"] != verify.FAILED
+
+
+def test_only_those_two_verdicts_lift_the_comparison():
+    assert verify.SETTLED == ("dropped", "promoted")
+
+
+def test_a_promoted_dream_must_name_a_topic_the_plan_holds():
+    assert judged(full().revised(dreams=[dream(verdict="promoted", promoted_to="ghost")])).stage == "dreams_shaped"
+    assert judged(full().revised(dreams=[dream(verdict="promoted")])).stage == "dreams_shaped"
+
+
+def test_only_a_promoted_dream_may_name_a_topic():
+    assert judged(full().revised(dreams=[dream(promoted_to="audience")])).stage == "dreams_shaped"
+
+
+def test_a_repeated_dream_id_is_red_because_promote_could_not_tell_them_apart():
+    result = judged(full().revised(dreams=[dream(), dream(title="Other")]))
+    assert result.stage == "dreams_shaped" and "more than one dream has the id d1" in result.report()
+
+
+def test_a_joined_up_dream_cannot_hide_from_the_cap():
+    assert judged(full().revised(dreams=[dream(takes=OVER_CAP.replace(" ", "-"))])).stage == "dreams_shaped"
+
+
+def test_the_green_line_says_dreams_are_not_findings_only_when_a_dream_check_held():
+    assert "Dreams are guesses" in judged(full()).summary
+    assert "Dreams are guesses" not in judged(full().revised(dreams=[])).summary

@@ -11,7 +11,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from protopilot.plan.model import Dream, Edge, Finding, Plan, Source, Topic
+from protopilot.plan.lenses import words as lens_words
+from protopilot.plan.model import RUBRIC, Dream, Edge, Finding, Plan, Source, Topic
 
 PLAN_FILE = "PLAN.md"
 DREAMS_FILE = "dreams.md"
@@ -26,6 +27,11 @@ RUNBOOK_MARK = "<!-- Written by proto plan because this plan failed its checks. 
 NOT_VERIFIED = f"> **Not verified.** This plan failed its checks; [{RUNBOOK_FILE}]({RUNBOOK_FILE}) says what is wrong."
 NOT_VERIFIED_TOPIC = NOT_VERIFIED.replace(f"]({RUNBOOK_FILE})", f"](../{RUNBOOK_FILE})")
 UNSET = "Not established."
+RETRY = "`proto dream` tries again."
+HOW_TO_CHOOSE = (
+    'Only a person moves a dream: `proto dream promote <id>` makes it a topic, and `proto dream drop <id> --why "..."` '
+    "rules it out."
+)
 
 #: What opens an HTML block in CommonMark, whose types 1 to 6 this lists: a comment or
 #: `<details>` in plan text would hide the page after it. `<tags>` is not on the list
@@ -52,6 +58,10 @@ def _inert(value: object) -> object:
     if isinstance(value, dict):
         return {key: _inert(item) for key, item in value.items()}
     return value
+
+
+def _topic_file(slug: str) -> str:
+    return f"{TOPICS_DIR}/{slug}.md"
 
 
 def _page(*blocks: str) -> str:
@@ -85,7 +95,7 @@ def _plan_page(plan: Plan, verified: bool) -> str:
     ]
     if plan.direction:
         scope.insert(0, f"**Direction:** {plan.direction}")
-    topic_map = [f"[{t.title}]({TOPICS_DIR}/{t.slug}.md): {t.why}" for t in plan.topics]
+    topic_map = [f"[{t.title}]({_topic_file(t.slug)}): {t.why}" for t in plan.topics]
     steps = [f"{n}. **{titles.get(s.topic, s.topic)}:** {s.action} {s.why}" for n, s in enumerate(plan.steps, start=1)]
     return _page(
         f"# {plan.title}",
@@ -133,23 +143,50 @@ def _whole_record(record: Dream | Source) -> tuple[str, str]:
     return record.id, record.model_dump_json()
 
 
+def _scores(dream: Dream) -> list[str]:
+    """Each rubric answer on its own: a rank nobody can see the reasons for is what they replace."""
+    scores = [(field, getattr(dream, field)) for field in RUBRIC if getattr(dream, field)]
+    return [f"Scores: {', '.join(f'{field} {score}' for field, score in scores)}"] if scores else []
+
+
 def _dream_block(dream: Dream, titles: dict[str, str]) -> str:
     facts = [
         f"Extends: {titles.get(dream.anchor, dream.anchor)}",
-        f"Lens: {dream.lens}",
+        f"Lens: {lens_words(dream.lens)}",
         f"Would take: {dream.takes}",
+        *_scores(dream),
     ]
     if dream.verdict:
         facts.append(f"Verdict: {dream.verdict}" + (f". {dream.reason}" if dream.reason else ""))
     if dream.if_adopted:
         facts.append(f"If adopted: {dream.if_adopted}")
+    if dream.promoted_to:
+        facts.append(
+            f"Now the topic: [{titles.get(dream.promoted_to, dream.promoted_to)}]({_topic_file(dream.promoted_to)})"
+        )
     return f"### {dream.title} ({dream.id})\n\nWhat if {dream.what_if}\n\n{_bullets(facts)}"
+
+
+def _dream_order(dream: Dream) -> tuple[int, str, str]:
+    """By number: d10 comes after d9, and a repeated id still cannot leak plan.json's order."""
+    return (len(dream.id), *_whole_record(dream))
 
 
 def _dreams_page(plan: Plan) -> str:
     titles = {t.slug: t.title for t in plan.topics}
-    dreams = sorted(plan.dreams, key=_whole_record)
-    sections = (("Proposals", "proposed"), ("Set aside", "set-aside"), ("Not yet evaluated", None))
+    dreams = sorted(plan.dreams, key=_dream_order)
+    sections = (
+        ("Proposals", "proposed"),
+        ("Set aside", "set-aside"),
+        ("Promoted", "promoted"),
+        ("Dropped", "dropped"),
+        ("Not yet evaluated", None),
+    )
+    failed = (
+        f"**Dreaming failed:** {plan.dream_failure} The plan does not depend on it. {RETRY}"
+        if plan.dream_failure
+        else ""
+    )
     blocks = []
     for heading, verdict in sections:
         chosen = [_dream_block(d, titles) for d in dreams if d.verdict == verdict]
@@ -158,7 +195,9 @@ def _dreams_page(plan: Plan) -> str:
     return _page(
         "# Dreams",
         "Extensions of the idea, kept apart from the plan. Nothing here is researched.",
-        *(blocks or ["No dreams yet: dreaming has not run for this plan."]),
+        failed,
+        HOW_TO_CHOOSE if dreams else "",
+        *(blocks or ([] if failed else ["No dreams yet: dreaming has not run for this plan."])),
     )
 
 
@@ -167,12 +206,32 @@ def _sources_page(plan: Plan) -> str:
     return _page("# Sources", _stamp(plan), _bullets(sources, empty="No sources."))
 
 
+def furniture(plan: Plan) -> dict[str, set[str]]:
+    """Per topic page, the lines it draws from anything but that topic's own words.
+
+    A topic with its text blanked still draws them, in either state of the banner, so
+    a title or a heading is not the topic saying something. A promoted topic's opening
+    line stays too: it is the words a person moved, so another dream like it is no copy.
+    """
+    plan = Plan.model_validate(_inert(plan.model_dump()))
+    blank = {"findings": [], "risks": [], "unknowns": [], "decisions": []}
+    promoted = {dream.promoted_to for dream in plan.dreams}
+    topics = [t.model_copy(update={**blank, "why": t.why if t.slug in promoted else ""}) for t in plan.topics]
+    bare = plan.revised(topics=topics)
+    return {
+        _topic_file(topic.slug): {
+            line for verified in (True, False) for line in _topic_page(bare, topic, verified).splitlines()
+        }
+        for topic in bare.topics
+    }
+
+
 def render(plan: Plan, runbook: str = "") -> dict[str, str]:
     """Every markdown file, by path relative to the tree. A `runbook` marks the plan unverified."""
     plan = Plan.model_validate(_inert(plan.model_dump()))
     verified = not runbook
     pages = {PLAN_FILE: _plan_page(plan, verified)}
-    pages.update({f"{TOPICS_DIR}/{t.slug}.md": _topic_page(plan, t, verified) for t in plan.topics})
+    pages.update({_topic_file(t.slug): _topic_page(plan, t, verified) for t in plan.topics})
     pages[DREAMS_FILE] = _dreams_page(plan)
     pages[SOURCES_FILE] = _sources_page(plan)
     if runbook:
