@@ -2,19 +2,20 @@
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
 from fakes import FakeLLM
-from plan_script import GOOD, IDEA, SLUGS, dream_row, judged_row, proposal_row, repair_of, script, step
+from plan_script import GOOD, IDEA, SLUGS, dream_row, edge, judged_row, proposal_row, repair_of, script, step
 
 from protopilot import cli
 from protopilot.jobs import Job
 from protopilot.llm import LLMError
-from protopilot.plan import dreaming, lenses, pipeline, verify
-from protopilot.plan.model import DREAM_FIELD_WORDS, DREAM_WORD_CAP, Dream, Plan, dream_words
+from protopilot.plan import dreaming, lenses, pipeline, render, verify
+from protopilot.plan.model import DREAM_FIELD_WORDS, DREAM_WORD_CAP, Dream, Plan, Topic, dream_words, plan_path
 from protopilot.plan.passes import collect, evaluate, propose
 
 pytestmark = [pytest.mark.unit]
@@ -459,3 +460,535 @@ def test_an_offline_round_on_a_person_added_topic_needs_no_baseline_row(tmp_path
     tree = offline_plan(tmp_path / "tree")
     plan = Plan.load(tree)
     assert collect.offline(plan.revised(dreams=[]))["dreams"][0]["anchor"] == plan.topics[0].slug
+
+
+# -- the pool -------------------------------------------------------------
+
+
+def test_two_offline_rounds_grow_one_pool_with_no_repeats_and_stable_ids(tmp_path):
+    tree = offline_plan(tmp_path / "tree")
+    first = Plan.load(tree).dreams
+    assert invoke("dream", str(tree), "--offline").exit_code == 0
+    second = Plan.load(tree).dreams
+    assert invoke("dream", str(tree), "--offline").exit_code == 0
+    third = Plan.load(tree).dreams
+    assert len(first) < len(second) < len(third)
+    assert third[: len(second)] == second and second[: len(first)] == first
+    ids, titles = [d.id for d in third], [d.title for d in third]
+    assert len(set(ids)) == len(ids) and len(set(titles)) == len(titles)
+    assert page(tree).count("# Dreams") == 1
+
+
+def test_two_offline_rounds_are_byte_identical_on_two_trees(tmp_path):
+    a, b = offline_plan(tmp_path / "a"), offline_plan(tmp_path / "b")
+    for tree in (a, b):
+        assert invoke("dream", str(tree), "--offline").exit_code == 0
+    assert snapshot(a) == snapshot(b)
+
+
+def test_a_pool_with_nothing_left_to_offer_reports_nothing_new_and_stays_green(tmp_path):
+    tree = offline_plan(tmp_path / "tree")
+    for _ in range(4):
+        assert invoke("dream", str(tree), "--offline").exit_code == 0
+    full = Plan.load(tree).dreams
+    assert len(full) == len(lenses.LENSES) * len(Plan.load(tree).topics)
+    result = invoke("dream", str(tree), "--offline")
+    assert result.exit_code == 0 and "0 new dream(s)" in result.output
+    assert Plan.load(tree).dreams == full
+
+
+def test_lens_narrows_a_round(tmp_path):
+    tree = offline_plan(tmp_path / "tree")
+    before = len(Plan.load(tree).dreams)
+    assert invoke("dream", str(tree), "--offline", "--lens", "the-opposite").exit_code == 0
+    fresh = Plan.load(tree).dreams[before:]
+    assert {dream.lens for dream in fresh} == {"the-opposite"}
+
+
+def test_an_unknown_lens_is_refused_by_the_command_line(tmp_path):
+    tree = offline_plan(tmp_path / "tree")
+    assert invoke("dream", str(tree), "--offline", "--lens", "made-up").exit_code == 2
+
+
+def test_a_model_round_reaches_the_collect_prompt_with_only_the_asked_lens(tmp_path):
+    tree = model_plan(tmp_path / "tree")
+    llm = FakeLLM(round_of(dream_row("the-opposite", word="paint")))
+    pipeline.dream_round(job_for(), tree, llm, lenses.chosen(("the-opposite",)))
+    assert "- the-opposite:" in llm.calls[0]["user"] and "- who-else:" not in llm.calls[0]["user"]
+
+
+def test_a_round_never_rewrites_a_dream_already_held(tmp_path):
+    tree = model_plan(tmp_path / "tree")
+    before = Plan.load(tree).dreams
+    assert pipeline.dream_round(job_for(), tree, FakeLLM(round_of(dream_row(word="paint")))).ok
+    assert Plan.load(tree).dreams[:2] == before
+
+
+def test_a_set_aside_dream_collected_again_is_not_new(tmp_path):
+    tree = model_plan(tmp_path / "tree")
+    before = Plan.load(tree).dreams
+    llm = FakeLLM([{"dreams": [dream_row("the-opposite", word="bread")]}])
+    assert pipeline.dream_round(job_for(), tree, llm).ok
+    assert Plan.load(tree).dreams == before
+    assert [call["label"] for call in llm.calls] == ["collect"]
+
+
+def test_a_dropped_dream_reworded_is_merged_by_evaluate_and_stays_dropped(tmp_path):
+    tree = model_plan(tmp_path / "tree")
+    assert pipeline.drop(job_for(), tree, "d1", "Not what a library is for.").ok
+    reworded = {**dream_row(word="seedlings"), "title": "A seedling shelf"}
+    answers = [{"dreams": [reworded]}, {"dreams": [judged_row("d3", duplicate_of="d1")]}]
+    assert pipeline.dream_round(job_for(), tree, FakeLLM(answers)).ok
+    plan = Plan.load(tree)
+    assert [dream.id for dream in plan.dreams] == ["d1", "d2"]
+    assert plan.dreams[0].verdict == "dropped"
+
+
+def test_evaluate_is_shown_the_pool_it_must_merge_into(tmp_path):
+    tree = model_plan(tmp_path / "tree")
+    llm = FakeLLM(round_of(dream_row(word="paint")))
+    pipeline.dream_round(job_for(), tree, llm)
+    assert "Already in the pool" in llm.calls[1]["user"] and '"id": "d2"' in llm.calls[1]["user"]
+
+
+def test_ids_read_in_number_order_past_nine(tmp_path):
+    tree = offline_plan(tmp_path / "tree")
+    assert invoke("dream", str(tree), "--offline").exit_code == 0
+    text = page(tree)
+    assert text.index("(d9)") < text.index("(d10)")
+
+
+def test_a_failed_round_changes_nothing_and_exits_one(tmp_path, monkeypatch):
+    tree = model_plan(tmp_path / "tree")
+    before = snapshot(tree)
+    monkeypatch.setattr(cli, "build_llm", lambda **_: DiesAt("evaluate", round_of(dream_row(word="paint"))[:1]))
+    result = invoke("dream", str(tree))
+    assert result.exit_code == 1
+    assert "Dreaming failed, and nothing was changed" in said(result) and "out of credit" in said(result)
+    assert snapshot(tree) == before
+
+
+def test_a_round_that_lost_a_race_for_the_plan_writes_nothing(tmp_path):
+    tree = model_plan(tmp_path / "tree")
+
+    class Races(FakeLLM):
+        def structured(self, *, system: str, user: str, schema: dict, label: str) -> dict:
+            if label == "propose":
+                Plan.load(tree).revised(goal="Someone else was here.").save(tree)
+            return super().structured(system=system, user=user, schema=schema, label=label)
+
+    with pytest.raises(pipeline.PlanRefused, match="changed while this ran"):
+        pipeline.dream_round(job_for(), tree, Races(round_of(dream_row(word="paint"))))
+    assert Plan.load(tree).goal == "Someone else was here."
+
+
+# -- what `proto dream` will work on --------------------------------------
+
+
+def red_tree(tree: Path) -> Path:
+    plan = Plan.load(offline_plan(tree))
+    plan.revised(steps=list(reversed(plan.steps))).save(tree)
+    return tree
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ("dream", "{tree}"),
+        ("dream", "promote", "d1", "--dir", "{tree}"),
+        ("dream", "drop", "d1", "--why", "x", "--dir", "{tree}"),
+    ],
+    ids=["round", "promote", "drop"],
+)
+def test_a_red_plan_is_refused_with_no_model_call_and_no_change(tmp_path, monkeypatch, args):
+    tree = red_tree(tmp_path / "tree")
+    before = snapshot(tree)
+    llm = FakeLLM([])
+    monkeypatch.setattr(cli, "build_llm", lambda **_: llm)
+    result = invoke(*(arg.format(tree=tree) for arg in args))
+    assert result.exit_code == 1
+    assert "fails its checks" in said(result) and "start_order" in said(result)
+    assert llm.calls == [] and snapshot(tree) == before
+
+
+def test_a_directory_with_no_plan_is_refused(tmp_path):
+    result = invoke("dream", str(tmp_path), "--offline")
+    assert result.exit_code == 1 and "holds no plan" in said(result)
+
+
+def test_a_plan_that_will_not_parse_is_refused(tmp_path):
+    tree = offline_plan(tmp_path / "tree")
+    plan_path(tree).write_text("{", encoding="utf-8")
+    result = invoke("dream", str(tree), "--offline")
+    assert result.exit_code == 1 and "cannot be read as a plan" in said(result)
+
+
+def test_a_hand_edited_page_is_drawn_over_and_the_person_is_told(tmp_path):
+    tree = offline_plan(tmp_path / "tree")
+    (tree / "PLAN.md").write_text("my edit", encoding="utf-8")
+    result = invoke("dream", str(tree), "--offline")
+    assert result.exit_code == 0
+    assert "PLAN.md differed from plan.json" in said(result)
+    assert "my edit" not in page(tree, "PLAN.md")
+
+
+def test_a_hand_edited_plan_json_that_still_holds_is_the_truth(tmp_path):
+    tree = offline_plan(tmp_path / "tree")
+    Plan.load(tree).revised(goal="My own goal.").save(tree)
+    assert invoke("dream", str(tree), "--offline").exit_code == 0
+    assert Plan.load(tree).goal == "My own goal."
+
+
+def test_a_leftover_runbook_goes_once_the_plan_is_green_again(tmp_path):
+    tree = red_tree(tmp_path / "tree")
+    pipeline.run_plan(job_for(), tree)
+    assert (tree / "RUNBOOK.md").exists()
+    plan = Plan.load(tree)
+    plan.revised(steps=list(reversed(plan.steps))).save(tree)
+    assert invoke("dream", str(tree), "--offline").exit_code == 0
+    assert not (tree / "RUNBOOK.md").exists()
+
+
+# -- the shape of the command ---------------------------------------------
+
+
+def test_the_bare_word_runs_a_round_in_the_current_directory(tmp_path, monkeypatch):
+    tree = offline_plan(tmp_path / "tree")
+    monkeypatch.chdir(tree)
+    assert invoke("dream", "--offline").exit_code == 0
+    assert len(Plan.load(tree).dreams) > len(lenses.LENSES)
+
+
+def test_a_directory_named_like_a_verb_is_written_as_a_path(tmp_path, monkeypatch):
+    offline_plan(tmp_path / "promote")
+    monkeypatch.chdir(tmp_path)
+    assert invoke("dream", "./promote", "--offline").exit_code == 0
+    assert len(Plan.load(tmp_path / "promote").dreams) > len(lenses.LENSES)
+
+
+def test_the_verb_wins_over_a_directory_and_says_what_it_lacks(tmp_path, monkeypatch):
+    offline_plan(tmp_path / "promote")
+    monkeypatch.chdir(tmp_path)
+    result = invoke("dream", "promote")
+    assert result.exit_code == 2 and "Missing argument 'ID'" in result.output
+
+
+def test_round_is_also_typed_out_so_a_directory_named_round_is_reachable(tmp_path, monkeypatch):
+    offline_plan(tmp_path / "round")
+    monkeypatch.chdir(tmp_path)
+    assert invoke("dream", "round", "round", "--offline").exit_code == 0
+
+
+def test_help_describes_the_group_and_each_verb():
+    shown = invoke("dream", "--help").output
+    assert "promote" in shown and "drop" in shown and "./promote" in shown
+    assert "--lens" in invoke("dream", "round", "--help").output
+
+
+def test_why_is_required_by_the_command_line(tmp_path):
+    tree = offline_plan(tmp_path / "tree")
+    assert invoke("dream", "drop", "d1", "--dir", str(tree)).exit_code == 2
+
+
+# -- drop -----------------------------------------------------------------
+
+
+def test_drop_records_why_calls_no_model_and_keeps_the_dream(tmp_path, monkeypatch):
+    tree = offline_plan(tmp_path / "tree")
+    monkeypatch.setattr(cli, "build_llm", lambda **_: pytest.fail("drop called for a model"))
+    result = invoke("dream", "drop", "d1", "--why", "  Too far  from it. ", "--dir", str(tree))
+    assert result.exit_code == 0, result.output
+    dream = Plan.load(tree).dreams[0]
+    assert (dream.verdict, dream.reason) == ("dropped", "Too far from it.")
+    assert "## Dropped" in page(tree) and "- Verdict: dropped. Too far from it." in page(tree)
+
+
+def test_a_reason_a_person_wrote_may_repeat_a_topic(tmp_path):
+    tree = offline_plan(tmp_path / "tree")
+    risk = Plan.load(tree).topics[0].risks[0]
+    assert pipeline.drop(job_for(), tree, "d1", risk).ok
+
+
+@pytest.mark.parametrize(
+    ("why", "first", "said_"),
+    [("   ", "d1", "needs a reason"), ("x", "d99", "no dream 'd99'")],
+    ids=["blank-why", "unknown-id"],
+)
+def test_drop_refuses_what_it_cannot_do(tmp_path, why, first, said_):
+    tree = offline_plan(tmp_path / "tree")
+    before = snapshot(tree)
+    result = invoke("dream", "drop", first, "--why", why, "--dir", str(tree))
+    assert result.exit_code == 1 and said_ in said(result)
+    assert snapshot(tree) == before
+
+
+def test_a_dream_is_dropped_once(tmp_path):
+    tree = offline_plan(tmp_path / "tree")
+    assert invoke("dream", "drop", "d1", "--why", "first", "--dir", str(tree)).exit_code == 0
+    result = invoke("dream", "drop", "d1", "--why", "second", "--dir", str(tree))
+    assert result.exit_code == 1 and "already dropped: first" in said(result)
+    assert Plan.load(tree).dreams[0].reason == "first"
+
+
+def test_a_promoted_dream_cannot_be_dropped(tmp_path):
+    tree = offline_plan(tmp_path / "tree")
+    assert invoke("dream", "promote", "d1", "--offline", "--dir", str(tree)).exit_code == 0
+    result = invoke("dream", "drop", "d1", "--why", "x", "--dir", str(tree))
+    assert result.exit_code == 1 and "a topic is not dropped here" in said(result)
+
+
+# -- promote --------------------------------------------------------------
+
+NEW = "seeds"
+
+
+def promote_answer(*edges: dict, **fields: list[str]) -> dict:
+    return {"edges": list(edges), "risks": ["r"], "unknowns": ["u?"], "decisions": ["d"], **fields}
+
+
+def test_promote_offline_adds_a_verified_topic_tied_to_its_anchor(tmp_path):
+    tree = offline_plan(tmp_path / "tree")
+    result = invoke("dream", "promote", "d2", "--offline", "--dir", str(tree))
+    assert result.exit_code == 0, result.output
+    plan = Plan.load(tree)
+    new, dream = plan.topics[-1], plan.dreams[1]
+    assert (dream.verdict, dream.promoted_to) == ("promoted", new.slug)
+    assert (new.title, new.why) == (dream.title, f"What if {dream.what_if}")
+    assert (new.risks, new.unknowns, new.decisions, new.findings) == ([], [], [], [])
+    assert any((e.from_topic, e.kind, e.to_topic) == (new.slug, "depends-on", dream.anchor) for e in plan.edges)
+    assert (tree / "topics" / f"{new.slug}.md").is_file()
+    assert f"topics/{new.slug}.md" in page(tree, "PLAN.md")
+    assert verify.verdict(plan, render.read(tree)).ok
+    assert "## Promoted" in page(tree) and f"[{new.title}](topics/{new.slug}.md)" in page(tree)
+
+
+def test_a_promoted_topic_says_it_is_not_researched(tmp_path):
+    tree = offline_plan(tmp_path / "tree")
+    result = invoke("dream", "promote", "d1", "--offline", "--dir", str(tree))
+    plan = Plan.load(tree)
+    assert plan.researched is False
+    assert render.NOT_RESEARCHED in page(tree, f"topics/{plan.topics[-1].slug}.md")
+    assert "it is not researched" in said(result)
+
+
+def test_a_promoted_dreams_own_words_on_its_topic_are_not_a_leak(tmp_path):
+    tree = offline_plan(tmp_path / "tree")
+    assert invoke("dream", "promote", "d1", "--offline", "--dir", str(tree)).exit_code == 0
+    plan = Plan.load(tree)
+    assert plan.dreams[0].what_if in page(tree, f"topics/{plan.topics[-1].slug}.md")
+    assert verify.dreams_apart(plan, render.read(tree)).state == verify.PASSED
+
+
+def test_with_a_model_a_promoted_topic_is_connected_and_considered(tmp_path):
+    tree = model_plan(tmp_path / "tree")
+    llm = FakeLLM([promote_answer(edge("seeds_too", "members"), edge("space", "seeds_too", "informs"))])
+    assert pipeline.promote(job_for(), tree, "d1", llm).ok
+    plan = Plan.load(tree)
+    new = plan.topics[-1]
+    assert (new.slug, new.risks, new.unknowns, new.decisions) == ("seeds_too", ["r"], ["u?"], ["d"])
+    assert plan.steps == Plan.load(tree).steps
+    assert "- Seeds too depends on Members" in page(tree, "topics/seeds_too.md")
+
+
+def test_promote_leaves_every_other_topic_and_edge_alone(tmp_path):
+    tree = model_plan(tmp_path / "tree")
+    before = Plan.load(tree)
+    assert pipeline.promote(job_for(), tree, "d1", FakeLLM([promote_answer(edge("seeds_too", "members"))])).ok
+    after = Plan.load(tree)
+    assert after.topics[:-1] == before.topics and after.edges[: len(before.edges)] == before.edges
+    assert after.steps == before.steps
+
+
+def test_a_link_that_leaves_out_the_new_topic_is_refused_and_nothing_changes(tmp_path):
+    tree = model_plan(tmp_path / "tree")
+    before = snapshot(tree)
+    with pytest.raises(pipeline.PlanRefused, match="leaves out the new topic"):
+        pipeline.promote(job_for(), tree, "d1", FakeLLM([promote_answer(edge("space", "money"))]))
+    assert snapshot(tree) == before
+
+
+def test_the_promote_pass_cannot_write_a_finding_or_a_source(tmp_path):
+    tree = model_plan(tmp_path / "tree")
+    forged = {
+        **promote_answer(),
+        "findings": [{"text": "x", "assumption": False}],
+        "researched": True,
+        "sources": ["s"],
+    }
+    assert pipeline.promote(job_for(), tree, "d1", FakeLLM([forged])).ok
+    plan = Plan.load(tree)
+    assert (plan.topics[-1].findings, plan.researched, plan.sources) == ([], False, [])
+
+
+def test_a_link_that_breaks_the_start_goes_through_the_verifier_and_repair(tmp_path):
+    tree = model_plan(tmp_path / "tree")
+    links = [*GOOD["connect"]["edges"], edge("members", "seeds_too")]
+    mended = repair_of(links, ["seeds_too", "members"])
+    llm = FakeLLM([promote_answer(edge("members", "seeds_too")), mended])
+    job = job_for()
+    assert pipeline.promote(job, tree, "d1", llm).ok
+    assert [call["label"] for call in llm.calls] == ["promote", "repair"]
+    assert any(e["kind"] == "verify_failed" and e["stage"] == "start_order" for e in job.events)
+    assert [s.topic for s in Plan.load(tree).steps] == ["seeds_too", "members"]
+
+
+def test_a_link_that_closes_a_loop_goes_through_repair_and_its_rules(tmp_path):
+    tree = model_plan(tmp_path / "tree")
+    loop = [edge("seeds_too", "members"), edge("members", "seeds_too")]
+    # Repair may give up one link on the loop, never an edge on no loop.
+    mended = repair_of([*GOOD["connect"]["edges"], edge("seeds_too", "members")], ["members"])
+    llm = FakeLLM([promote_answer(*loop), mended])
+    assert pipeline.promote(job_for(), tree, "d1", llm).ok
+    assert sum(e.to_topic == "seeds_too" for e in Plan.load(tree).edges) == 0
+
+
+def test_a_repair_that_deletes_a_real_edge_is_still_thrown_away(tmp_path):
+    tree = model_plan(tmp_path / "tree")
+    before = snapshot(tree)
+    lost = repair_of([edge("seeds_too", "members")], ["members"])
+    answers = [promote_answer(edge("seeds_too", "members"), edge("members", "seeds_too")), lost, lost, lost]
+    with pytest.raises(pipeline.PlanRefused, match="failed its checks"):
+        pipeline.promote(job_for(), tree, "d1", FakeLLM(answers))
+    assert snapshot(tree) == before
+
+
+def test_a_promotion_that_stays_red_changes_nothing_and_exits_one(tmp_path, monkeypatch):
+    tree = model_plan(tmp_path / "tree")
+    before = snapshot(tree)
+    stuck = repair_of([*GOOD["connect"]["edges"], edge("members", "seeds_too")], ["members"])
+    llm = FakeLLM([promote_answer(edge("members", "seeds_too")), stuck, stuck, stuck])
+    monkeypatch.setattr(cli, "build_llm", lambda **_: llm)
+    result = invoke("dream", "promote", "d1", "--dir", str(tree))
+    assert result.exit_code == 1
+    assert "Nothing was changed" in said(result) and "start_order" in said(result)
+    assert snapshot(tree) == before and not (tree / "RUNBOOK.md").exists()
+
+
+def test_a_backend_failure_while_promoting_changes_nothing(tmp_path):
+    tree = model_plan(tmp_path / "tree")
+    before = snapshot(tree)
+    with pytest.raises(pipeline.PlanRefused, match="was not promoted"):
+        pipeline.promote(job_for(), tree, "d1", DiesAt("promote", []))
+    assert snapshot(tree) == before
+
+
+def test_a_dream_is_promoted_once(tmp_path):
+    tree = offline_plan(tmp_path / "tree")
+    assert invoke("dream", "promote", "d1", "--offline", "--dir", str(tree)).exit_code == 0
+    topics = len(Plan.load(tree).topics)
+    result = invoke("dream", "promote", "d1", "--offline", "--dir", str(tree))
+    assert result.exit_code == 1 and "already the topic" in said(result)
+    assert len(Plan.load(tree).topics) == topics
+
+
+def test_promote_refuses_an_id_the_pool_does_not_hold(tmp_path):
+    tree = offline_plan(tmp_path / "tree")
+    result = invoke("dream", "promote", "../../etc", "--offline", "--dir", str(tree))
+    assert result.exit_code == 1 and "no dream '../../etc'" in said(result)
+
+
+def test_a_set_aside_dream_can_be_promoted_because_a_person_may_disagree(tmp_path):
+    tree = model_plan(tmp_path / "tree")
+    assert Plan.load(tree).dreams[1].verdict == "set-aside"
+    assert pipeline.promote(job_for(), tree, "d2", FakeLLM([promote_answer()])).ok
+    assert Plan.load(tree).dreams[1].verdict == "promoted"
+
+
+def test_a_promoted_title_that_collides_takes_a_number(tmp_path):
+    tree = model_plan(tmp_path / "tree")
+    plan = Plan.load(tree)
+    taken = plan.dreams[0].model_copy(update={"title": "Members"})
+    plan.revised(dreams=[taken, *plan.dreams[1:]]).save(tree)
+    assert pipeline.promote(job_for(), tree, "d1", FakeLLM([promote_answer()])).ok
+    assert Plan.load(tree).topics[-1].slug == "members_2"
+
+
+def test_a_promoted_slug_stays_inside_the_length_a_file_can_have():
+    plan = Plan(slug="p", title="t", idea="i", topics=[Topic(slug="a" * 64, title="T", why="w")])
+    assert len(dreaming._free_slug(plan, "a" * 64)) == 64
+
+
+def test_a_later_round_treats_a_promoted_dream_as_taken(tmp_path):
+    tree = model_plan(tmp_path / "tree")
+    assert pipeline.promote(job_for(), tree, "d1", FakeLLM([promote_answer()])).ok
+    llm = FakeLLM([{"dreams": [dream_row()]}])
+    assert pipeline.dream_round(job_for(), tree, llm).ok
+    assert [dream.id for dream in Plan.load(tree).dreams] == ["d1", "d2"]
+
+
+def test_collect_is_asked_for_every_lens_and_shown_the_pool(tmp_path):
+    tree = model_plan(tmp_path / "tree")
+    llm = FakeLLM(round_of(dream_row(word="paint")))
+    pipeline.dream_round(job_for(), tree, llm)
+    shown = llm.calls[0]["user"]
+    assert all(lens.slug in shown for lens in lenses.LENSES)
+    assert "Seeds too" in shown and "Bread too" in shown
+
+
+def test_a_rerender_keeps_the_note_and_a_good_round_clears_it(tmp_path):
+    tree = tmp_path / "tree"
+    run(tree, collect={"nonsense": True})
+    assert pipeline.run_plan(job_for(), tree, FakeLLM([])).ok
+    assert "**Dreaming failed:**" in page(tree)
+    assert pipeline.dream_round(job_for(), tree, FakeLLM(round_of(dream_row(), first=1))).ok
+    assert "**Dreaming failed:**" not in page(tree)
+    assert "dream_failure" not in json.loads(plan_path(tree).read_text(encoding="utf-8"))
+
+
+def test_a_sibling_dream_close_to_a_promoted_one_does_not_block_the_promotion(tmp_path):
+    tree = tmp_path / "tree"
+    close = {**dream_row("the-opposite", word="seedlings"), "title": "Another shelf"}
+    run(tree, collect={"dreams": [dream_row(), close]})
+    assert pipeline.promote(job_for(), tree, "d1", FakeLLM([promote_answer()])).ok
+
+
+# -- nothing else crosses -------------------------------------------------
+
+
+def test_no_run_of_any_pass_turns_a_dream_into_a_topic(tmp_path):
+    tree = model_plan(tmp_path / "tree")
+    assert [topic.slug for topic in Plan.load(tree).topics] == SLUGS
+    assert pipeline.dream_round(job_for(), tree, FakeLLM(round_of(dream_row(word="paint")))).ok
+    assert [topic.slug for topic in Plan.load(tree).topics] == SLUGS
+
+
+def test_only_the_promote_verb_calls_the_one_function_that_crosses():
+    callers = [
+        path.relative_to(REPO).as_posix()
+        for path in (REPO / "protopilot").rglob("*.py")
+        if re.search(r"dreaming\.promoted\(", path.read_text(encoding="utf-8"))
+    ]
+    assert callers == ["protopilot/plan/pipeline.py"]
+    source = (REPO / "protopilot" / "plan" / "pipeline.py").read_text(encoding="utf-8")
+    assert source.count("dreaming.promoted(") == 1
+    assert source.index("dreaming.promoted(") > source.index("def promote(")
+    assert (REPO / "protopilot" / "cli.py").read_text(encoding="utf-8").count("pipeline.promote(") == 1
+
+
+# -- honesty --------------------------------------------------------------
+
+
+def test_a_dreams_page_always_says_nothing_here_is_researched(tmp_path):
+    tree = offline_plan(tmp_path / "tree")
+    assert invoke("dream", "drop", "d1", "--why", "no", "--dir", str(tree)).exit_code == 0
+    assert invoke("dream", "promote", "d2", "--offline", "--dir", str(tree)).exit_code == 0
+    assert "Nothing here is researched." in page(tree)
+
+
+def test_html_a_model_writes_in_a_dream_stays_inert(tmp_path):
+    tree = tmp_path / "tree"
+    row = {**dream_row(), "title": "<!-- hide"}
+    run(tree, collect={"dreams": [row, dream_row("the-opposite", word="bread")]})
+    assert "&lt;!-- hide" in page(tree)
+
+
+@pytest.mark.parametrize("dream_id", ["../../etc", "D1", "", "a b", "d" * 40, "d1/x"])
+def test_a_dream_id_is_validated_when_the_plan_loads(dream_id):
+    with pytest.raises(ValueError, match="dream id"):
+        Dream(id=dream_id, title="t", what_if="w", lens="l", anchor="a", takes="x")
+
+
+@pytest.mark.parametrize("link", ["../../etc", "a/b", "A"])
+def test_a_promoted_link_is_a_slug_because_it_is_drawn_as_a_path(link):
+    with pytest.raises(ValueError, match="slug"):
+        Dream(id="d1", title="t", what_if="w", lens="l", anchor="a", takes="x", promoted_to=link)

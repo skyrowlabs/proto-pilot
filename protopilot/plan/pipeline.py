@@ -18,7 +18,8 @@ CLI exits 1, as `proto new`'s floor does. A failed pass is a different thing: a
 pass that returns nothing a plan can hold leaves no tree at all.
 
 Dreaming is the exception, because dreams are extras. A plan keeps going when its
-dreaming fails, and `dreams.md` says so.
+dreaming fails, and `dreams.md` says so. `dream_round`, `promote` and `drop` work on a
+plan that is already green, and change nothing unless the result is green too.
 """
 
 from __future__ import annotations
@@ -30,19 +31,16 @@ from pathlib import Path
 from protopilot.llm import LLM, OfflineLLM
 from protopilot.plan import baseline, dreaming, render, verify
 from protopilot.plan.lenses import LENSES, Lens
-from protopilot.plan.model import DEFAULT_DEPTH, Depth, Plan, plan_path
+from protopilot.plan.model import DEFAULT_DEPTH, Depth, Dream, Plan, plan_path
 from protopilot.plan.passes import (
     collect,
     connect,
     consider,
     evaluate,
     outline,
-    propose,
-    repair,
-    run_pass,
-    scope,
-    start,
 )
+from protopilot.plan.passes import promote as promote_pass
+from protopilot.plan.passes import propose, repair, run_pass, scope, start
 
 #: Every model call a run makes, in order; the review sits after `BEFORE_REVIEW`.
 PLAN_PASSES = (scope, outline, connect, consider, start)
@@ -364,6 +362,99 @@ def run_plan(
         return rerender(job, tree)
     llm = llm or OfflineLLM()
     return build(job, tree, outlined(job, llm, scoped(job, llm, depth, dream), dream), llm, dream)
+
+
+def _held(tree: Path) -> Plan:
+    """The plan in `tree`, refused unless green: a dream extends a plan that holds, so fix that first."""
+    if not plan_path(tree).exists():
+        raise PlanRefused(f"{tree} holds no plan. `proto plan` makes one; a dream needs a plan to extend.")
+    try:
+        plan = Plan.load(tree)
+    except (OSError, ValueError) as exc:
+        raise PlanRefused(f"{plan_path(tree)} cannot be read as a plan: {exc}") from exc
+    result = verify.verdict(plan, render.render(plan))
+    if not result.ok:
+        raise PlanRefused(
+            f"{tree} holds a plan that fails its checks, so nothing was changed and no model was called. "
+            f"Red at {result.stage}: {result.summary} Mend {plan_path(tree)}, then rerun."
+        )
+    return plan
+
+
+def _found(plan: Plan, dream_id: str) -> Dream:
+    try:
+        return dreaming.find(plan, dream_id)
+    except ValueError as exc:
+        raise PlanRefused(str(exc)) from exc
+
+
+def _land(job, tree: Path, before: Plan, checked: Checked, names: list[str]) -> verify.PlanVerdict:
+    """Hand back a change to a held plan, which must be green. Red, or raced, leaves the tree as it was."""
+    if not checked.verdict.ok:
+        tried = "".join(f"\n  {line}" for line in checked.tried)
+        raise PlanRefused(
+            f"Nothing was changed, because the result failed its checks.\n{checked.verdict.report()}{tried}"
+        )
+    if Plan.load(tree) != before:
+        raise PlanRefused(f"{plan_path(tree)} changed while this ran, so this result was not written. Rerun it.")
+    drawn = render.render(before)
+    edited = sorted(name for name, page in render.read(tree).items() if name in drawn and page != drawn[name])
+    if edited:
+        job.log(f"  {', '.join(edited)} differed from plan.json and are drawn over: plan.json is the truth")
+    return _hand_back(job, tree, names, checked, save=True)
+
+
+def _once(job, plan: Plan) -> Checked:
+    return Checked(plan, _verified(job, plan, 1, 1), 1, [])
+
+
+def dream_round(
+    job, tree: Path, llm: LLM, lenses: tuple[Lens, ...] = LENSES, per_lens: int = dreaming.ROUND_PER_LENS
+) -> verify.PlanVerdict:
+    """Another round into the pool of the plan in `tree`. A failed round leaves the tree as it was."""
+    tree = Path(tree)
+    job.project_dir = str(tree)
+    plan = _held(tree)
+    names = [*(module.NAME for module in DREAM_PASSES), RENDER]
+    job.event("plan", passes=names)
+    try:
+        grown = _dreamed(job, plan, llm, names, lenses, per_lens)
+    except DreamFailed as exc:
+        raise PlanRefused(f"Dreaming failed, and nothing was changed: {exc} Rerun to try again.") from exc
+    return _land(job, tree, plan, _once(job, grown.revised(dream_failure="")), names)
+
+
+def promote(job, tree: Path, dream_id: str, llm: LLM) -> verify.PlanVerdict:
+    """A person's promotion: the dream as a topic, connected and considered, or nothing at all."""
+    tree = Path(tree)
+    job.project_dir = str(tree)
+    plan = _held(tree)
+    dream = _found(plan, dream_id)
+    names = [promote_pass.NAME, RENDER]
+    job.event("plan", passes=names)
+    try:
+        grown = dreaming.promoted(plan, dream)
+        fitted = _model_pass(job, promote_pass, grown, llm, names)
+    except Exception as exc:  # noqa: BLE001 -- the plan on disk is good, and stays
+        raise PlanRefused(f"Dream {dream_id} was not promoted, and nothing was changed: {exc}") from exc
+    verdict = _land(job, tree, plan, repaired(job, fitted, llm), names)
+    if verdict.ok:
+        job.log(f"Dream {dream_id} is now a topic, and it is not researched: a person chose it, nothing checked it.")
+    return verdict
+
+
+def drop(job, tree: Path, dream_id: str, why: str) -> verify.PlanVerdict:
+    """A person's ruling on a dream. Calls no model, and the dream stays so no round offers it again."""
+    tree = Path(tree)
+    job.project_dir = str(tree)
+    plan = _held(tree)
+    dream = _found(plan, dream_id)
+    job.event("plan", passes=[RENDER])
+    try:
+        ruled = dreaming.dropped(plan, dream, why)
+    except ValueError as exc:
+        raise PlanRefused(str(exc)) from exc
+    return _land(job, tree, plan, _once(job, ruled), [RENDER])
 
 
 def after_failure(tree: Path) -> str:
