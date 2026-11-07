@@ -67,11 +67,17 @@ proto plan "start a community tool library" --offline --yes
 | `--backend` | `api` bills API credit, `claude-code` a Claude subscription, `offline` calls no model. Beats `PROTOPILOT_LLM`; with neither set, `api` is used |
 | `--offline` | The deterministic baseline with no model call. Beats `--backend` |
 | `--yes`, `-y` | Skip scope's questions, which stay open in `PLAN.md`, and the outline review |
+| `--no-dream` | Skip dreaming. `dreams.md` says it has not run, and `proto dream` can start the pool later |
 
 A run calls a model by default: `scope`, `outline`, the review, `connect`, `consider`,
-`start`, verification, any repair, then render. **It does no research or dreaming
-yet**, so every plan is stamped *Not researched* and holds no findings beyond the
-offline baseline's assumptions.
+`start`, `collect`, `evaluate`, `propose`, verification, any repair, then render. The
+checkpoint estimates 8 calls, or 5 with `--no-dream`, and a dream pass with nothing to
+read makes none. **It does no research yet**, so every plan is stamped *Not researched*
+and holds no findings beyond the offline baseline's assumptions.
+
+**Dreaming runs by default, at a small count:** one dream through each of the six
+lenses, of which at most three are proposed. Dreams are guesses, not findings, and they
+go in `dreams.md`, never in a topic file. [`proto dream`](#proto-dream) has the rest.
 
 **Verification proves structure, never truth.** A green run ends on a line built from
 what held: it names those checks and claims nothing past them. A check with nothing
@@ -95,7 +101,9 @@ refuses before calling a model.
 
 **A failed model pass leaves no tree.** A rerun starts from scope, and any review
 edits are lost. A failed repair pass is not one of these: it ends repair, and the tree
-is written as above. A render that fails after saving `plan.json` keeps it, so a rerun
+is written as above. **Nor is a failed dream pass:** the plan is written without
+dreams, `dreams.md` and a closing line say what stopped, and the run exits as the plan's
+checks decide, so 0 on a green plan. `proto dream` tries again. A render that fails after saving `plan.json` keeps it, so a rerun
 redraws it with no model call. A write that dies partway can leave old topic pages
 behind, and the error says any page may be out of date until that rerun.
 
@@ -111,3 +119,68 @@ green, and blocks a red plan: every other page is drawn and marked, and the comm
 refuses with exit 1 until it is moved. A link at a page path is refused the same way,
 as is a directory there, except that on green nothing is drawn. Nothing is written
 outside the tree. A green run removes only a runbook this tool wrote.
+
+## `proto dream`
+
+Everything that happens to a plan's pool of dreams after the plan exists. Each command
+works on a green plan already on disk, and none of them prompts, so none needs `--yes`.
+
+```bash
+proto dream                                     # another round, on the plan in this folder
+proto dream ./mytree --lens who-else --lens the-opposite
+proto dream promote d4 --dir ./mytree
+proto dream drop d7 --why "needs a second town" --dir ./mytree
+```
+
+| Command | What it does | Model calls |
+| ------- | ------------ | ----------- |
+| `proto dream [DIR]` | Adds a round to the pool. `DIR` defaults to the current folder | 3 at most |
+| `proto dream promote ID` | Turns a dream into the plan's last topic, connected and verified | 1, plus 0 to 3 repair calls |
+| `proto dream drop ID --why WHY` | Rules a dream out. `--why` is required, and the reason stays beside it | None |
+
+**The verbs and the directory share one position.** A first word that is a verb is the
+verb, and anything else is a directory for a round. So a directory named like a verb is
+written `./promote`, `./drop` or `./round`. `proto dream round [DIR]` is the same round
+spelt out, and `proto dream --help` lists the verbs. `promote` and `drop` never take a
+position for the directory: they take `--dir`, which defaults to the current folder.
+
+| Flag | On | What it does |
+| ---- | -- | ------------ |
+| `--lens` | a round | Dream through this lens only; repeat for more. One of `who-else`, `the-opposite`, `ten-times-bigger`, `the-smallest-version`, `remove-the-main-constraint`, `borrow-from-another-field`. The default is all six |
+| `--offline`, `--backend` | a round, `promote` | As on `proto plan`. `drop` calls no model and takes neither |
+| `--dir` | `promote`, `drop` | The plan's directory |
+| `--why` | `drop` | What ruled the dream out |
+
+**A round goes wider than a plan's own:** two dreams through each lens, not one. It adds
+and never rewrites, so a dream keeps its id, words and verdict through every later round.
+`collect` writes the dreams. `evaluate`, a separate call, rates each on `pull`, `reach`,
+`cost` and `fit`, never summed, then gives a verdict of `proposed` or `set-aside` with a
+sentence of reasoning, and merges near-duplicates, including of a dream already set aside
+or dropped. `propose` keeps at most three a round, each saying what would change if
+adopted, and whatever it passes over is set aside.
+
+**A dream is at most 44 words** across its title (6), what-if (26) and what it would take
+(12). One over the cap, or otherwise unfit for the pool, is left out with a line saying
+why, and costs only itself. Offline, a dream is a template that says so, its ratings read
+`not judged`, and the first few in lens order are proposed.
+
+**Only a person promotes.** Any dream not yet promoted can be, a set-aside or dropped one
+included, and no pass can do it. The links and notes come from one call, and every link
+must touch the new topic. Offline it depends on the dream's anchor and has no risks,
+unknowns or decisions. Repair may mend only what touches the new topic, because what the
+plan held before is settled. The topic is stamped *Not researched* like every other.
+
+**Exit codes.** Each command changes nothing and exits 1 when:
+
+- The plan is red. All three refuse it with no model call, and name the check to mend.
+- A pass fails. `proto plan` writes on past a failed dream pass, and a round does not.
+- A promotion stays red after repair. The report says what failed and what repair tried.
+- The id is not in the pool, or `plan.json` changed while the command ran.
+
+A round in which no dream survives is not a failure: it reports `0 new dream(s)`, keeps
+the pool and exits 0. If the pool is still empty, `dreams.md` says dreaming failed.
+
+**Two limits.** `dreams_apart`, the check that keeps dreams out of topic files, catches a
+copy with a word or two changed and misses a paraphrase. The API backend has never been
+run for these passes, and it asks for the word limits in a schema description where the
+`claude-code` backend enforces them. `verify.py` holds the cap on both.

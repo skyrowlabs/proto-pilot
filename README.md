@@ -46,13 +46,16 @@ Open a small bakery that only sells sourdough
     2. Kitchen terms and who holds the obligations
     3. What a loaf must earn, and how it reaches a buyer
     4. Testing demand cheaply, and the conditions to stop
-Estimated model calls: 5 in all, 3 still to come (connect, consider, start).
+Estimated model calls: 8 in all, 6 still to come (connect, consider, start, collect, evaluate, propose), plus 0 to 3 repair calls, only if verification finds something repair can fix. Research does not run in this build, so these numbers exclude it.
 
 Write this plan? Enter accepts, or: add TITLE | drop N | rename N TITLE | quit:
 
   pass connect...
   pass consider...
   pass start...
+  pass collect...
+  pass evaluate...
+  pass propose...
   verify (attempt 1)...
   pass render...
 Not researched: nothing here was checked against a source.
@@ -61,12 +64,13 @@ Green: this plan's structure holds, which is not the same as true. Nothing in it
 Plan at open_small_bakery_that. Start with PLAN.md.
 ```
 
-That is a real run, shortened. You get a folder:
+That is a real run, shortened. It predates dreaming, so the call estimate and the three
+dream passes are what `proto plan` prints now, not what that run printed. You get a folder:
 
 ```
 PLAN.md              the idea, the topic map, how topics connect, where to start
 topics/<topic>.md    one text plan per topic: why it matters, risks, unknowns, decisions
-dreams.md            extensions of the idea, kept apart from the plan (not built yet)
+dreams.md            guesses at what else the idea could be, kept apart from the plan
 sources.md           what research relied on (not built yet)
 ```
 
@@ -102,12 +106,14 @@ Planning needs nothing else. Docker is only for `proto new --target web`.
 
 | | |
 |---|---|
-| `proto plan IDEA` | scope it, outline it with you, connect the topics, weigh the risks, pick first steps, check the structure, write the folder |
+| `proto plan IDEA` | scope it, outline it with you, connect the topics, weigh the risks, pick first steps, dream a little, check the structure, write the folder |
+| `proto dream [DIR]` / `dream promote ID` / `dream drop ID --why WHY` | run another round of dreams; turn one into a topic; rule one out, with the reason kept |
 | `proto doctor` | why it will not work here |
 
 Useful flags on `plan`: `--direction` (scope, emphasis, constraints), `--depth`
 (`shallow`, `standard` or `deep`: 4, 6 or 8 topics), `--dir`, `--backend`, `--offline`
-(no API calls, see below), `--yes` (skip the questions and the review).
+(no API calls, see below), `--yes` (skip the questions and the review), `--no-dream`
+(skip dreaming; `proto dream` can start the pool later).
 
 Off a terminal, `--yes` is required, so a script is refused rather than left waiting.
 Run on a folder that already holds a plan for the same idea and direction, it redraws
@@ -128,7 +134,7 @@ The prototype commands are under [Prototypes come later](#prototypes-come-later)
 | `connect` | typed links: `depends-on`, `informs`, `conflicts-with` | built |
 | `consider` | per topic: risks, unknowns, decisions someone must make | built |
 | `start` | the first few steps, each with its reason | built |
-| `dream` | extensions of the idea, collected, evaluated and proposed | coming |
+| `collect`, `evaluate`, `propose` | dreams: extensions of the idea, gathered, judged in a separate call, the top few kept | built |
 | `verify` | structural checks, with a bounded repair | built |
 | render | every page | built, no model call |
 
@@ -150,11 +156,45 @@ things worse. If the plan is still red you get the whole folder anyway, with a
 `RUNBOOK.md` saying what is wrong, "Not verified" banners on the pages, and exit 1.
 
 **Model output is data, not authority.** A pass can only fill the fields it owns. It
-cannot mark a plan researched, add a source or remove the stamp, and the only model text
-that reaches a file name is a checked slug.
+cannot mark a plan researched, add a source, promote a dream or remove the stamp, and the
+only model text that reaches a file name is a checked slug.
 
-**A pass that fails leaves no folder.** A rerun starts over from `scope`, and review
-edits are lost.
+**A plan pass that fails leaves no folder.** A rerun starts over from `scope`, and review
+edits are lost. A dream pass is the exception, below.
+
+### Dreaming
+
+Every other pass narrows, so this one widens. Six fixed lenses each ask what else the
+idea could be: who else, the opposite, ten times bigger, the smallest version, remove the
+main constraint, borrow from another field. A second call scores each dream, and a third
+keeps at most three, saying what would change if one were adopted. A plan dreams once
+through each lens. `proto dream` goes wider, and adds to the pool without rewriting it.
+
+**Dreams are guesses, not findings.** A dream is unresearched, at most 44 words across its
+title, what-if and what it would take, and lives in `dreams.md`, never in a topic file.
+From a real run on a community tool library, shortened:
+
+```
+### Six tools and a wall tally (d13)
+
+What if the first year were six tools and a chalked tally of everything townspeople asked for that the library did not have
+
+- Lens: the smallest version
+- Would take: One volunteer willing to say no and write it down
+- Scores: pull high, reach medium, cost low, fit high
+```
+
+**Only a person promotes.** `proto dream promote d13` makes that a topic, connected and
+checked, and still Not researched: a person chose it, nothing checked it. If the result
+stays red, nothing changes and it exits 1.
+
+**A dream never costs a plan.** If dreaming fails during `proto plan`, the plan is written
+anyway, a line says what stopped, and a green plan still exits 0. A failed `proto dream`
+round changes nothing and exits 1. A red plan is refused by all three verbs with no model
+call, because a dream extends a plan that holds.
+
+Two limits. The check that keeps dreams out of topic files catches copies and misses
+paraphrase. And the API backend has never been run for these passes.
 
 ### What a plan does not know yet
 
@@ -163,18 +203,15 @@ sourced findings. Treat what it says as a well-organised set of questions and re
 not as facts. Only the prompt stops a model stating a fact inside a risk or a reason, and
 the stamp is there for that.
 
-Two things are next, in [the plan for this work](docs/TODO/plan-prototypes.md):
-
-- **Dreaming**, because every pass here narrows. It collects lighter extensions of the
-  idea through fixed lenses, scores them in a separate call, and keeps them in their own
-  file so a guess can never read as a finding. Only a person promotes one into the plan.
-- **Research**, one call per topic, with every source retrieved during the run.
+**Research** is next, in [the plan for this work](docs/TODO/plan-prototypes.md): one call
+per topic, with every source retrieved during the run.
 
 ## Works offline
 
 Every plan pass has two implementations: a prompt and a deterministic twin. `--offline`
 runs the second: no API calls and no key, a generic topic skeleton with every finding
-labelled an assumption, byte-identical on every run.
+labelled an assumption, dreams that are templates and say so, and the same bytes on every
+run.
 
 It is what the test suite runs, so the whole pipeline is exercised on every commit. A
 pipeline that can only be tested with a network call and a credit card stops being
@@ -244,8 +281,8 @@ per pass. Override with `PROTOPILOT_MODEL` / `PROTOPILOT_EFFORT`.
 until a plan is concrete enough to feed it.
 
 Early, and honest about it. `proto plan` runs against a real model today and writes a
-real plan with its structure checked, with no research or dreaming yet. `NOTES.md` is the live parking
-lot: open items, what got resolved, and what is worth doing next.
+real plan with its structure checked and a pool of dreams beside it, with no research yet.
+`NOTES.md` is the live parking lot: open items, what got resolved, and what is worth doing next.
 
 ## Working on this repo
 
