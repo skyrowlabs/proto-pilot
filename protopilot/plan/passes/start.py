@@ -30,18 +30,9 @@ Return an ordered list of steps, no more than you are told. Each names a topic, 
 """
 
 
-def _needs(plan: Plan) -> dict[str, set[str]]:
-    """Each topic's `depends-on` targets. `connect` has already refused a dangling edge."""
-    needs: dict[str, set[str]] = {topic.slug: set() for topic in plan.topics}
-    for edge in plan.edges:
-        if edge.kind == "depends-on" and edge.from_topic in needs:
-            needs[edge.from_topic].add(edge.to_topic)
-    return needs
-
-
 def ready(plan: Plan) -> list[Topic]:
     """The topics with no unmet `depends-on`, before anything has been done."""
-    needs = _needs(plan)
+    needs = plan.needs()
     return [topic for topic in plan.topics if not needs[topic.slug]]
 
 
@@ -77,7 +68,7 @@ def schema(plan: Plan) -> dict:
 def build(plan: Plan) -> tuple[str, str]:
     if not ready(plan):
         raise PlanPassError("every topic depends on another, so `depends-on` has a cycle and nothing can go first")
-    needs = _needs(plan)
+    needs = plan.needs()
     waits = [f"- {t.slug} depends on: {', '.join(sorted(needs[t.slug])) or 'nothing'}" for t in plan.topics]
     block = topics_block(plan.topics, "risks", "unknowns")
     graph = "## What each topic depends on\n\n" + "\n".join(waits)
@@ -97,7 +88,7 @@ def apply(plan: Plan, data: dict) -> Plan:
     steps = [Step(topic=r["topic"], action=text(r["action"]), why=text(r["why"])) for r in data["steps"]]
     if not steps:
         raise ValueError("no steps, and a plan has to say where to begin")
-    needs = _needs(plan)
+    needs = plan.needs()
     covered: set[str] = set()
     for number, step in enumerate(steps, start=1):
         if step.topic not in needs:

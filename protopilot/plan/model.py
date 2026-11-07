@@ -32,6 +32,8 @@ TOPIC_COUNTS: dict[str, int] = {"shallow": 4, "standard": 6, "deep": 8}
 DEFAULT_DEPTH = "standard"
 MIN_TOPICS = min(TOPIC_COUNTS.values())
 MAX_TOPICS = max(TOPIC_COUNTS.values())
+#: The words a dream's title, what-if and what-it-takes may spend between them.
+DREAM_WORD_CAP = 60
 
 
 def _checked_slug(value: str) -> str:
@@ -51,6 +53,8 @@ class Source(_Record):
     id: str
     title: str
     url: str
+    # False unless the run's ledger saw this URL return usable content, so a typed source is red.
+    fetched: bool = False
 
 
 class Finding(_Record):
@@ -132,6 +136,14 @@ class Plan(_Record):
     def revised(self, **changes: object) -> "Plan":
         """A copy with `changes`, validated: `model_copy` would skip the slug checks."""
         return Plan.model_validate({**self.model_dump(), **changes})
+
+    def needs(self) -> dict[str, set[str]]:
+        """Each topic's `depends-on` targets; an edge from a topic the plan lacks is the map's to report."""
+        needs: dict[str, set[str]] = {topic.slug: set() for topic in self.topics}
+        for edge in self.edges:
+            if edge.kind == "depends-on" and edge.from_topic in needs:
+                needs[edge.from_topic].add(edge.to_topic)
+        return needs
 
     def summary(self) -> str:
         """What the outline checkpoint prints; a topic left out here is one nobody reviews."""
