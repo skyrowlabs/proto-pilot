@@ -149,13 +149,9 @@ def test_start_schema_offers_every_topic():
     assert enum == [topic.slug for topic in plan.topics]
 
 
-@pytest.mark.parametrize(
-    ("topic", "said"),
-    [("lending", "waits on members"), ("ghost", "does not exist")],
-)
-def test_a_first_step_the_graph_forbids_is_refused(tmp_path, topic, said):
-    bad = {"steps": [{"topic": topic, "action": "Do it.", "why": "Because."}]}
-    assert said in fail_at(tmp_path / "tree", start=bad)
+def test_a_first_step_naming_no_topic_is_refused(tmp_path):
+    bad = {"steps": [{"topic": "ghost", "action": "Do it.", "why": "Because."}]}
+    assert "does not exist" in fail_at(tmp_path / "tree", start=bad)
 
 
 def test_a_later_step_may_build_on_an_earlier_one(tmp_path):
@@ -205,6 +201,7 @@ def test_a_render_that_dies_leaves_no_entry_page_on_a_fresh_tree(tmp_path, monke
 def test_the_estimate_counts_what_runs_and_says_research_is_excluded():
     said = pipeline.call_estimate(FakeLLM([]))
     assert "5 in all" in said and "3 still to come (connect, consider, start)" in said
+    assert "plus 0 to 3 repair calls" in said
     assert "exclude" in said and "Research" in said
 
 

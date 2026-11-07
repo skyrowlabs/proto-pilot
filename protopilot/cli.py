@@ -496,8 +496,8 @@ def plan_command(
                 f"{target} already holds this plan at depth {existing.depth or 'none (offline baseline)'}, "
                 "and a re-render cannot change that. Drop --depth, or pick another --dir."
             )
-        _plan_step(STORE.create(idea, direction), target, lambda j: pipeline.rerender(j, target))
-        return
+        result = _plan_step(STORE.create(idea, direction), target, lambda j: pipeline.rerender(j, target))
+        sys.exit(0 if result.ok else 1)
 
     if not yes and not _stdin_is_terminal():
         # `click.prompt` would abort on EOF, and wait forever on a pipe nobody writes to.
@@ -523,7 +523,9 @@ def plan_command(
     _echo(f"\n  -> {target}\n")
     if not yes:
         draft = _review_outline(draft)
-    _plan_step(job, target, lambda j: pipeline.build(j, target, draft, llm))
+    result = _plan_step(job, target, lambda j: pipeline.build(j, target, draft, llm))
+    if not result.ok:
+        sys.exit(1)  # the tree is handed back, as `proto new`'s floor hands one back
 
 
 @main.command()

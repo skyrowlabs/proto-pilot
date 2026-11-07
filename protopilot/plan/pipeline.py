@@ -10,17 +10,24 @@ Three halves, as `generation` has two, so a front end can stop between them:
 on one job and share one event list. Nothing reaches disk until every pass has
 worked, so a failed pass leaves no tree: `existing_plan` treats any plan.json as
 finished, and only a whole one is ever written.
+
+`repaired` verifies before the render, against pages drawn in memory, so repair
+only ever edits data. `_hand_back` writes, then reads the tree and checks again. A
+plan still red is handed back with a RUNBOOK, `finished` says `ok=False`, and the
+CLI exits 1, as `proto new`'s floor does. A failed pass is a different thing: a
+pass that returns nothing a plan can hold leaves no tree at all.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 from protopilot.llm import LLM, OfflineLLM
-from protopilot.plan import baseline, render
+from protopilot.plan import baseline, render, verify
 from protopilot.plan.model import DEFAULT_DEPTH, Depth, Plan, plan_path
-from protopilot.plan.passes import connect, consider, outline, run_pass, scope, start
+from protopilot.plan.passes import connect, consider, outline, repair, run_pass, scope, start
 
 #: Every model call a run makes, in order; the review sits after `BEFORE_REVIEW`.
 PASSES = (scope, outline, connect, consider, start)
@@ -30,6 +37,16 @@ RENDER = "render"
 
 class PlanRefused(Exception):
     """The target cannot take a plan; the message says why, for a person."""
+
+
+@dataclass
+class Checked:
+    """Where verification left a plan: the verdict, the checks it took, and what repair tried."""
+
+    plan: Plan
+    verdict: verify.PlanVerdict
+    attempts: int
+    tried: list[str]
 
 
 def existing_plan(tree: Path, idea: str, direction: str = "") -> Plan | None:
@@ -86,7 +103,9 @@ def call_estimate(llm: LLM) -> str:
     if llm.offline:
         return f"Estimated model calls: 0, because this run is offline. {excluded}"
     ahead = [module.NAME for module in PASSES if module not in BEFORE_REVIEW]
-    return f"Estimated model calls: {len(PASSES)} in all, {len(ahead)} still to come ({', '.join(ahead)}). {excluded}"
+    repairs = f"plus 0 to {repair.ATTEMPTS} repair calls, only if verification finds something repair can fix"
+    still = f"{len(ahead)} still to come ({', '.join(ahead)})"
+    return f"Estimated model calls: {len(PASSES)} in all, {still}, {repairs}. {excluded}"
 
 
 def scoped(job, llm: LLM, depth: Depth | None = None) -> Plan:
@@ -112,14 +131,102 @@ def _refuse_if_taken(job, tree: Path) -> None:
         raise PlanRefused(f"{tree} gained a plan while this one was being made; leaving it alone")
 
 
-def _drawn(plan: Plan, tree: Path) -> list[str]:
+def _drawn(plan: Plan, tree: Path, runbook: str) -> list[str]:
     try:
-        return render.write(plan, tree)
+        return render.write(plan, tree, runbook)
     except render.PageBlocked as exc:
         raise PlanRefused(str(exc)) from exc
 
 
-def build(job, tree: Path, plan: Plan, llm: LLM) -> None:
+def _verified(job, plan: Plan, attempt: int, of: int) -> verify.PlanVerdict:
+    """One verification and its events, against the pages this plan draws."""
+    job.log(f"  verify (attempt {attempt})...")
+    job.event("verify_started", attempt=attempt, of=of)
+    result = verify.verdict(plan, render.render(plan))
+    if result.ok:
+        job.log("    no check failed")
+        job.event("verify_passed", attempt=attempt, summary=result.summary, no_subject=result.named(verify.NO_SUBJECT))
+    else:
+        job.log(f"    failed at {result.stage}: {result.summary}")
+        job.event("verify_failed", attempt=attempt, stage=result.stage, summary=result.summary)
+    return result
+
+
+def _repair_once(job, llm: LLM, checked: Checked, rejection: str) -> str | None:
+    """One repair, folded into `checked`. Returns why it was thrown away, "" if it landed, None to stop."""
+    plan, result, attempt = checked.plan, checked.verdict, checked.attempts
+    label = f"attempt {attempt} ({result.stage})"
+    if not repair.fixable(result):
+        out_of_reach = ", ".join(result.named(verify.FAILED))
+        job.log(f"    repair cannot reach {out_of_reach}")
+        checked.tried.append(f"{label}: repair cannot reach {out_of_reach}, so none ran")
+        return None
+    job.log("  pass repair...")
+    job.event("repair_started", attempt=attempt, stage=result.stage)
+    try:
+        after = run_pass(repair, plan, llm, repair.failure(result, rejection))
+    except Exception as exc:  # noqa: BLE001 -- a failed repair is an outcome
+        job.log(f"    repair pass failed: {exc}")
+        job.event("repair_failed", attempt=attempt, error=str(exc))
+        checked.tried.append(f"{label}: the repair pass failed: {exc}")
+        return None
+    change = repair.changes(plan, after)
+    if not change:
+        notes = "offline mode cannot repair; rerun without --offline" if llm.offline else "the repair changed nothing"
+        job.log(f"    repair produced no changes: {notes}")
+        job.event("repair_empty", attempt=attempt, notes=notes)
+        checked.tried.append(f"{label}: {notes}")
+        return None
+    reason = repair.rejected(plan, after)
+    if reason:
+        job.log(f"    rejected: {reason}")
+        job.event("repair_rejected", attempt=attempt, reason=reason)
+        checked.tried.append(f"{label}: rejected, because {reason}")
+        return reason
+    job.log(f"    {change}")
+    job.event("repair_done", attempt=attempt, files=[], notes=change)
+    checked.tried.append(f"{label}: {change}")
+    checked.plan = after
+    return ""
+
+
+def repaired(job, plan: Plan, llm: LLM) -> Checked:
+    """Verify, and on red repair and verify again, up to `repair.ATTEMPTS` times, then stop."""
+    checked = Checked(plan, _verified(job, plan, 1, repair.ATTEMPTS), 1, [])
+    rejection: str | None = ""
+    while not checked.verdict.ok and checked.attempts <= repair.ATTEMPTS and rejection is not None:
+        rejection = _repair_once(job, llm, checked, rejection)
+        if rejection is not None:
+            checked.attempts += 1
+            checked.verdict = _verified(job, checked.plan, checked.attempts, repair.ATTEMPTS)
+    if not checked.verdict.ok:
+        job.event("exhausted", attempts=checked.attempts, stage=checked.verdict.stage)
+    return checked
+
+
+def _hand_back(job, tree: Path, names: list[str], checked: Checked, save: bool) -> verify.PlanVerdict:
+    """Write the plan, whatever colour it is, then judge what landed, which is the run's verdict."""
+    plan = checked.plan
+
+    def runbook(result: verify.PlanVerdict) -> str:
+        return "" if result.ok else verify.runbook(result, checked.attempts, checked.tried)
+
+    def written() -> tuple[None, list[str]]:
+        saved = [str(plan.save(tree).relative_to(tree))] if save else []
+        return None, [*saved, *_drawn(plan, tree, runbook(checked.verdict))]
+
+    _pass(job, RENDER, names, written)
+    landed = verify.verdict(plan, render.read(tree))
+    if checked.verdict.ok and not landed.ok:
+        job.log(f"    the written tree failed at {landed.stage}: {landed.summary}")
+        job.event("verify_failed", attempt=checked.attempts, stage=landed.stage, summary=landed.summary)
+        job.event("exhausted", attempts=checked.attempts, stage=landed.stage)
+        _drawn(plan, tree, runbook(landed))
+    _finish(job, tree, plan, landed, checked.attempts)
+    return landed
+
+
+def build(job, tree: Path, plan: Plan, llm: LLM) -> verify.PlanVerdict:
     """Everything after the review, whether a person approved it or nobody was asked."""
     tree = Path(tree)
     _refuse_if_taken(job, tree)
@@ -127,44 +234,46 @@ def build(job, tree: Path, plan: Plan, llm: LLM) -> None:
 
     for module in (connect, consider, start):
         plan = _model_pass(job, module, plan, llm)
+    checked = repaired(job, plan, llm)
     # Again, because those passes take minutes. What is left is the instant between
     # here and the save's rename, in which another run's plan would still be replaced.
     _refuse_if_taken(job, tree)
-
-    def written() -> tuple[None, list[str]]:
-        saved = plan.save(tree)
-        return None, [str(saved.relative_to(tree)), *_drawn(plan, tree)]
-
-    _pass(job, RENDER, _names(), written)
-    _finish(job, tree, plan)
+    return _hand_back(job, tree, _names(), checked, save=True)
 
 
-def _finish(job, tree: Path, plan: Plan) -> None:
+def _finish(job, tree: Path, plan: Plan, result: verify.PlanVerdict, attempts: int) -> None:
     if not plan.researched:
         job.log("Not researched: nothing here was checked against a source.")
-    job.log(f"\nPlan at {tree}. Start with {render.PLAN_FILE}.")
-    job.event("finished", ok=True, attempts=0, project_dir=str(tree), run_hint="")
+    if result.ok:
+        job.log(result.summary)
+        job.log(f"\nPlan at {tree}. Start with {render.PLAN_FILE}.")
+    else:
+        job.log(f"Not verified: red at {result.stage} after {attempts} check(s).")
+        job.log(f"\nThe tree is at {tree}, and what is still wrong is written down in {render.RUNBOOK_FILE}.")
+    job.event("finished", ok=result.ok, attempts=attempts, project_dir=str(tree), run_hint="")
 
 
-def rerender(job, tree: Path) -> None:
-    """Draw the plan already in `tree` again. No pass runs, so no model is called."""
+def rerender(job, tree: Path) -> verify.PlanVerdict:
+    """Verify the plan already in `tree` and draw it again. No model, so no repair: plan.json may be hand-edited."""
     tree = Path(tree)
     job.project_dir = str(tree)
-    job.log(f"{tree} already holds this plan; drawing it again, with no model call.")
+    job.log(f"{tree} already holds this plan; checking it and drawing it again, with no model call.")
     job.event("plan", passes=[RENDER])
     plan = Plan.load(tree)
-    _pass(job, RENDER, [RENDER], lambda: (None, _drawn(plan, tree)))
-    _finish(job, tree, plan)
+    result = _verified(job, plan, 1, 1)
+    tried = [] if result.ok else ["A re-render calls no model, so no repair ran."]
+    if not result.ok:
+        job.event("exhausted", attempts=1, stage=result.stage)
+    return _hand_back(job, tree, [RENDER], Checked(plan, result, 1, tried), save=False)
 
 
-def run_plan(job, tree: Path, llm: LLM | None = None, depth: Depth | None = None) -> None:
+def run_plan(job, tree: Path, llm: LLM | None = None, depth: Depth | None = None) -> verify.PlanVerdict:
     """Every half with nobody asked, or a re-render of the plan already in `tree`."""
     tree = Path(tree)
     if existing_plan(tree, job.idea, job.direction) is not None:
-        rerender(job, tree)
-        return
+        return rerender(job, tree)
     llm = llm or OfflineLLM()
-    build(job, tree, outlined(job, llm, scoped(job, llm, depth)), llm)
+    return build(job, tree, outlined(job, llm, scoped(job, llm, depth)), llm)
 
 
 def after_failure(tree: Path) -> str:

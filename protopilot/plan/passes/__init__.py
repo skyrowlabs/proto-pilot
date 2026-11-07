@@ -75,12 +75,12 @@ def topics_block(topics: list[Topic], *fields: str) -> str:
     return "## The topics\n\n```json\n" + json.dumps(rows, indent=2, ensure_ascii=False) + "\n```"
 
 
-def run_pass(module: ModuleType, plan: Plan, llm: LLM) -> Plan:
-    """Produce a pass's output and fold it into a new plan, or raise."""
+def run_pass(module: ModuleType, plan: Plan, llm: LLM, *context: str) -> Plan:
+    """Produce a pass's output and fold it into a new plan, or raise. `context` goes to `build`."""
     if llm.offline:
         data = module.offline(plan)
     else:
-        system, user = module.build(plan)
+        system, user = module.build(plan, *context)
         data = llm.structured(system=system, user=user, schema=module.schema(plan), label=module.NAME)
     try:
         return module.apply(plan, data)

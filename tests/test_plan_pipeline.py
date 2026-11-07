@@ -11,7 +11,7 @@ from click.testing import CliRunner
 from protopilot import cli
 from protopilot.console import progress
 from protopilot.jobs import Job
-from protopilot.plan import pipeline, render
+from protopilot.plan import pipeline, render, verify
 from protopilot.plan.model import Plan, Topic, plan_path
 
 pytestmark = [pytest.mark.unit]
@@ -70,6 +70,7 @@ def test_a_fresh_run_emits_the_whole_sequence_in_order(tmp_path):
     pipeline.run_plan(job, tree)
     passes = [(n, i) for i, n in enumerate(["scope", "outline", "connect", "consider", "start"], start=1)]
     sequence = [e for e in events(job) if e["kind"] != "outline"]
+    plan = Plan.load(tree)
     assert sequence == [
         {"kind": "plan", "passes": [name for name, _ in passes] + ["render"]},
         *(
@@ -77,9 +78,16 @@ def test_a_fresh_run_emits_the_whole_sequence_in_order(tmp_path):
             for name, index in passes
             for kind, extra in (("pass_started", {}), ("pass_done", {"files": []}))
         ),
+        {"kind": "verify_started", "attempt": 1, "of": 3},
+        {
+            "kind": "verify_passed",
+            "attempt": 1,
+            "summary": verify.verdict(plan, render.render(plan)).summary,
+            "no_subject": ["sources_fetched", "dreams_shaped", "dreams_apart"],
+        },
         {"kind": "pass_started", "name": "render", "index": 6, "of": 6},
         {"kind": "pass_done", "name": "render", "index": 6, "of": 6, "files": [PLAN_JSON, *PAGES]},
-        {"kind": "finished", "ok": True, "attempts": 0, "project_dir": str(tree), "run_hint": ""},
+        {"kind": "finished", "ok": True, "attempts": 1, "project_dir": str(tree), "run_hint": ""},
     ]
 
 
@@ -131,7 +139,11 @@ def test_a_render_that_dies_reports_pass_failed_and_never_finishes(tmp_path):
     with pytest.raises(pipeline.PlanRefused):
         pipeline.run_plan(job, tree)
 
-    assert kinds(job) == [("plan", ""), ("pass_started", "render"), ("pass_failed", "render")]
+    assert [k for k in kinds(job) if k[0] != "verify_started" and k[0] != "verify_passed"] == [
+        ("plan", ""),
+        ("pass_started", "render"),
+        ("pass_failed", "render"),
+    ]
     failed = events(job)[-1]
     assert (failed["index"], failed["of"]) == (1, 1)
     assert "PLAN.md" in failed["error"]

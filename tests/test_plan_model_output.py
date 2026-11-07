@@ -37,6 +37,12 @@ def refused(tree: Path, **overrides: object) -> str:
     return str(caught.value)
 
 
+def red(tree: Path, **overrides: object) -> str:
+    """The floor's account of a run the fake model has no repair for."""
+    assert not pipeline.run_plan(job_for(), tree, FakeLLM(script(**overrides))).ok
+    return (tree / "RUNBOOK.md").read_text(encoding="utf-8")
+
+
 def snapshot(tree: Path) -> dict[str, bytes]:
     return {str(p.relative_to(tree)): p.read_bytes() for p in sorted(tree.rglob("*")) if p.is_file()}
 
@@ -270,8 +276,8 @@ CHAIN = {"edges": [edge("lending", "members"), edge("tools", "lending"), edge("t
         (["members", "tools"], "step 2 (tools) waits on lending, space"),
     ],
 )
-def test_a_step_ahead_of_its_dependency_is_refused(tmp_path, order, said):
-    assert said in refused(tmp_path / "tree", connect=CHAIN, start={"steps": [step(t) for t in order]})
+def test_a_step_ahead_of_its_dependency_reaches_the_verifier(tmp_path, order, said):
+    assert said in red(tmp_path / "tree", connect=CHAIN, start={"steps": [step(t) for t in order]})
 
 
 def test_a_step_may_follow_every_topic_it_waits_on(tmp_path):
@@ -303,8 +309,8 @@ def test_a_partial_cycle_is_kept_for_the_verifier_and_only_the_walk_keeps_steps_
 
 
 @pytest.mark.parametrize("topic", ["lending", "space", "tools"])
-def test_a_step_inside_a_partial_cycle_or_behind_one_is_refused(tmp_path, topic):
-    assert "waits on" in refused(tmp_path / "tree", connect=LOOP, start={"steps": [step(topic)]})
+def test_a_step_inside_a_partial_cycle_or_behind_one_reaches_the_verifier(tmp_path, topic):
+    assert "waits on" in red(tmp_path / "tree", connect=LOOP, start={"steps": [step(topic)]})
 
 
 def test_a_cycle_over_every_topic_fails_connect_before_consider_is_spent(tmp_path):
@@ -561,8 +567,8 @@ def test_identical_edges_collapse_and_different_kinds_do_not(tmp_path):
     assert [(e.from_topic, e.kind) for e in plan.edges] == [("lending", "depends-on"), ("lending", "informs")]
 
 
-def test_the_same_topic_twice_in_start_is_refused(tmp_path):
-    said = refused(tmp_path / "tree", start={"steps": [step("members"), step("space"), step("members")]})
+def test_the_same_topic_twice_in_start_reaches_the_verifier(tmp_path):
+    said = red(tmp_path / "tree", start={"steps": [step("members"), step("space"), step("members")]})
     assert "step 3 (members) repeats a topic" in said
 
 
