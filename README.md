@@ -115,7 +115,7 @@ back a link you click and a terminal app has no link.
 |---|---|
 | `proto new IDEA` | generate, boot, verify, hand it back |
 | `proto add CHANGE` | amend the spec, regenerate, re-verify |
-| `proto plan IDEA` | ask a model for a scope, an outline you review, connections, risks and first steps, and write a plan folder; nothing is researched or verified yet |
+| `proto plan IDEA` | ask a model for a scope, an outline you review, connections, risks and first steps, and write a plan folder with its structure checked; nothing is researched yet |
 | `proto up` / `down` / `logs` / `test` | the obvious things |
 | `proto spec` | what this project actually promised |
 | `proto archetypes` | what shapes this build can generate, and what each asks |
@@ -289,8 +289,8 @@ does not abandon a generation that is most of the way done. Override with
 **The direction changed on 2026-11-06.** proto.pilot is becoming a planning tool,
 and the prototyping described here is tabled: it works, and gets upkeep but no new
 features. [`docs/ideas/plans-first.md`](docs/ideas/plans-first.md) has why.
-`proto plan` calls a model and writes a plan folder, but does no research, dreaming
-or verification yet, so every plan it writes is stamped *Not researched*.
+`proto plan` calls a model, writes a plan folder and checks its structure, but does
+no research or dreaming yet, so every plan it writes is stamped *Not researched*.
 
 Early, and honest about it. Known gaps, in the order they will bite:
 
