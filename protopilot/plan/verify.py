@@ -196,6 +196,22 @@ def findings_traced(plan: Plan, pages: Pages) -> CheckResult:
     return _judged("findings_traced", subject, problems, advice, "The plan has no findings to trace.")
 
 
+def _borrowed(plan: Plan) -> list[str]:
+    """Each cited finding whose source its own topic's research never fetched. No ledger, no subject."""
+    if not plan.research:
+        return []
+    urls = {source.id: ledger.normal(source.url) for source in plan.sources}
+    problems = []
+    for topic in plan.topics:
+        record = plan.research_of(topic.slug)
+        own = {ledger.normal(f.url) for f in record.fetches if f.usable} if record else set()
+        for finding in topic.findings:
+            stray = sorted(i for i in finding.source_ids if not finding.assumption and i in urls and urls[i] not in own)
+            if stray:
+                problems.append(f"topic {topic.slug} cites {', '.join(stray)}, which its own research never fetched")
+    return problems
+
+
 def sources_fetched(plan: Plan, pages: Pages) -> CheckResult:
     """Every source was fetched with usable content during this run, not typed by the model.
 
@@ -211,6 +227,7 @@ def sources_fetched(plan: Plan, pages: Pages) -> CheckResult:
             problems.append(f"source {source.id} ({source.url}) has no usable fetch in this run's ledger{typed}")
     if plan.researched and not plan.sources:
         problems.append("the plan says it was researched, and it holds no source")
+    problems += _borrowed(plan)
     advice = "Only a research run can record a fetch, so remove the source or research it."
     return _judged("sources_fetched", plan.sources, problems, advice, "The plan has no sources to check.")
 

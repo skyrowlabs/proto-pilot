@@ -11,7 +11,8 @@ not the page, so a citation shows that summary was read, never that a claim is i
 The transcripts live in `.protopilot/research/`, beside the reviewed outline a resumed
 run starts from. `reconciled` redraws each record's fetches from its transcript, so a
 `fetched: true` typed into plan.json, or a fetch typed into the ledger, earns nothing.
-A forged transcript is beyond any check here.
+A forged transcript is beyond any check here. `normal` keeps http/https, `www.`, `:443`
+and `%7E` apart, which errs toward calling a citation an assumption: a ruling, for now.
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
 from protopilot.llm import LLMError, stream_events
-from protopilot.plan.model import Fetch, Plan
+from protopilot.plan.model import Fetch, Plan, TopicResearch
 from protopilot.spec import SPEC_DIR
 
 RESEARCH_DIR = f"{SPEC_DIR}/research"
@@ -35,7 +36,14 @@ FAILED_TEXT = (
     re.compile(r"response body was not retrieved", re.IGNORECASE),
     re.compile(r"\b(?:could not|couldn't|cannot|can't|unable to) (?:find|read|access|retrieve) any", re.IGNORECASE),
     re.compile(r"\bnot readable text\b", re.IGNORECASE),
+    re.compile(r"\bstatus code [45]\d\d\b", re.IGNORECASE),
+    re.compile(r"\b[45]\d\d (?:Forbidden|Not Found|Unauthorized|Gone|Too Many Requests|Bad Gateway)\b", re.IGNORECASE),
+    re.compile(r"\b(?:page|file) not found\b", re.IGNORECASE),
+    re.compile(r"\baccess denied\b", re.IGNORECASE),
+    re.compile(r"\bjust a moment\b|\benable javascript\b", re.IGNORECASE),
 )
+#: What a record says when its evidence is gone, so a hand edit reads as what it is.
+NO_EVIDENCE = "its transcript is missing, renamed or altered, so nothing it fetched counts"
 
 
 def normal(url: str) -> str:
@@ -156,18 +164,46 @@ def forget_draft(tree: Path) -> None:
         (research_dir(tree) / DRAFT_FILE).unlink(missing_ok=True)
 
 
+def _evidence(record: TopicResearch, tree: Path) -> list[Fetch] | None:
+    """The fetches in this topic's own transcript, or None if it is not there as written."""
+    if record.transcript != transcript_name(record.topic):
+        return None
+    path = research_dir(tree) / record.transcript
+    if path.is_symlink() or not path.is_file():
+        return None
+    said = path.read_text(encoding="utf-8", errors="replace")
+    if digest(said) != record.sha256:
+        return None
+    try:
+        return fetches(said)
+    except LLMError:
+        return None
+
+
+def cites_own(plan: Plan, slug: str, found: list[Fetch]) -> bool:
+    """Whether a finding of `slug` cites a source that this topic's own fetches back."""
+    usable = {normal(fetch.url) for fetch in found if fetch.usable}
+    urls = {source.id: normal(source.url) for source in plan.sources}
+    topic = next((t for t in plan.topics if t.slug == slug), None)
+    findings = topic.findings if topic else []
+    return any(urls.get(i) in usable for f in findings if not f.assumption for i in f.source_ids)
+
+
 def reconciled(plan: Plan, tree: Path) -> Plan:
-    """`plan` with each record's fetches drawn again from its transcript; a missing or edited one holds none."""
+    """`plan` with each record's fetches and state drawn again from its own transcript, never from plan.json.
+
+    An honest failure needs no evidence and stays one. Any other record without its
+    transcript is a failure that says so, and `researched` follows the records.
+    """
     records = []
     for record in plan.research:
-        if not record.transcript:
+        found = _evidence(record, tree)
+        if found is None and record.state == "failed" and not record.transcript:
             records.append(record.model_copy(update={"fetches": []}))
-            continue
-        path = research_dir(tree) / Path(record.transcript).name
-        said = None if path.is_symlink() or not path.is_file() else path.read_text(encoding="utf-8", errors="replace")
-        try:
-            found = fetches(said) if said is not None and digest(said) == record.sha256 else []
-        except LLMError:
-            found = []
-        records.append(record.model_copy(update={"fetches": found}))
-    return plan.revised(research=[r.model_dump() for r in records])
+        elif found is None:
+            records.append(record.model_copy(update={"fetches": [], "state": "failed", "failure": NO_EVIDENCE}))
+        else:
+            state = "researched" if cites_own(plan, record.topic, found) else "nothing cited"
+            records.append(record.model_copy(update={"fetches": found, "state": state, "failure": ""}))
+    researched = any(r.state == "researched" for r in records) if records else plan.researched
+    return plan.revised(research=[r.model_dump() for r in records], researched=researched)
