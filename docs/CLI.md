@@ -145,7 +145,7 @@ outside the tree. A green run removes only a runbook this tool wrote.
 ## A plan on the app commands
 
 `proto plan` lists its folder on this machine as kind `plan`, once `plan.json` lands,
-whether the plan is green or red. A plan made before plans were listed joins the list
+whether the plan is green or red, and even when a page could not be drawn. A plan made before plans were listed joins the list
 the next time `proto plan` redraws it.
 
 | Command | On a plan |
@@ -159,8 +159,9 @@ the next time `proto plan` redraws it.
 
 What a folder is comes from its own files, never from the list: a `spec.json` there
 makes it an app, and a `plan.json` a plan. A folder holding neither, including one
-whose research stopped before `plan.json` was written, is refused by `proto rm`.
-An app and a plan made from one idea share a slug, so the second one listed gets `_2`.
+whose research stopped before `plan.json` was written, is refused by `proto rm`, and
+so are `/` and any folder that is or holds your home or the list itself. Two folders
+never share a slug in the list: one whose slug is taken is listed as `_2`, `_3`.
 
 ## `proto dream`
 

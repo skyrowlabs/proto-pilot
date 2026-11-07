@@ -329,15 +329,18 @@ HTML opener in plan text.
   stays.
 - **A plan tree is registered, and is not an app.** `build` records it as kind
   `plan`, with no port, once `plan.json` lands, green or red; a re-render records a
-  plan made before plans were listed, and keeps an entry's date. What a tree is comes
-  from its own files (`registry.tree_kind`), never from the index: `spec.json` is an
-  app, `plan.json` a plan, and anything else is not ours, so a tree with
-  only research in progress is neither. `proto ls` lists a plan with no port or state,
-  `proto rm` deletes it with no Docker call, and `up`, `down`, `test`, `add`, `reset`,
-  `logs`, `spec` and `export` refuse it in a sentence that says what to do instead.
-  `proto serve` lists it read-only, and asks the tree too. A slug another path holds
-  is recorded with `_2`, `_3`, because the web finds an entry by slug. `proto console` lists no saved trees at all, so a
-  plan does not appear there.
+  plan made before plans were listed, and keeps an entry's date. What a verb does to
+  a tree comes from the tree's own files (`registry.tree_kind`), never from the index,
+  in the CLI and the web alike: `spec.json` is an app, `plan.json` a plan, and anything
+  else is not ours, so a tree with only research in progress is neither. The index's
+  kind is only displayed: `proto ls` prints it in a column, and reads an entry whose
+  tree no longer matches it as `gone`. `proto ls` lists a plan with no port or state,
+  `proto rm` deletes it with no Docker call, `down --all` passes over it, and `up`,
+  `down`, `test`, `add`, `reset`, `logs`, `spec` and `export` refuse it in a sentence
+  that says what to do instead. `proto serve` shows it read-only, and every route that
+  acts asks the tree first. A slug another path holds is recorded with `_2`, `_3`,
+  because the web finds an entry by slug. `proto console` lists no saved trees at
+  all, so it was left unchanged and a plan does not appear there.
 
 ## Critical Patterns
 
@@ -404,6 +407,18 @@ with no resources to label reads as coverage and is not. `proto prune` is about
 the *registry* rather than Docker and applies to any tree. What remains open is
 what these commands should *say* for a `tui` project, and that is in
 [`NOTES.md`](../NOTES.md), not here.
+
+### The registry is shared, so it is written whole and under a lock
+
+`projects.json` is written by every `proto new`, `proto plan`, `rm` and `prune`, and
+read by `proto serve` while they run. Each load-modify-save holds an exclusive
+`flock` on `projects.json.lock` beside it, so two writers never lose each other's
+entry, and `save` writes a temporary file and renames it over, so a reader never
+sees half of one. `registry.delete` is reached from an HTTP handler with a slug in
+the URL, so it trusts no caller: it refuses a tree that is neither an app nor a
+plan, `/`, and any path that is or holds your home or the registry file. The web's
+delete confirm reads its text from a `data-confirm` attribute, never from inline
+script, so a quote in a name cannot run.
 
 ### A skipped verification stage is reported as skipped
 
