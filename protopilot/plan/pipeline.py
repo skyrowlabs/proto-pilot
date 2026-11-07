@@ -598,14 +598,18 @@ def _refuse_if_blocked(plan: Plan, tree: Path) -> None:
 
 
 def _held(tree: Path) -> Plan:
-    """The plan in `tree`, refused unless green: a dream extends a plan that holds, so fix that first."""
+    """The plan in `tree`, refused unless green: a dream extends a plan that holds, so fix that first.
+
+    It is the plan as its transcripts tell it, so a verb that saves never writes back a forged state.
+    """
     if not plan_path(tree).exists():
         raise PlanRefused(f"{tree} holds no plan. `proto plan` makes one; a dream needs a plan to extend.")
     try:
         plan = Plan.load(tree)
     except (OSError, ValueError) as exc:
         raise PlanRefused(f"{plan_path(tree)} cannot be read as a plan: {exc}") from exc
-    result = verify.verdict(ledger.reconciled(plan, tree), render.render(plan))
+    plan = ledger.reconciled(plan, tree)
+    result = verify.verdict(plan, render.render(plan))
     if not result.ok:
         raise PlanRefused(
             f"{tree} holds a plan that fails its checks, so nothing was changed and no model was called. "
@@ -640,7 +644,7 @@ def _land(job, tree: Path, before: Plan, checked: Checked, names: list[str]) -> 
             f"Nothing was changed, because the result failed its checks.\n{checked.verdict.report()}{tried}"
         )
     try:
-        moved = Plan.load(tree) != before
+        moved = ledger.reconciled(Plan.load(tree), tree) != before
     except (OSError, ValueError):
         moved = True
     if moved:

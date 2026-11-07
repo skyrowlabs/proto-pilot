@@ -211,3 +211,68 @@ def test_the_pipeline_refuses_to_resume_offline(tmp_path):
 )
 def test_a_failure_said_in_words_is_not_usable(text: str):
     assert not ledger.judged(URL, text, None, False).usable
+
+
+# -- the second round -----------------------------------------------------
+
+
+def flipped(tmp_path: Path) -> Path:
+    tree = researched_tree(tmp_path, {"money": LLMError("net")})
+    edited(tree, lambda d: topic(d, "money").update(state="researched", failure=""))
+    return tree
+
+
+@pytest.mark.parametrize("verb", ["drop", "promote"])
+def test_a_dream_verb_saves_the_reconciled_state_never_a_forged_one(tmp_path, verb: str):
+    tree = flipped(tmp_path)
+    if verb == "drop":
+        assert pipeline.drop(job_for(), tree, "d1", "not for us").ok
+    else:
+        answer = {"edges": [], "risks": [], "unknowns": [], "decisions": []}
+        assert pipeline.promote(job_for(), tree, "d1", ResearchingLLM([answer], {})).ok
+    assert Plan.load(tree).research_of("money").state == "failed"  # type: ignore[union-attr]
+    assert render.TOPIC_RESEARCHED not in (tree / "topics" / "money.md").read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    ("text", "said"),
+    [
+        ("# Heading", "\\# Heading"),
+        ("+ item", "\\+ item"),
+        ("- item", "\\- item"),
+        ("=== rule", "\\=== rule"),
+        ("> quote", "\\> quote"),
+        ("1. first", "1\\. first"),
+        ("12) twelfth", "12\\) twelfth"),
+        ("~~~ fence", "\\~\\~\\~ fence"),
+        ("a ~~strike~~", "a \\~\\~strike\\~\\~"),
+        ("a - b + c # d 1. e", "a - b + c # d 1. e"),
+    ],
+)
+def test_md_text_escapes_what_opens_a_block_at_the_start_of_a_line(text: str, said: str):
+    assert render.md_text(text) == said
+
+
+def test_a_fence_in_a_cited_finding_keeps_its_citation(tmp_path):
+    said = transcript(findings=[cited("~~~"), assumed(), assumed("Other.")])
+    tree = tmp_path / "tree"
+    assert pipeline.run_plan(job_for(), tree, ResearchingLLM(script(), {"members": said})).ok
+    assert "- \\~\\~\\~ (sources: s1)" in (tree / "topics" / "members.md").read_text(encoding="utf-8")
+
+
+def used(name: str) -> str:
+    use = {"type": "tool_use", "id": "toolu_x", "name": name, "input": {}}
+    line = json.dumps({"type": "assistant", "message": {"content": [use]}}) + "\n"
+    head, rest = transcript().split("\n", 1)
+    return f"{head}\n{line}{rest}"
+
+
+@pytest.mark.parametrize("name", ["Bash", "mcp__drive__search", "Write"])
+def test_a_stream_that_used_any_tool_but_the_webs_is_thrown_away(name: str):
+    with pytest.raises(LLMError, match=f"used {name}"):
+        research_result(used(name), "r")
+
+
+@pytest.mark.parametrize("name", ["WebFetch", "WebSearch", "StructuredOutput"])
+def test_the_webs_tools_and_structured_output_may_be_used(name: str):
+    assert research_result(used(name), "r")["findings"]
