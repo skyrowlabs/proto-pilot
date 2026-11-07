@@ -329,11 +329,108 @@ nothing.
 Read in the other order this is a doc that mislabels which stage fires. The
 useful consequence: a blank-screen regression reported at `tests` is the normal
 path and not evidence that `paint` is broken.
+## How a prototype is built
+
+For `proto new`, which is tabled: it works and gets upkeep only.
+
+idea
+      -> spec.json          typed, small, reviewed by a human
+      -> the target's skeleton   copied, never generated
+      -> five passes        each fed the previous pass's real source
+      -> started and driven  observed, not assumed
+      -> repair loop        bounded, with a floor
+
+Five decisions carry most of the weight.
+
+**The stack is fixed, not chosen.** Per target, and never per idea. The
+terminal target is Textual over SQLAlchemy 2.0 and one SQLite file, in one
+process. The web target is FastAPI, server-rendered Jinja, SQLAlchemy 2.0,
+Postgres, and Pillow so a prototype can draw its own images instead of
+hotlinking one. Neither has a JS build step, a CDN or migrations. A generator
+that picks a stack per idea produces N unrunnable variants and you debug all of
+them.
+
+Everything in `skeleton/<target>/` is copied byte for byte into every app, so
+it is debugged once rather than once per prototype — the Dockerfile, the
+compose file and the stylesheet on the web side; `app/main.py`, `app/db.py`,
+`app/base.py` and the test harness on both. Which tree a spec gets is
+`spec.target`, and a target owns rather more than the tree — fifteen things,
+where the design predicted four. Six of the eleven it did not predict are
+sentences this tool prints about itself that turned out to be true only of
+Docker: a port, a URL, `make up`, "Container logs".
+[What a target owns](#what-a-target-owns) has the contract.
+
+**The model can only write a handful of paths**, and the list belongs to the
+target. On the web target: `app/models.py`, `app/routes.py`, `app/seed.py`,
+`app/templates/*.html` (except `base.html`), and `tests/test_smoke.py`. On the
+terminal target: `app/models.py`, `app/screens.py`, `app/seed.py`,
+`app/widgets.py`, `app/app.tcss` and `tests/test_smoke.py`. Everything else is
+refused by `files.py` before it reaches disk — and `files.py` holds no list of
+its own, so a second target cannot inherit the wrong one by default. Model
+output is data, not authority, and the parts of the tree that are known to work
+are the parts the model must not be able to touch.
+
+Enforcing that takes two guards. `files.py` decides what the model's *answer*
+may write, and `llm.ISOLATION` decides what the process producing that answer
+can do — the `claude-code` backend shells out to a CLI that has a filesystem
+and a shell by default, so without the second guard the first one is a rule
+about JSON rather than about the disk.
+
+**Tests are generated before the code they test.** The pass order is
+`schema -> smoke -> seed -> routes -> ui` on the web target and
+`schema -> smoke -> seed -> screens -> ui` on the terminal one. Smoke tests come
+second, generated from the spec, when nothing they test exists yet — so they
+describe what was asked for rather than what got built, and the fourth pass is
+handed them as its target. Tests written after the code describe whatever the
+code happened to do.
+
+**Each pass reads the previous pass's real source**, not a description of it.
+A routes pass told "there is a Trip model" invents a field name; one handed
+`models.py` does not. The UI pass goes last and gets `routes.py`, because a
+template referencing a context key no route passes is the single most common
+way a generated app 500s.
+
+**Nothing is handed back unobserved.** On the web target `verify.py` brings the
+stack up, waits on `/healthz` (which checks the database, so it stays red while
+Postgres is still coming up), runs the smoke suite inside the container, and
+captures the logs — `build -> health -> tests -> browser`. On the terminal
+target `verify_tui.py` imports the tree, starts it under `App.run_test`, drives
+it, runs the smoke suite and compares the rendered screen buffer to that of an
+application with nothing in it — `import -> boot -> tests -> paint`, with no
+daemon, no port and no health race. On red, the repair pass gets the stage, the
+output, whatever the app printed and every generated file, and returns a
+minimal patch. Three attempts.
+
+Then a floor: if it cannot get to green, the tree is handed back anyway with a
+`RUNBOOK.md` saying exactly which stage is red, what the last error was, and
+what was tried. A prototype whose broken shape you know beats a mystery, and
+both beat a loop that never terminates.
+
+One guard the prompt cannot enforce: if a repair shrinks the smoke suite, the
+file is reverted. Green because there is nothing left to fail is the only
+failure mode here that nobody would notice.
+
+The last stage exists because every other one is blind to what was drawn. On
+the web target `/healthz` returns 200 for a page that paints nothing and the
+smoke suite runs through an in-process client that never executes a script tag,
+so with the `browser` extra installed there is a stage that loads every screen
+for real; without Playwright it is skipped and reported as skipped, never as
+green. The terminal target's equivalent is two strings — the app's screen
+buffer against an empty application's — so it needs no extra, is never skipped,
+and is the same check on every machine.
+
+On the terminal target that last stage is a **backstop rather than the first
+line**, and it is worth knowing which fires. `skeleton/tui/tests/test_boots.py`
+already asserts a non-empty buffer, and it is skeleton, so every generated tree
+carries it — a blank app goes red at `tests`, one stage earlier. `paint` catches
+the case the tree's own suite cannot: an app that mounts, answers every query
+and shows nothing, with a smoke suite that never thought to look.
+
 ## Decisions and Their Reasons
 
 - **The five load-bearing decisions** — fixed stack, the write guard, tests
   before code, each pass reading real source, nothing handed back unobserved —
-  are argued in [`README.md`](../README.md#how-it-works).
+  are argued in [How a prototype is built](#how-a-prototype-is-built).
 - **What is unfinished, and what bit us** — [`NOTES.md`](../NOTES.md), the live
   parking lot, including traps that are fixed but worth knowing.
 - **Planned work** — [`TODO/README.md`](TODO/README.md). A new plan goes

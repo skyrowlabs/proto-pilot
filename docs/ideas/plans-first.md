@@ -45,5 +45,4 @@ that tests a plan's riskiest assumption is the most likely way to earn that back
 
 The parked plans ([Improvement Loop](../TODO/improvement-loop.md),
 [Drawing Freedom](../TODO/drawing-freedom.md)) wait on this direction. The README
-keeps describing `proto new` as the working command, with a pointer here, until
-`proto plan` exists: until then, describing it as the product would be false.
+leads with `proto plan` now that it calls a model, and says what it does not do yet.
