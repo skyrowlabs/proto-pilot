@@ -6,6 +6,10 @@ The registry is a flat JSON file of every project this machine has generated:
 enough to list them, relaunch one, and notice when a directory has been
 deleted out from under it.
 
+Two kinds share it: an `app` from `proto new`, and a `plan` from `proto plan`,
+which has no port and nothing to run. An entry written before kinds existed is
+an app, because only apps were registered then.
+
 Deliberately not a database. It is a list of paths.
 """
 
@@ -17,7 +21,11 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from protopilot.plan.model import plan_path
 from protopilot.spec import SPEC_DIR, SPEC_FILENAME
+
+APP = "app"
+PLAN = "plan"
 
 
 def _state_home() -> Path:
@@ -34,13 +42,29 @@ class Entry:
     slug: str
     name: str
     path: str
-    port: int
+    # None for a plan: nothing in it listens.
+    port: int | None
     created_at: str
     idea: str = ""
+    kind: str = APP
 
     @property
     def exists(self) -> bool:
-        return (Path(self.path) / SPEC_DIR / SPEC_FILENAME).exists()
+        return tree_kind(Path(self.path)) == self.kind
+
+
+def tree_kind(path: Path) -> str | None:
+    """What a directory holds by our own files: `app`, `plan`, or None when it is not ours.
+
+    Asked of the tree, never of the registry, because a command is run inside a tree
+    and a guard that trusted an index would delete whatever the index named.
+    """
+    root = Path(path)
+    if (root / SPEC_DIR / SPEC_FILENAME).exists():
+        return APP
+    if plan_path(root).exists():
+        return PLAN
+    return None
 
 
 def load() -> list[Entry]:
@@ -68,7 +92,7 @@ def save(entries: list[Entry]) -> None:
     path.write_text(json.dumps([asdict(e) for e in entries], indent=2) + "\n")
 
 
-def record(*, slug: str, name: str, path: Path, port: int, idea: str = "") -> Entry:
+def record(*, slug: str, name: str, path: Path, port: int | None, idea: str = "", kind: str = APP) -> Entry:
     """Add or update one project, keyed by resolved path."""
     resolved = str(Path(path).resolve())
     entries = [e for e in load() if e.path != resolved]
@@ -79,6 +103,7 @@ def record(*, slug: str, name: str, path: Path, port: int, idea: str = "") -> En
         port=port,
         created_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         idea=idea,
+        kind=kind,
     )
     entries.insert(0, entry)
     save(entries)
@@ -102,27 +127,32 @@ class NotAProject(ValueError):
 
 
 def delete(path: Path, runner=None) -> None:
-    """Stop the stack, drop its data, and remove the tree. Irreversible.
+    """Stop an app's stack and drop its data, then remove the tree. Irreversible.
 
     Guarded rather than trusting the caller: this is reached from an HTTP
     handler with a slug in the URL, and the difference between deleting a
     prototype and deleting a home directory is one bad lookup. A directory
-    without a spec in it is not ours and is never removed.
+    holding neither our spec nor our plan is not ours and is never removed.
+    A plan has no stack, so it goes with no Docker call at all.
     """
     import shutil
     import subprocess
 
     root = Path(path).resolve()
-    if not (root / SPEC_DIR / SPEC_FILENAME).exists():
-        raise NotAProject(f"{root} has no {SPEC_DIR}/{SPEC_FILENAME}; refusing to delete")
+    kind = tree_kind(root)
+    if kind is None:
+        raise NotAProject(
+            f"{root} has no {SPEC_DIR}/{SPEC_FILENAME} and no {plan_path(root).relative_to(root)}; refusing to delete"
+        )
     if root.parent == root or root == Path.home():
         raise NotAProject(f"{root} is not a safe path to delete")
 
-    call = runner or (lambda argv, cwd: subprocess.call(argv, cwd=cwd))  # noqa: S603
-    try:
-        call(["docker", "compose", "down", "-v"], str(root))
-    except OSError:
-        # No daemon, or never started. The tree still goes.
-        pass
+    if kind == APP:
+        call = runner or (lambda argv, cwd: subprocess.call(argv, cwd=cwd))  # noqa: S603
+        try:
+            call(["docker", "compose", "down", "-v"], str(root))
+        except OSError:
+            # No daemon, or never started. The tree still goes.
+            pass
     shutil.rmtree(root, ignore_errors=True)
     forget(root)

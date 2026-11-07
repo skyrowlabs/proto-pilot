@@ -32,6 +32,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TypeVar
 
+from protopilot import registry
 from protopilot.llm import LLM, LLMError, OfflineLLM, ResearchUnavailable, research_result
 from protopilot.plan import baseline, dreaming, ledger, render, verify
 from protopilot.plan.lenses import LENSES, Lens
@@ -470,7 +471,17 @@ def build(job, tree: Path, plan: Plan, llm: LLM, dream: bool = True, researching
     # Again, because those passes take minutes. What is left is the instant between
     # here and the save's rename, in which another run's plan would still be replaced.
     _refuse_if_taken(job, tree)
-    return _hand_back(job, tree, names, checked, save=True)
+    result = _hand_back(job, tree, names, checked, save=True)
+    _register(checked.plan, tree)
+    return result
+
+
+def _register(plan: Plan, tree: Path) -> None:
+    """List a landed plan, red or green, so `proto ls` and `proto rm` can find it; a listed one keeps its date."""
+    resolved = str(tree.resolve())
+    if any(e.path == resolved and e.kind == registry.PLAN for e in registry.load()):
+        return
+    registry.record(slug=plan.slug, name=plan.title, path=tree, port=None, idea=plan.idea, kind=registry.PLAN)
 
 
 def _research_account(plan: Plan) -> list[str]:
@@ -531,7 +542,9 @@ def rerender(job, tree: Path) -> verify.PlanVerdict:
     tried = [] if result.ok else [*earlier, *([] if earlier[-1:] == [RERENDER_TRIED] else [RERENDER_TRIED])]
     if not result.ok:
         job.event("exhausted", attempts=1, stage=result.stage)
-    return _hand_back(job, tree, [RENDER], Checked(plan, result, 1, tried), save=False)
+    verdict = _hand_back(job, tree, [RENDER], Checked(plan, result, 1, tried), save=False)
+    _register(plan, tree)  # a plan made before plans were listed joins the list here
+    return verdict
 
 
 def resume_refusal(

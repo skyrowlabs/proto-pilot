@@ -2,7 +2,8 @@
 
 Every route here is a thin wrapper over something the CLI already does. The
 CLI stays the reference implementation; this exists so a demo does not have to
-be a terminal.
+be a terminal. A plan from `proto plan` is listed read-only: it is made, and
+acted on, in a terminal.
 """
 
 from __future__ import annotations
@@ -159,6 +160,16 @@ def run_amend(
         log(f"red at {stage}; the tree is at {target}")
 
 
+def _plan_summary(root: Path) -> str:
+    """What the plan says it is, or why it cannot say: a page must not 500 on a hand-edited plan.json."""
+    from protopilot.plan.model import Plan
+
+    try:
+        return Plan.load(root).summary()
+    except (OSError, ValueError) as exc:
+        return f"plan.json cannot be read: {exc}"
+
+
 def create_app(workspace: Path, backend: str | None = None, demo: bool = True) -> FastAPI:
     app = FastAPI(title="proto-pilot")
     workspace = Path(workspace).resolve()
@@ -226,6 +237,8 @@ def create_app(workspace: Path, backend: str | None = None, demo: bool = True) -
         entry = next((e for e in registry.load() if e.slug == slug), None)
         if entry is None:
             return RedirectResponse("/", status_code=303)
+        if entry.kind != registry.APP:
+            return RedirectResponse(f"/projects/{slug}", status_code=303)
         job = STORE.create(f"[change] {change.strip()}", "")
         STORE.run(
             job,
@@ -258,6 +271,12 @@ def create_app(workspace: Path, backend: str | None = None, demo: bool = True) -
             for p in root.rglob("*")
             if p.is_file() and not {"__pycache__", ".git", ".pytest_cache"} & set(p.parts)
         )
+        if entry.kind != registry.APP:
+            return TEMPLATES.TemplateResponse(
+                request,
+                "plan.html",
+                {"entry": entry, "files": files, "summary": _plan_summary(root), "demo": demo},
+            )
         show_tests = bool(tests) or not demo
         hidden = sum(1 for f in files if is_test_path(f))
         if not show_tests:
@@ -283,6 +302,9 @@ def create_app(workspace: Path, backend: str | None = None, demo: bool = True) -
         entry = next((e for e in registry.load() if e.slug == slug), None)
         if entry is None:
             return RedirectResponse("/", status_code=303)
+        if entry.kind != registry.APP:
+            # Read-only here: a plan has no stack, and is deleted with `proto rm`.
+            return RedirectResponse(f"/projects/{slug}", status_code=303)
         if action == "up":
             _compose(entry, "up", "-d", "--build")
         elif action == "down":

@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Turn an idea into a running app</h1>
-<p class="muted small">Generates a FastAPI + Postgres prototype, boots it in Docker, and verifies it before handing back a URL.</p>
+<p class="muted small">Generates a FastAPI + Postgres prototype, boots it in Docker, and verifies it before handing back a URL.
+To plan an idea instead, run <code>proto plan "an idea"</code> in a terminal; its plans are listed below, read-only.</p>
 
 {% if not docker_ok %}<div class="card" style="border-color:var(--bad)"><strong>Docker unavailable</strong><div class="small muted">{{ docker_why }}</div></div>{% endif %}
 
@@ -16,16 +17,18 @@
   </form>
 </div>
 
-<h2>Saved prototypes</h2>
+<h2>Saved apps and plans</h2>
 {% if projects %}
-<table><tr><th>Name</th><th>Port</th><th>Created</th><th></th></tr>
+<table><tr><th>Name</th><th>Kind</th><th>Port</th><th>Created</th><th></th></tr>
 {% for p in projects %}
 <tr><td><a href="/projects/{{ p.slug }}">{{ p.name }}</a><div class="muted small">{{ p.idea[:70] }}</div></td>
-<td class="small">:{{ p.port }}</td><td class="muted small">{{ p.created_at[:16].replace("T"," ") }}</td>
-<td class="row" style="gap:6px"><a class="btn small" href="http://localhost:{{ p.port }}" target="_blank" rel="noopener">open</a>
+<td class="small">{{ p.kind }}</td>
+<td class="small">{% if p.kind == "app" %}:{{ p.port }}{% else %}&ndash;{% endif %}</td><td class="muted small">{{ p.created_at[:16].replace("T"," ") }}</td>
+{% if p.kind == "app" %}<td class="row" style="gap:6px"><a class="btn small" href="http://localhost:{{ p.port }}" target="_blank" rel="noopener">open</a>
 <form method="post" action="/projects/{{ p.slug }}/delete"
       onsubmit="return confirm('Delete {{ p.name }} and everything in {{ p.path }}?\n\nThis cannot be undone.')">
-  <button type="submit" class="small" style="border-color:var(--bad);color:var(--bad)">delete</button></form></td></tr>
+  <button type="submit" class="small" style="border-color:var(--bad);color:var(--bad)">delete</button></form></td>
+{% else %}<td class="muted small">read-only</td>{% endif %}</tr>
 {% endfor %}</table>
 {% else %}<div class="empty">Nothing generated yet.</div>{% endif %}
 

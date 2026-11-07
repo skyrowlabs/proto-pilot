@@ -121,9 +121,23 @@ def _parse_answers(archetype_name: str, given: tuple[str, ...]) -> dict[str, str
     return out
 
 
+#: What to do with a plan instead, for every verb that only an app can answer.
+PLAN_INSTEAD = (
+    "Read PLAN.md there; `proto plan` with the same idea checks it and draws it again, "
+    "`proto dream` adds to its dreams, and `proto rm` deletes it."
+)
+
+
 def _project(directory: str | None) -> Path:
+    """The app this verb acts on; a plan is refused by name, with what to do instead."""
     path = Path(directory or ".").resolve()
-    if not (path / SPEC_DIR / SPEC_FILENAME).exists():
+    kind = registry.tree_kind(path)
+    if kind == registry.PLAN:
+        verb = click.get_current_context().info_name or "this"
+        raise click.ClickException(
+            f"{path} is a plan, not an app, so there is nothing to `proto {verb}`. {PLAN_INSTEAD}"
+        )
+    if kind is None:
         raise click.ClickException(f"{path} is not a proto-pilot project (no {SPEC_DIR}/{SPEC_FILENAME})")
     return path
 
@@ -182,7 +196,7 @@ def _down_all(purge: bool) -> None:
     is gone are `proto gc`'s job -- stopping them here would half-clean them
     and leave the volume, which is the state that is hardest to notice.
     """
-    alive = [e for e in registry.load() if e.exists]
+    alive = [e for e in registry.load() if e.kind == registry.APP and e.exists]
     if not alive:
         _echo("nothing to stop")
         return
@@ -977,7 +991,7 @@ def list_targets() -> None:
 
 @main.command(name="ls")
 def list_projects() -> None:
-    """List every prototype generated on this machine.
+    """List every app and plan generated on this machine.
 
     Read-only. This used to call `prune()`, which deletes every entry whose
     directory has gone -- so looking at the list was enough to empty it, and
@@ -987,20 +1001,25 @@ def list_projects() -> None:
     """
     entries = registry.load()
     if not entries:
-        _echo('no prototypes yet -- `proto new "an idea"`')
+        _echo('no prototypes yet -- `proto plan "an idea"` makes a plan, `proto new "an idea"` an app')
         return
 
-    running = containers.running_paths(SubprocessRunner())
+    # Only an app can be up, so Docker is asked only when one is listed.
+    apps = any(e.kind == registry.APP for e in entries)
+    running = containers.running_paths(SubprocessRunner()) if apps else set()
     width = max(len(e.slug) for e in entries)
     missing = 0
     for entry in entries:
         if not entry.exists:
             state, missing = "gone", missing + 1
+        elif entry.kind != registry.APP:
+            state = "-"
         elif entry.path in running:
             state = "up"
         else:
             state = "down"
-        _echo(f"  {state:<5} {entry.slug:<{width}}  :{entry.port}  {entry.path}")
+        port = f":{entry.port}" if entry.kind == registry.APP else "-"
+        _echo(f"  {state:<5} {entry.kind:<4}  {entry.slug:<{width}}  {port:<5}  {entry.path}")
 
     _echo(f"\n  {len(entries)} prototype(s)")
     if missing:
@@ -1090,16 +1109,29 @@ def gc(yes: bool, dry_run: bool) -> None:
 @click.option("--dir", "directory", default=None)
 @click.option("--yes", "-y", is_flag=True)
 def remove_project(directory: str | None, yes: bool) -> None:
-    """Delete this prototype: containers, data and the tree."""
-    target = _project(directory)
-    spec = Spec.load(target)
-    if not yes and not click.confirm(f"Delete {spec.name} and everything in {target}?", default=False):
+    """Delete this prototype: an app's containers and data, then the tree. A plan has only the tree."""
+    target = Path(directory or ".").resolve()
+    if registry.tree_kind(target) == registry.PLAN:
+        name = _plan_title(target)
+    else:
+        name = Spec.load(_project(directory)).name
+    if not yes and not click.confirm(f"Delete {name} and everything in {target}?", default=False):
         raise click.Abort()
     try:
         registry.delete(target)
     except registry.NotAProject as exc:
         raise click.ClickException(str(exc)) from exc
     _echo(f"deleted {target}")
+
+
+def _plan_title(tree: Path) -> str:
+    """A plan's title for a prompt; a plan.json that will not read is still ours, so its folder names it."""
+    from protopilot.plan.model import Plan
+
+    try:
+        return Plan.load(tree).title
+    except (OSError, ValueError):
+        return tree.name
 
 
 @main.command(name="export")
