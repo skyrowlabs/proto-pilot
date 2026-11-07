@@ -201,8 +201,9 @@ Comes before research because it needs no tools and can be judged on offline out
 - [x] `proto dream [dir]`, `--lens`, merging into the existing pool
 - [x] `proto dream promote <id>` and `proto dream drop <id> --why "…"`
 - [x] `--no-dream` on `proto plan`
-- [ ] Judge one real idea by hand: are the lenses producing different dreams, and does
-      the evaluation separate them? (~operator)
+- [x] Judge one real idea by hand: are the lenses producing different dreams, and does
+      the evaluation separate them? (~operator) Ruled 2026-11-07 by Jeston, on the tool
+      library run (17 dreams): the lenses differ, and the evaluation separates them.
 
 ## Phase 6 — Research
 
