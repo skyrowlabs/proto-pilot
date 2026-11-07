@@ -9,7 +9,7 @@ import pytest
 from pydantic import ValidationError
 from pydantic_core import ErrorDetails
 
-from protopilot.plan.model import Dream, Edge, Finding, Plan, Source, Step, Topic, plan_path
+from protopilot.plan.model import MAX_SLUG_LENGTH, Dream, Edge, Finding, Plan, Source, Step, Topic, plan_path
 
 pytestmark = [pytest.mark.unit]
 
@@ -212,3 +212,18 @@ def test_save_creates_the_directory_and_keeps_non_ascii_readable(tmp_path):
     text = path.read_text(encoding="utf-8")
     assert '"title": "工具 café"' in text
     assert text.endswith("}\n")
+
+
+def test_a_topic_slug_too_long_for_a_filename_is_refused_by_the_model():
+    with pytest.raises(ValueError):
+        Topic(slug="y" * 300, title="T", why="W")
+
+
+def test_the_slug_limit_is_inclusive_on_topics_and_plans():
+    at_limit, over = "y" * MAX_SLUG_LENGTH, "y" * (MAX_SLUG_LENGTH + 1)
+    assert Topic(slug=at_limit, title="T", why="W").slug == at_limit
+    assert Plan(slug=at_limit, title="T", idea="i").slug == at_limit
+    with pytest.raises(ValidationError):
+        Topic(slug=over, title="T", why="W")
+    with pytest.raises(ValidationError):
+        Plan(slug=over, title="T", idea="i")

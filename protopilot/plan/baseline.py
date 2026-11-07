@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 
-from protopilot.plan.model import Edge, Finding, Plan, Step, Topic
+from protopilot.plan.model import MAX_SLUG_LENGTH, Edge, Finding, Plan, Step, Topic
 
 #: Words that open an idea without naming it, dropped from the directory name.
 FILLER = frozenset({"a", "an", "and", "build", "create", "for", "make", "of", "start", "the", "to"})
@@ -126,7 +126,8 @@ def slug_for(idea: str) -> str:
     if not words:
         return FALLBACK_SLUG
     slug = "_".join(words)
-    return slug if slug[0].isalpha() else f"{FALLBACK_SLUG}_{slug}"
+    slug = slug if slug[0].isalpha() else f"{FALLBACK_SLUG}_{slug}"
+    return slug[:MAX_SLUG_LENGTH].rstrip("_")
 
 
 def _topic(idea: str, slug: str, title: str, why: str, findings, risk: str, unknown: str, decision: str) -> Topic:

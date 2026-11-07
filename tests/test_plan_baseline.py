@@ -7,7 +7,7 @@ from graphlib import TopologicalSorter
 import pytest
 
 from protopilot.plan import baseline, render
-from protopilot.plan.model import Plan
+from protopilot.plan.model import MAX_SLUG_LENGTH, Plan
 from protopilot.spec import SLUG_RE
 
 pytestmark = [pytest.mark.unit]
@@ -152,3 +152,15 @@ def test_no_direction_means_no_constraints():
 
 def test_the_title_capitalises_the_first_letter_and_nothing_else():
     assert baseline.build_plan("a Tool library").title == "A Tool library"
+
+
+def test_a_one_word_idea_longer_than_a_filename_still_gives_a_valid_directory_name():
+    assert len(baseline.slug_for("y" * 300).encode()) <= 255
+
+
+@pytest.mark.parametrize("idea", ["y" * 300, "y" * 63 + " zed", "1" * 300, "yy " * 40])
+def test_a_long_idea_gives_a_slug_the_model_accepts(idea):
+    slug = baseline.slug_for(idea)
+    assert len(slug) <= MAX_SLUG_LENGTH
+    assert not slug.endswith("_")
+    assert baseline.build_plan(idea).slug == slug

@@ -323,3 +323,11 @@ def test_a_rerender_leaves_everything_but_stale_topic_pages_alone(tmp_path):
     after = snapshot(tree)
     assert {name: after.get(name) for name in kept} == kept
     assert "topics/risks.md" not in after
+
+
+def test_a_directory_named_like_a_page_does_not_stop_a_rerender(tmp_path):
+    tree = tmp_path / "tree"
+    pipeline.run_plan(Job(id="1", idea="x"), tree)
+    (tree / "topics" / "drafts.md").mkdir()
+    pipeline.run_plan(Job(id="2", idea="x"), tree)
+    assert (tree / "topics" / "drafts.md").is_dir()

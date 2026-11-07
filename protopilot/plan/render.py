@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from protopilot.plan.model import Dream, Edge, Finding, Plan, Topic
+from protopilot.plan.model import Dream, Edge, Finding, Plan, Source, Topic
 
 PLAN_FILE = "PLAN.md"
 DREAMS_FILE = "dreams.md"
@@ -69,27 +69,34 @@ def _plan_page(plan: Plan) -> str:
     )
 
 
-def _finding_line(finding: Finding) -> str:
-    """Anything without a source reads as an assumption, whatever its flag says."""
+def _finding_line(finding: Finding, known_sources: set[str]) -> str:
+    """Anything no real source backs reads as an assumption, whatever its flag says."""
     cited = f" (sources: {', '.join(finding.source_ids)})" if finding.source_ids else ""
-    label = "**Assumption:** " if finding.assumption or not finding.source_ids else ""
+    backed = known_sources.intersection(finding.source_ids)
+    label = "**Assumption:** " if finding.assumption or not backed else ""
     return f"{label}{finding.text}{cited}"
 
 
 def _topic_page(plan: Plan, topic: Topic) -> str:
     titles = {t.slug: t.title for t in plan.topics}
     links = [_edge_line(e, titles) for e in _edges(plan) if topic.slug in (e.from_topic, e.to_topic)]
+    known_sources = {s.id for s in plan.sources}
     return _page(
         f"# {topic.title}",
         _stamp(plan),
         f"Part of [{plan.title}](../{PLAN_FILE}).",
         topic.why,
-        f"## Findings\n\n{_bullets([_finding_line(f) for f in topic.findings])}",
+        f"## Findings\n\n{_bullets([_finding_line(f, known_sources) for f in topic.findings])}",
         f"## Connections\n\n{_bullets(links)}",
         f"## Risks\n\n{_bullets(topic.risks)}",
         f"## Unknowns\n\n{_bullets(topic.unknowns)}",
         f"## Decisions to make\n\n{_bullets(topic.decisions)}",
     )
+
+
+def _whole_record(record: Dream | Source) -> tuple[str, str]:
+    """Id first, then every field, so a repeated id cannot leak plan.json's order."""
+    return record.id, record.model_dump_json()
 
 
 def _dream_block(dream: Dream, titles: dict[str, str]) -> str:
@@ -107,7 +114,7 @@ def _dream_block(dream: Dream, titles: dict[str, str]) -> str:
 
 def _dreams_page(plan: Plan) -> str:
     titles = {t.slug: t.title for t in plan.topics}
-    dreams = sorted(plan.dreams, key=lambda d: d.id)
+    dreams = sorted(plan.dreams, key=_whole_record)
     sections = (("Proposals", "proposed"), ("Set aside", "set-aside"), ("Not yet evaluated", None))
     blocks = []
     for heading, verdict in sections:
@@ -122,7 +129,7 @@ def _dreams_page(plan: Plan) -> str:
 
 
 def _sources_page(plan: Plan) -> str:
-    sources = [f"{s.id}: [{s.title}]({s.url})" for s in sorted(plan.sources, key=lambda s: s.id)]
+    sources = [f"{s.id}: [{s.title}]({s.url})" for s in sorted(plan.sources, key=_whole_record)]
     return _page("# Sources", _stamp(plan), _bullets(sources, empty="No sources."))
 
 
@@ -141,7 +148,7 @@ def write(plan: Plan, tree: Path) -> list[str]:
     topics = Path(tree) / TOPICS_DIR
     topics.mkdir(parents=True, exist_ok=True)
     for stale in topics.glob("*.md"):
-        if f"{TOPICS_DIR}/{stale.name}" not in pages:
+        if stale.is_file() and f"{TOPICS_DIR}/{stale.name}" not in pages:
             stale.unlink()
     for name, text in pages.items():
         (Path(tree) / name).write_text(text, encoding="utf-8")

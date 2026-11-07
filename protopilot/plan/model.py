@@ -17,6 +17,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from protopilot.spec import SLUG_RE, SPEC_DIR
 
 PLAN_FILENAME = "plan.json"
+#: A slug names a file or a directory, and a filesystem refuses a long one at write time.
+MAX_SLUG_LENGTH = 64
 
 EdgeKind = Literal["depends-on", "informs", "conflicts-with"]
 Verdict = Literal["proposed", "set-aside"]
@@ -25,6 +27,8 @@ Verdict = Literal["proposed", "set-aside"]
 def _checked_slug(value: str) -> str:
     if not SLUG_RE.fullmatch(value):
         raise ValueError(f"slug must be snake_case: {value!r}")
+    if len(value) > MAX_SLUG_LENGTH:
+        raise ValueError(f"slug must be at most {MAX_SLUG_LENGTH} characters: {value!r}")
     return value
 
 

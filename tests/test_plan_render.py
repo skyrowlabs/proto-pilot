@@ -169,6 +169,9 @@ def test_a_plan_with_no_dreams_says_dreaming_has_not_run():
         (False, ["s1", "s2"], "- Drills sit idle. (sources: s1, s2)"),
         (True, ["s1"], "- **Assumption:** Drills sit idle. (sources: s1)"),
         (True, [], "- **Assumption:** Drills sit idle."),
+        (False, ["ghost"], "- **Assumption:** Drills sit idle. (sources: ghost)"),
+        (False, ["ghost", "s1"], "- Drills sit idle. (sources: ghost, s1)"),
+        (False, ["s2", "s1"], "- Drills sit idle. (sources: s2, s1)"),
     ],
 )
 def test_a_finding_shows_its_label_and_its_citations(assumption, source_ids, expected):
@@ -177,6 +180,18 @@ def test_a_finding_shows_its_label_and_its_citations(assumption, source_ids, exp
 
 def test_an_uncited_finding_is_an_assumption_even_when_flagged_otherwise():
     assert finding_line(Finding(text="Drills sit idle.", assumption=False)) == "- **Assumption:** Drills sit idle."
+
+
+def test_sources_sharing_an_id_render_the_same_in_either_order():
+    a = Source(id="s1", title="A", url="https://example.test/a")
+    b = Source(id="s1", title="B", url="https://example.test/b")
+    assert render.render(sample(sources=[a, b])) == render.render(sample(sources=[b, a]))
+
+
+def test_dreams_sharing_an_id_render_the_same_in_either_order():
+    a = unevaluated()
+    b = a.model_copy(update={"title": "Another"})
+    assert render.render(sample(dreams=[a, b])) == render.render(sample(dreams=[b, a]))
 
 
 def test_sources_are_listed_with_their_links():
@@ -286,7 +301,7 @@ def test_dangling_references_render_as_their_raw_ids():
     assert "- ghost_a informs ghost_b\n- Members depends on ghost_topic" in pages["PLAN.md"]
     assert "1. **ghost_step:** Act. Because." in pages["PLAN.md"]
     assert "- Members depends on ghost_topic" in pages["topics/members.md"]
-    assert "- Cited. (sources: ghost_source)" in pages["topics/members.md"]
+    assert "- **Assumption:** Cited. (sources: ghost_source)" in pages["topics/members.md"]
     assert "- Extends: ghost_anchor" in pages["dreams.md"]
 
 
