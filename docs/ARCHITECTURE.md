@@ -176,16 +176,47 @@ HTML opener in plan text.
   drawn from it, and a re-render overwrites them, so an edit belongs in `plan.json`.
 - **Rendering is deterministic.** `render.py` uses no model and no clock, so one
   plan is one set of bytes; `tests/test_plan_render.py` holds that.
-- **A run is `scope`, `outline`, the review, `connect`, `consider`, `start`, `collect`,
-  `evaluate`, `propose`, verification, any repair, then render.** That is eight model
-  calls, five with `--no-dream`, and up to three repair calls, one module each in `protopilot/plan/passes/`. `pipeline.py` runs them on one job, in halves, so `proto plan` can stop for
+- **A run is `scope`, `outline`, the review, `research`, `connect`, `consider`, `start`,
+  `collect`, `evaluate`, `propose`, verification, any repair, then render.** That is eight
+  model calls plus one research call per topic, five with `--no-dream`, none for research
+  with `--no-research`, and up to three repair calls, one module each in `protopilot/plan/passes/`. `pipeline.py` runs them on one job, in halves, so `proto plan` can stop for
   scope's questions and the outline review. `--yes` skips both, and off a terminal
   it is required, `--offline` included, because a prompt there cannot be answered.
-- **Nothing is researched yet.** No research pass exists, so every plan
-  is stamped not researched, green or red. A pass's `apply` reads only the fields it
-  names, so none can set `researched`, `sources` or a finding: a model run's topics
-  have no findings, and an offline run's have only the baseline's assumptions.
-  `apply` refuses what a plan cannot hold, such as an edge or a step naming a missing
+- **Research is one tool-using call per topic, on the `claude-code` backend only.**
+  `ClaudeCodeLLM.research` holds `WebSearch` and `WebFetch` and nothing else, streams
+  `stream-json`, runs in an empty directory, and throws its answer away if the stream's
+  init event names any other tool or an MCP server. `structured()` and `ISOLATION` are
+  untouched. The api backend refuses research in a sentence, and `proto plan` refuses it
+  before any call unless `--no-research`; its web search has never been run here. The
+  offline twin reads nothing, so an offline plan stays stamped. `--depth` sets how many
+  findings a topic returns and pages it may read (`research.EFFORT`).
+- **A source is fetched only if this run's transcript says so.** `ledger.py` reads each
+  `WebFetch` and its result out of the stream, never from the model's citations, and
+  calls a fetch usable by a **heuristic**: a 2xx status where the CLI sends one, some
+  bytes, and text that does not read as a 403, an unfollowed redirect, or a summary
+  saying it read nothing. A failed fetch carries no error flag. `research.apply` makes a
+  finding cited only through a usable fetch of its URL; any other citation becomes an
+  assumption, its URL kept as `unfetched` for `sources.md`. `WebFetch` returns a model's
+  summary of a page, so a citation shows that summary was read, never that the claim is in
+  the source, and the green line says so.
+- **The ledger is redrawn from transcripts, so a hand edit cannot upgrade it.** Each
+  topic's raw stream lands in `.protopilot/research/<slug>.jsonl`, and its sha256 in
+  `plan.json`. `sources_fetched` reads the ledger and never `Source.fetched`, and
+  `rerender`, `_hand_back` and `_held` redraw the ledger from the transcripts first, so
+  `fetched: true`, or a fetch typed into the ledger, stays red. A forged transcript is
+  past any check here.
+- **Page text never reaches a later pass.** What does is the findings, bounded in count
+  and length by the research schema, as JSON under a note that they are untrusted data
+  (`findings_block`). Topic pages say per topic whether research ran, failed, cited
+  nothing, or never ran because a person promoted the topic from a dream.
+- **A failed topic costs only itself, and a stopped run resumes.** A topic whose call or
+  output fails is recorded `failed` and the run goes on. Before the first call the
+  reviewed outline is saved as `outline.json` beside the transcripts, and each topic's
+  transcript as it lands, so a run that stops, or fails at a later pass, resumes on
+  rerun: `resumable` finds the outline, and a topic with a transcript is replayed, not
+  asked again. The outline is removed once `plan.json` lands; the transcripts stay.
+- **A pass's `apply` reads only the fields it names**, so none but `research` can set
+  `researched`, `sources` or a finding. `apply` refuses what a plan cannot hold, such as an edge or a step naming a missing
   topic. Order is the verifier's: a step ahead of its dependency lands in the plan and
   goes red at `start_order`.
 - **Dreams are guesses, kept apart from the plan.** A `Dream` lives in `plan.json` and
@@ -228,9 +259,9 @@ HTML opener in plan text.
   so one check judges the pages drawn in memory and the pages read back from disk, and
   all of them always run. A check ends passed, failed or no subject, and no subject
   proved nothing. `green_line` builds its sentence from what held: *coherent and
-  traceable* needs `findings_traced` and `sources_fetched` both to hold, which no
-  run earns until research records a fetch, so green today says the structure holds
-  and that nothing traces to a source.
+  traceable* needs `findings_traced` and `sources_fetched` both to hold, which only a
+  researched plan earns; otherwise green says the structure holds and that nothing
+  traces to a source.
 - **Repair reaches links and steps, and nothing else.** On red, `repaired` runs
   `protopilot/plan/passes/repair.py` up to three times, against pages drawn in memory,
   so repair only ever edits data. Its `apply` is `connect`'s then `start`'s, and `FIXES`
@@ -253,11 +284,11 @@ HTML opener in plan text.
 - **The baseline is the offline twin.** `baseline.py` builds a generic plan from the
   idea's words, and each pass's `offline` slices it. It always has the same six
   topics, so `--depth`, which asks for 4, 6 or 8, is refused on an offline backend.
-- **Nothing reaches disk until render.** `plan.json` saves atomically, then the pages
+- **Nothing but research reaches disk until render.** `plan.json` saves atomically, then the pages
   follow. In a fresh tree `PLAN.md` goes last, so holding it means holding every page;
   over an old one a red plan draws it first, so a write that dies midway leaves it
-  marked. A failed plan pass leaves no tree, and a rerun starts from scope, losing any
-  review edits. A render that fails after that save keeps `plan.json`, so a rerun
+  marked. A failed plan pass leaves no tree unless research had begun, and a rerun
+  starts from scope, losing any review edits; with research begun it resumes. A render that fails after that save keeps `plan.json`, so a rerun
   redraws it. **That order covers `PLAN.md` alone:** a write dying mid-render can leave
   old topic pages, unmarked, which is why `after_failure` says any page may be out of
   date and points at the rerun.
@@ -265,7 +296,8 @@ HTML opener in plan text.
   needs neither `--yes` nor a terminal. Another idea, direction or `--depth` is refused.
   `plan.json` may be hand-edited, so `rerender` judges it as it stands, and red takes
   the floor and exits 1. With no model there is no repair, so a red tree's rerun never
-  retries one: a fresh attempt means removing the tree.
+  retries one: a fresh attempt means removing the tree. Its runbook keeps what the
+  last run tried, and adds that the re-render repaired nothing.
 - **`render.write` never writes through what it did not make.** `_blockers` names a
   link, dangling or not, at a page path or at `topics/`, a directory at a page path, a
   read-only file, and a `RUNBOOK.md` that does not open with `RUNBOOK_MARK`, which is a person's. A
