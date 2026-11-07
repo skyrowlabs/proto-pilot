@@ -95,8 +95,34 @@ class Source(_Record):
     id: str
     title: str
     url: str
-    # False unless the run's ledger saw this URL return usable content, so a typed source is red.
+    # What research said when it made this source. The verifier reads the ledger, never this.
     fetched: bool = False
+
+
+#: `nothing cited` is a call that worked and cited no page it fetched, which is not research.
+ResearchState = Literal["researched", "failed", "nothing cited"]
+
+
+class Fetch(_Record):
+    """One `WebFetch` in a research transcript, and whether it brought back usable content."""
+
+    url: str
+    usable: bool
+    why: str = Field(default="", description="Why the heuristic called it unusable")
+
+
+class TopicResearch(_Record):
+    """One topic's research: the ledger drawn from its transcript, never from what the model said."""
+
+    topic: str
+    state: ResearchState
+    failure: str = ""
+    # The transcript's file under `.protopilot/research/`, and its hash, so an edit to either shows.
+    transcript: str = ""
+    sha256: str = ""
+    fetches: list[Fetch] = Field(default_factory=list)
+    # URLs a finding cited that no usable fetch backs; those findings were made assumptions.
+    unfetched: list[str] = Field(default_factory=list)
 
 
 class Finding(_Record):
@@ -176,6 +202,11 @@ class Plan(_Record):
     # plan.json omits the key. A failed dream costs the extras, never the plan.
     dream_failure: str = ""
     sources: list[Source] = Field(default_factory=list)
+    # The research ledger, one record per topic research was tried on. Empty for a plan never
+    # researched, and then plan.json omits it, as it omits `research_failure`.
+    research: list[TopicResearch] = Field(default_factory=list)
+    # Why research did not run at all, for `PLAN.md`.
+    research_failure: str = ""
 
     _slug = field_validator("slug")(_checked_slug)
 
@@ -198,6 +229,9 @@ class Plan(_Record):
             if edge.kind == "depends-on" and edge.from_topic in needs:
                 needs[edge.from_topic].add(edge.to_topic)
         return needs
+
+    def research_of(self, slug: str) -> TopicResearch | None:
+        return next((record for record in self.research if record.topic == slug), None)
 
     def summary(self) -> str:
         """What the outline checkpoint prints; a topic left out here is one nobody reviews."""
@@ -224,8 +258,9 @@ class Plan(_Record):
         data = self.model_dump(mode="json")
         if self.depth is None:
             del data["depth"]
-        if not self.dream_failure:
-            del data["dream_failure"]
+        for key in ("dream_failure", "research", "research_failure"):
+            if not data[key]:
+                del data[key]
         absent = [folder for folder in (path.parent, *path.parent.parents) if not folder.exists()]
         temp = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
         try:

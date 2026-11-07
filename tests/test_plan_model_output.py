@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from fakes import FakeLLM
 from plan_script import (
+    EVENT_NAMES,
     GOOD,
     IDEA,
     NO_REPAIR,
@@ -401,19 +402,20 @@ def test_an_offline_outline_event_has_no_depth_and_no_calls(tmp_path):
     assert event["estimate"].startswith("Estimated model calls: 0, because this run is offline.")
 
 
-def test_the_outline_event_sits_between_the_outline_and_connect_passes(tmp_path):
+def test_the_outline_event_sits_between_the_outline_and_research_passes(tmp_path):
     job = job_for()
     pipeline.run_plan(job, tmp_path / "tree", FakeLLM(script()))
     order = [(e["kind"], e.get("name", "")) for e in job.events]
     at = order.index(("outline", ""))
-    assert order[at - 1 : at + 2] == [("pass_done", "outline"), ("outline", ""), ("pass_started", "connect")]
+    assert order[at - 1 : at + 2] == [("pass_done", "outline"), ("outline", ""), ("pass_started", "research")]
+    assert order[order.index(("pass_done", "research")) + 1] == ("pass_started", "connect")
 
 
 def test_the_outline_event_survives_json_and_the_console_fold(tmp_path):
     job = job_for()
     pipeline.run_plan(job, tmp_path / "tree", FakeLLM(script()))
     assert json.loads(json.dumps(job.snapshot()))["events"] == job.events
-    assert [p.state for p in progress.fold(job.events).passes] == [progress.DONE] * (len(PASS_NAMES) + 1)
+    assert [p.state for p in progress.fold(job.events).passes] == [progress.DONE] * (len(EVENT_NAMES) + 1)
 
 
 def test_a_run_that_stops_at_the_outline_emits_no_outline_event(tmp_path):
@@ -445,7 +447,7 @@ def test_a_backend_failure_at_any_pass_is_a_failed_pass_and_no_tree(tmp_path, na
     with pytest.raises(LLMError, match="out of credit"):
         pipeline.run_plan(job, tree, DiesAt(name))
     failed = job.events[-1]
-    assert (failed["kind"], failed["name"], failed["index"]) == ("pass_failed", name, PASS_NAMES.index(name) + 1)
+    assert (failed["kind"], failed["name"], failed["index"]) == ("pass_failed", name, EVENT_NAMES.index(name) + 1)
     assert list(tmp_path.iterdir()) == []
     assert pipeline.after_failure(tree).startswith(f"Nothing was written to {tree}.")
 

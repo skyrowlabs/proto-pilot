@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from difflib import SequenceMatcher
 from typing import NamedTuple
 
-from protopilot.plan import render
+from protopilot.plan import ledger, render
 from protopilot.plan.model import DREAM_WORD_CAP, UNSPACED, Dream, Edge, Plan, dream_words
 from protopilot.verify import VerifyResult
 
@@ -197,12 +197,18 @@ def findings_traced(plan: Plan, pages: Pages) -> CheckResult:
 
 
 def sources_fetched(plan: Plan, pages: Pages) -> CheckResult:
-    """Every source was fetched with usable content during this run, not typed by the model."""
-    problems = [
-        f"source {source.id} ({source.url}) was never fetched with usable content"
-        for source in plan.sources
-        if not source.fetched
-    ]
+    """Every source was fetched with usable content during this run, not typed by the model.
+
+    The evidence is the research ledger, never `Source.fetched`, so typing `true` there earns
+    nothing. The pipeline redraws the ledger from the run's transcripts before a loaded plan
+    is checked, so typing a fetch into the ledger earns nothing either.
+    """
+    usable = ledger.usable_urls(plan)
+    problems = []
+    for source in plan.sources:
+        if ledger.normal(source.url) not in usable:
+            typed = ", though plan.json marks it fetched" if source.fetched else ""
+            problems.append(f"source {source.id} ({source.url}) has no usable fetch in this run's ledger{typed}")
     if plan.researched and not plan.sources:
         problems.append("the plan says it was researched, and it holds no source")
     advice = "Only a research run can record a fetch, so remove the source or research it."
@@ -381,7 +387,8 @@ def green_line(results: Iterable[CheckResult]) -> str:
         parts.append(f"Dreams are guesses, not findings: their checks read {' and '.join(read)}.")
     if "sources_fetched" in held:
         parts.append(
-            "A source retrieved this run proves a summary of it was read, not that a claim is in the original."
+            "Every source was fetched this run and read through a summary of the page, which is not the page: "
+            "a citation shows that summary was read, never that the claim is in the source."
         )
     return " ".join(parts)
 

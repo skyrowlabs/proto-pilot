@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
-from plan_script import PASS_NAMES
+from plan_script import EVENT_NAMES
 
 from protopilot import cli
 from protopilot.console import progress
@@ -69,19 +69,20 @@ class RenderBlocked(Job):
 def test_a_fresh_run_emits_the_whole_sequence_in_order(tmp_path):
     job, tree = job_for(), tmp_path / "tree"
     pipeline.run_plan(job, tree, dream=False)
-    passes = [(n, i) for i, n in enumerate(["scope", "outline", "connect", "consider", "start"], start=1)]
+    names = ["scope", "outline", "research", "connect", "consider", "start"]
+    passes = [(n, i) for i, n in enumerate(names, start=1)]
     sequence = [e for e in events(job) if e["kind"] != "outline"]
     plan = Plan.load(tree)
     assert sequence == [
         {"kind": "plan", "passes": [name for name, _ in passes] + ["render"]},
         *(
-            {"kind": kind, "name": name, "index": index, "of": 6, **extra}
+            {"kind": kind, "name": name, "index": index, "of": 7, **extra}
             for name, index in passes
             for kind, extra in (("pass_started", {}), ("pass_done", {"files": []}))
         ),
         {"kind": "verify_started", "attempt": 1, "of": 3},
-        {"kind": "pass_started", "name": "render", "index": 6, "of": 6},
-        {"kind": "pass_done", "name": "render", "index": 6, "of": 6, "files": [PLAN_JSON, *PAGES]},
+        {"kind": "pass_started", "name": "render", "index": 7, "of": 7},
+        {"kind": "pass_done", "name": "render", "index": 7, "of": 7, "files": [PLAN_JSON, *PAGES]},
         {
             "kind": "verify_passed",
             "attempt": 1,
@@ -120,7 +121,7 @@ def test_the_console_fold_reads_a_finished_run(tmp_path):
     job, tree = job_for(), tmp_path / "tree"
     pipeline.run_plan(job, tree)
     folded = progress.fold(job.events)
-    assert [(p.name, p.state) for p in folded.passes] == [(name, progress.DONE) for name in (*PASS_NAMES, "render")]
+    assert [(p.name, p.state) for p in folded.passes] == [(name, progress.DONE) for name in (*EVENT_NAMES, "render")]
     assert folded.passes[-1].files == [PLAN_JSON, *PAGES]
     assert (folded.finished, folded.ok, folded.gave_up) == (True, True, False)
     assert folded.project_dir == str(tree)

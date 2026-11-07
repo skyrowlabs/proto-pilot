@@ -13,6 +13,8 @@ SLUGS = ["members", "lending", "space", "tools", "money", "safety"]
 PLAN_PASS_NAMES = ["scope", "outline", "connect", "consider", "start"]
 DREAM_PASS_NAMES = ["collect", "evaluate", "propose"]
 PASS_NAMES = [*PLAN_PASS_NAMES, *DREAM_PASS_NAMES]
+#: The passes a run's events name, research among them: it calls `research`, not `structured`.
+EVENT_NAMES = [*PLAN_PASS_NAMES[:2], "research", *PLAN_PASS_NAMES[2:], *DREAM_PASS_NAMES]
 
 
 def outline_of(slugs: list[str]) -> dict:

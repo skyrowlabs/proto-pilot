@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from protopilot.plan import render
-from protopilot.plan.model import Dream, Edge, Finding, Plan, Source, Step, Topic
+from protopilot.plan.model import Dream, Edge, Finding, Plan, Source, Step, Topic, TopicResearch
 
 pytestmark = [pytest.mark.unit]
 
@@ -196,7 +196,7 @@ def test_dreams_sharing_an_id_render_the_same_in_either_order():
 
 def test_sources_are_listed_with_their_links():
     page = render.render(sample())["sources.md"]
-    assert "- s1: [First](https://example.test/1)\n- s2: [Second](https://example.test/2)\n" in page
+    assert "- s1: [First](https://example.test/1), cited by Members\n- s2: [Second](https://example.test/2)\n" in page
 
 
 def test_a_plan_with_no_sources_says_so():
@@ -212,10 +212,23 @@ def test_a_plan_that_never_said_is_stamped_on_every_page_but_dreams():
     assert stamped == set(pages) - {"dreams.md"}
 
 
-def test_researched_removes_the_stamp_and_changes_nothing_else():
-    stamped, researched = render.render(sample()), render.render(sample(researched=True))
+def every_topic_researched(**over) -> Plan:
+    plan = sample(researched=True, **over)
+    records = [TopicResearch(topic=t.slug, state="researched") for t in plan.topics]
+    return plan.revised(research=[r.model_dump() for r in records])
+
+
+def test_a_plan_researched_throughout_trades_the_stamp_for_what_a_citation_proves():
+    stamped, researched = render.render(sample()), render.render(every_topic_researched())
     assert not [name for name, text in researched.items() if "not researched" in text.lower()]
-    assert researched == {name: text.replace(f"{STAMP}\n\n", "") for name, text in stamped.items()}
+    assert researched["PLAN.md"] == stamped["PLAN.md"].replace(STAMP, render.RESEARCHED)
+    assert "read through a model's summary of the page" in researched["topics/members.md"]
+    assert "Every source here was fetched during this run" in researched["sources.md"]
+
+
+def test_a_flag_alone_does_not_make_a_topic_researched():
+    page = render.render(sample(researched=True))["PLAN.md"]
+    assert "These topics are **not researched**" in page and "Research did not run for it." in page
 
 
 def test_dreams_stay_labelled_unresearched_when_the_plan_is_researched():

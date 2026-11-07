@@ -13,7 +13,7 @@ import re
 from pathlib import Path
 
 from protopilot.plan.lenses import words as lens_words
-from protopilot.plan.model import RUBRIC, Dream, Edge, Finding, Plan, Source, Topic
+from protopilot.plan.model import RUBRIC, Dream, Edge, Finding, Plan, Source, Topic, TopicResearch
 
 PLAN_FILE = "PLAN.md"
 DREAMS_FILE = "dreams.md"
@@ -23,6 +23,16 @@ TOPICS_DIR = "topics"
 
 HEADER = "<!-- Rendered from .protopilot/plan.json. A re-render overwrites this file: do not edit it. -->"
 NOT_RESEARCHED = "> **Not researched.** Nothing here was checked against a source; every finding is an assumption."
+#: What a citation proves, said wherever one is drawn: the page was read through a summary of it.
+THROUGH_A_SUMMARY = (
+    "each read through a model's summary of the page, not the page itself, so a citation shows the "
+    "summary was read, never that the claim is in the source"
+)
+RESEARCHED = f"> **Researched.** Cited findings rest on pages fetched during this run, {THROUGH_A_SUMMARY}."
+TOPIC_RESEARCHED = (
+    f"> **Researched.** Cited findings rest on pages fetched during this run, {THROUGH_A_SUMMARY}. "
+    "Anything uncited is an assumption."
+)
 #: Opens every runbook this tool writes, and is how a green run tells one from a person's own.
 RUNBOOK_MARK = "<!-- Written by proto plan because this plan failed its checks. A green run removes this file. -->"
 NOT_VERIFIED = f"> **Not verified.** This plan failed its checks; [{RUNBOOK_FILE}]({RUNBOOK_FILE}) says what is wrong."
@@ -74,8 +84,42 @@ def _bullets(items: list[str], empty: str = "None recorded.") -> str:
     return "\n".join(f"- {item}" for item in items) or empty
 
 
+def topic_research(plan: Plan, topic: Topic) -> tuple[bool, str]:
+    """Whether this topic was researched, and if not, why, in a sentence."""
+    record: TopicResearch | None = plan.research_of(topic.slug)
+    if record is not None and record.state == "researched":
+        return True, ""
+    if record is not None and record.state == "failed":
+        return False, f"Research for this topic failed: {record.failure.rstrip('.')}."
+    if record is not None:
+        return False, "Research ran and cited no page it fetched."
+    if any(dream.promoted_to == topic.slug for dream in plan.dreams):
+        return False, "It was promoted from a dream, and a person's choice is not research."
+    if plan.research_failure:
+        return False, f"Research did not run: {plan.research_failure.rstrip('.')}."
+    return False, "Research did not run for it."
+
+
 def _stamp(plan: Plan) -> str:
-    return "" if plan.researched else NOT_RESEARCHED
+    """The entry page's word on research: whole, in part with each topic left out named, or not at all."""
+    if not plan.researched:
+        why = f"\n>\n> Research did not run: {plan.research_failure}" if plan.research_failure else ""
+        return NOT_RESEARCHED + why
+    left = [(t, topic_research(plan, t)) for t in plan.topics]
+    left = [f"> - {t.title}: {why}" for t, (done, why) in left if not done]
+    if not left:
+        return RESEARCHED
+    return "\n".join(
+        [RESEARCHED, ">", "> These topics are **not researched**, and every finding in them is an assumption:", *left]
+    )
+
+
+def _topic_stamp(plan: Plan, topic: Topic) -> str:
+    done, why = topic_research(plan, topic)
+    if not plan.researched:
+        failed = plan.research_of(topic.slug)
+        return f"{NOT_RESEARCHED} {why}" if failed is not None else NOT_RESEARCHED
+    return TOPIC_RESEARCHED if done else f"> **Not researched.** {why} Every finding here is an assumption."
 
 
 def _edges(plan: Plan) -> list[Edge]:
@@ -127,7 +171,7 @@ def _topic_page(plan: Plan, topic: Topic, verified: bool) -> str:
     known_sources = {s.id for s in plan.sources}
     return _page(
         f"# {topic.title}",
-        _stamp(plan),
+        _topic_stamp(plan, topic),
         "" if verified else NOT_VERIFIED_TOPIC,
         f"Part of [{plan.title}](../{PLAN_FILE}).",
         topic.why,
@@ -204,9 +248,48 @@ def _dreams_page(plan: Plan) -> str:
     )
 
 
+def _link_target(url: str) -> str:
+    """A URL that cannot close or break the markdown link it sits in."""
+    return url.replace(" ", "%20").replace("(", "%28").replace(")", "%29").replace("<", "%3C").replace(">", "%3E")
+
+
 def _sources_page(plan: Plan) -> str:
-    sources = [f"{s.id}: [{s.title}]({s.url})" for s in sorted(plan.sources, key=_whole_record)]
-    return _page("# Sources", _stamp(plan), _bullets(sources, empty="No sources."))
+    titles = {t.slug: t.title for t in plan.topics}
+    citing: dict[str, list[str]] = {}
+    for topic in plan.topics:
+        for source_id in dict.fromkeys(i for finding in topic.findings for i in finding.source_ids):
+            citing.setdefault(source_id, []).append(topic.title)
+    sources = [
+        f"{s.id}: [{s.title}]({_link_target(s.url)})"
+        + (f", cited by {', '.join(citing[s.id])}" if s.id in citing else "")
+        for s in sorted(plan.sources, key=_whole_record)
+    ]
+    blocks = [_bullets(sources, empty="No sources.")]
+    if plan.sources and plan.researched:
+        blocks.insert(0, f"Every source here was fetched during this run, {THROUGH_A_SUMMARY}.")
+    unfetched = [
+        f"{titles.get(r.topic, r.topic)}: {url}"
+        for r in sorted(plan.research, key=lambda r: r.topic)
+        for url in r.unfetched
+    ]
+    failed = [
+        f"{titles.get(r.topic, r.topic)}: {f.url} ({f.why})"
+        for r in sorted(plan.research, key=lambda r: r.topic)
+        for f in r.fetches
+        if not f.usable
+    ]
+    heuristic = (
+        "Telling a usable fetch from a failed one is a heuristic: a refusal or a redirect comes back as text, "
+        "not as an error, so this list reads the status and the text."
+    )
+    if unfetched:
+        blocks.append(
+            "## Cited, and not fetched with usable content\n\nA finding cited each of these, and this run holds no "
+            f"usable fetch of it, so that finding is labelled an assumption. {heuristic}\n\n{_bullets(unfetched)}"
+        )
+    if failed:
+        blocks.append(f"## Fetched, and not usable\n\n{heuristic}\n\n{_bullets(failed)}")
+    return _page("# Sources", _stamp(plan), *blocks)
 
 
 def furniture(plan: Plan) -> dict[str, set[str]]:
@@ -242,7 +325,7 @@ def render(plan: Plan, runbook: str = "") -> dict[str, str]:
     return pages
 
 
-def _is_ours(path: Path) -> bool:
+def is_ours(path: Path) -> bool:
     """A runbook this tool wrote, read without following a link."""
     if path.is_symlink() or not path.is_file():
         return False
@@ -257,7 +340,7 @@ def _blockers(pages: dict[str, str], tree: Path) -> list[Path]:
         path = tree / name
         if name.startswith(f"{TOPICS_DIR}/") and blocked[:1] == [folder]:
             continue
-        foreign = name == RUNBOOK_FILE and path.exists() and not _is_ours(path)
+        foreign = name == RUNBOOK_FILE and path.exists() and not is_ours(path)
         read_only = path.is_file() and not os.access(path, os.W_OK)
         if path.is_symlink() or path.is_dir() or foreign or read_only:
             blocked.append(path)
@@ -273,7 +356,7 @@ def _clear_stale(pages: dict[str, str], tree: Path, folder_free: bool) -> None:
     """Drop a topic page the plan lost, and a runbook of ours once green. A link is never followed or removed."""
     stale = [path for path in (tree / TOPICS_DIR).glob("*.md") if f"{TOPICS_DIR}/{path.name}" not in pages]
     stale = stale if folder_free else []
-    if RUNBOOK_FILE not in pages and _is_ours(tree / RUNBOOK_FILE):
+    if RUNBOOK_FILE not in pages and is_ours(tree / RUNBOOK_FILE):
         stale.append(tree / RUNBOOK_FILE)
     for path in stale:
         if path.is_file() and not path.is_symlink():
