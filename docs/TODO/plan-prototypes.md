@@ -196,11 +196,11 @@ Decision 5 is confirmed.
 
 Comes before research because it needs no tools and can be judged on offline outlines.
 
-- [ ] Lenses as data; `collect`, `evaluate`, `propose` as three passes
-- [ ] Word cap enforced by the schema, and tested by the verifier
-- [ ] `proto dream [dir]`, `--lens`, merging into the existing pool
-- [ ] `proto dream promote <id>` and `proto dream drop <id> --why "…"`
-- [ ] `--no-dream` on `proto plan`
+- [x] Lenses as data; `collect`, `evaluate`, `propose` as three passes
+- [x] Word cap enforced by the schema, and tested by the verifier
+- [x] `proto dream [dir]`, `--lens`, merging into the existing pool
+- [x] `proto dream promote <id>` and `proto dream drop <id> --why "…"`
+- [x] `--no-dream` on `proto plan`
 - [ ] Judge one real idea by hand: are the lenses producing different dreams, and does
       the evaluation separate them? (~operator)
 
