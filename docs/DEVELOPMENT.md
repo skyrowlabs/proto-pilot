@@ -27,6 +27,9 @@ version control:
   `.gitattributes` naming a driver that does not exist and a `check pre-push` that
   is red until it runs. Verify with `pp check merge-drivers`, which checks and
   never installs.
+- **The pre-push hook** (`scripts/hooks/pre-push`, installed by that same script) —
+  see [Pushing](#pushing). Git runs a copy under `.git/hooks`, so a changed hook needs
+  the installer again, and `check pre-push` is red until it has run.
 
 The block above is static text, and so are the install blocks in `README.md` and
 `AGENTS.md`. They were generated from one source when this repository was
@@ -46,6 +49,33 @@ That last claim is present-tense about a mechanism, which is what the paragraph
 before it says to distrust. It is honest for the one reason the warning turns on:
 the test ships beside this file and runs in the same `pp check pre-push`, with no
 rendering step between the claim and its enforcement.
+
+## Pushing
+
+A push to `develop` or `main` needs evidence that the pushed tree was
+checked. Commit first, then run the gates, then push:
+
+```bash
+./pp check pre-push
+git push
+```
+
+A full run on a checkout with nothing uncommitted stamps `HEAD^{tree}` under the git
+common dir. The hook reads every ref in the push, and a protected one passes if the
+pushed commit's tree is stamped or equals the fetched tip of either branch, which CI has
+already seen. Otherwise it refuses and names the command. Other branches, tags and
+deletes are not judged.
+
+- **The stamp is per tree.** Rewording a commit keeps it. A merge or a pull that
+  produces a new tree needs a fresh run, so every direct push pays for a full
+  `check pre-push`.
+- **`--quick` never stamps,** and a run with uncommitted changes says it did not.
+- **`git push --no-verify` skips the hook.** Nothing records that it did.
+- **An unattended job pushing to a protected branch is refused** until it runs the gates
+  first.
+- **The installer leaves a pre-push hook it did not write alone,** and `check pre-push`
+  stays red until you remove it. To decline the hook, delete `scripts/hooks/pre-push` and
+  `tests/test_green_stamp.py`.
 
 ## Configuration
 
