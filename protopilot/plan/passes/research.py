@@ -26,7 +26,8 @@ EFFORT: dict[str, tuple[int, int, int]] = {"shallow": (3, 4, 3), "standard": (4,
 MAX_FINDING_CHARS = 400
 MAX_TITLE_CHARS = 160
 MAX_URL_CHARS = 600
-WEB_URL = re.compile(r"https?://[^\s<>()\[\]]+")
+#: An http(s) URL with no space or bracket, except balanced parentheses, as Wikipedia's use.
+WEB_URL = re.compile(r"https?://(?:[^\s<>()\[\]]|\([^\s<>()\[\]]*\))+")
 
 SYSTEM = """\
 You research one topic of a plan, with web search and web fetch and nothing else.
@@ -108,8 +109,13 @@ def _source_for(plan: Plan, fetched: str, title: str) -> tuple[list[Source], str
 def apply(plan: Plan, slug: str, data: dict, fetches: list[Fetch]) -> tuple[Plan, TopicResearch]:
     """The topic's findings, sourced only through `fetches`, and its ledger record without the transcript."""
     usable = {ledger.normal(fetch.url): fetch.url for fetch in fetches if fetch.usable}
+    rows = listed(data["findings"])
+    most = effort(plan)[1]
+    if len(rows) > most:
+        # Refused, not cut: which findings to keep would be our guess, and the call ignored its limit.
+        raise ValueError(f"{len(rows)} findings, past the {most} this depth allows")
     findings, unfetched, cited = [], [], 0
-    for row in listed(data["findings"]):
+    for row in rows:
         said = text(row["text"])
         if len(said) > MAX_FINDING_CHARS:
             raise ValueError(f"a finding runs to {len(said)} characters, past the cap of {MAX_FINDING_CHARS}")
@@ -119,7 +125,7 @@ def apply(plan: Plan, slug: str, data: dict, fetches: list[Fetch]) -> tuple[Plan
             continue
         fetched = usable.get(ledger.normal(url)) if WEB_URL.fullmatch(url) else None
         if fetched is None:
-            unfetched.append(url[:MAX_URL_CHARS])
+            unfetched.append(" ".join(url.split())[:MAX_URL_CHARS])
             findings.append(Finding(text=said, assumption=True))
             continue
         title = " ".join(str(row["source_title"]).split())[:MAX_TITLE_CHARS]
