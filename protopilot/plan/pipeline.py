@@ -55,7 +55,7 @@ PLAN_PASSES = (scope, outline, connect, consider, start)
 DREAM_PASSES = (collect, evaluate, propose)
 PASSES = (*PLAN_PASSES, *DREAM_PASSES)
 BEFORE_REVIEW = (scope, outline)
-#: As measured once, on one topic, 2026-11-06 (docs/TODO/plan-prototypes.md, Phase 1).
+#: As measured once, on one topic, 2026-11-06 (docs/implementations/spec/plan-prototypes.md, Phase 1).
 MINUTES_PER_TOPIC = 2
 REPORTED_USD_PER_TOPIC = 0.4
 RENDER = "render"

@@ -16,7 +16,7 @@ that were dropped, and the constraints that shaped what landed.
 
 **Machine-readable index**: [`../implementation_index.json`](../implementation_index.json).
 
-**3 archived plans** across 1 categories.
+**4 archived plans** across 1 categories.
 
 ---
 
@@ -26,6 +26,7 @@ that were dropped, and the constraints that shaped what landed.
 | ----- | ---- | --------- | ------- |
 | ⭐⭐⭐ | [The proto Console](spec/proto-console.md) | 2026-09-04 | A terminal front end for the tool itself — type the idea in one pane, watch generation in another — built as a second view over the job seam `proto serve` already paid for. |
 | ⭐⭐⭐ | [The Terminal Target](spec/terminal-target.md) | 2026-09-04 | Make the output medium an axis and build a terminal target beside the web one — gated on a measurement, because the model has seen far less Textual than FastAPI. |
+| ⭐⭐⭐ | [Plan Prototypes and Dreaming](spec/plan-prototypes.md) | 2026-11-07 | Add `proto plan`, which turns an idea into a researched, connected, organised set of text plans, plus a dreaming step that collects, evaluates and proposes lighter extensions of the idea. |
 | ⭐ | [Archetypes and Theme](spec/archetypes-and-theme.md) | 2026-09-01 | Give the spec a shape axis and a look axis, so a chess app and a gear tracker stop being the same CRUD app with a different adjective. |
 
 ---

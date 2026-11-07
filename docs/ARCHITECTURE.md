@@ -170,7 +170,7 @@ rewrite the meaning of every spec on disk.
 `proto plan "an idea"` writes a folder of text instead of an app:
 `PLAN.md`, `topics/`, `dreams.md`, `sources.md` and a stored `plan.json`, with a
 `RUNBOOK.md` when the plan ends red. Why is [plans-first](ideas/plans-first.md); the design and what is still to build are
-[plan-prototypes](TODO/plan-prototypes.md); flags are in [CLI.md](CLI.md#proto-plan), and
+[plan-prototypes](implementations/spec/plan-prototypes.md); flags are in [CLI.md](CLI.md#proto-plan), and
 `proto dream`'s [beside them](CLI.md#proto-dream).
 
 **It is a sibling of the `Spec` pipeline, not a third target.** It shares the job
@@ -272,7 +272,7 @@ HTML opener in plan text.
   not touch it is refused, so what the plan had settled stays settled. It writes no
   finding, so the topic stays not researched. A promotion that stays red changes nothing.
 - **Verification proves structure, never truth.** `verify.py` has one check per bullet
-  of [What "verified" means](TODO/plan-prototypes.md#what-verified-means-for-text):
+  of [What "verified" means](implementations/spec/plan-prototypes.md#what-verified-means-for-text):
   `topic_map`, `no_cycles`, `findings_traced`, `sources_fetched`, `start_order`,
   `dreams_shaped` and `dreams_apart`. `dreams_apart` reads what a topic says, not what
   every topic page draws, and catches a copy with a word or two changed; **a paraphrase
