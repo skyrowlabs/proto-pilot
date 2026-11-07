@@ -283,3 +283,95 @@ def test_a_runbook_lists_what_is_wrong_what_was_tried_and_what_had_no_subject():
     assert "1. attempt 1 (no_cycles): nothing changed" in text
     assert "- sources_fetched: The plan has no sources to check." in text
     assert "Nothing here is verified" in text
+
+
+# -- dreams_apart: what counts as a copy ----------------------------------
+
+AT_THE_LENGTH = "a" * 16
+
+
+@pytest.mark.parametrize("field", ["title", "what_if", "takes", "reason", "if_adopted"])
+def test_every_field_a_dream_writes_is_compared(field):
+    text = "two volunteers and a van"
+    result = judged(leaked(text, **{field: text}))
+    assert result.stage == "dreams_apart"
+    assert f"topics/audience.md repeats the {field} of dream d1" in result.report()
+
+
+def test_text_at_the_length_is_a_leak_and_one_character_less_is_not():
+    assert judged(leaked(AT_THE_LENGTH, takes=AT_THE_LENGTH)).stage == "dreams_apart"
+    assert judged(leaked(AT_THE_LENGTH[1:], takes=AT_THE_LENGTH[1:])).ok
+
+
+def test_the_length_is_measured_on_the_words_and_not_on_their_punctuation():
+    padded = "* a van! -- (now) *"
+    assert judged(leaked("a van now", takes=padded)).ok
+
+
+@pytest.mark.parametrize(
+    "risk",
+    [
+        "Volunteers may not turn up on the day.",
+        "The library may lend saws that are unsafe.",
+        "Seeds and saws need different shelves.",
+        "lent seeds as well",
+    ],
+    ids=["unrelated", "shares-words", "shares-the-nouns", "a-fragment-of-the-dream"],
+)
+def test_ordinary_plan_text_near_a_dream_is_not_a_leak(risk):
+    assert judged(leaked(risk)).ok
+
+
+def test_a_dream_repeated_on_its_own_page_and_the_entry_page_is_not_a_leak():
+    plan = full().revised(constraints=[WHAT_IF])
+    pages = render.render(plan)
+    assert WHAT_IF in pages["dreams.md"] and WHAT_IF in pages["PLAN.md"]
+    assert judged(plan).ok
+
+
+def test_each_page_a_dream_leaks_into_is_named():
+    plan = full()
+    tops = [t.model_copy(update={"risks": [WHAT_IF]}) for t in plan.topics[:2]]
+    result = judged(plan.revised(topics=[*tops, *plan.topics[2:]]))
+    assert {problem.split()[0] for problem in result.failed[0].problems} == {f"topics/{t.slug}.md" for t in tops}
+
+
+# -- what the checks do not say -------------------------------------------
+
+
+def test_a_step_with_a_fault_is_reported_once_and_covers_what_follows():
+    plan = steps("scope", "audience", "resources")
+    assert [fault.topic for fault in verify.step_faults(plan)] == ["scope"]
+
+
+def test_a_step_waiting_on_a_ghost_is_red_at_both_checks_that_can_see_it():
+    plan = edges(("audience", "depends-on", "ghost"))
+    result = judged(plan)
+    assert result.named(verify.FAILED) == ["topic_map", "start_order"]
+    assert "step 1 (audience) waits on ghost" in result.report()
+
+
+def test_an_edge_from_a_ghost_cannot_make_a_real_step_wait():
+    assert verify.step_faults(edges(("ghost", "depends-on", "audience"))) == []
+
+
+def test_a_finding_citing_a_source_the_plan_holds_but_never_fetched_is_red_at_the_source():
+    plan = full().revised(sources=[source(fetched=False)])
+    assert judged(plan).named(verify.FAILED) == ["sources_fetched"]
+
+
+def test_the_green_line_is_absent_from_a_red_verdict():
+    result = judged(steps("scope", "audience"))
+    assert not result.ok and "Green" not in result.summary and "Green" not in result.report()
+
+
+def test_a_loop_of_three_names_all_three_links_and_nothing_else():
+    plan = edges(
+        ("risks", "depends-on", "operations"),
+        ("operations", "depends-on", "first_test"),
+        ("first_test", "depends-on", "risks"),
+    )
+    looped = {(e.from_topic, e.to_topic) for e in verify.cycle_edges(plan)}
+    on_the_ring = {("risks", "operations"), ("operations", "first_test"), ("first_test", "risks")}
+    assert on_the_ring <= looped
+    assert all(a in {"risks", "operations", "first_test"} for a, _ in looped)
