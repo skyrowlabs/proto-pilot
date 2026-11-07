@@ -399,7 +399,7 @@ def _plan_step(job, target: Path, work):
     STORE.run(job, run)
     _follow(job, shown)
     if refused:
-        raise click.ClickException(refused[0])  # it says all there is: this run wrote nothing
+        raise click.ClickException(refused[0])  # it says all there is, and what to do next
     if job.status != "done":
         raise click.ClickException(f"{job.error}\n  {pipeline.after_failure(target)}")
     return produced[0]

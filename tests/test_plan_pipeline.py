@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 import pytest
@@ -127,7 +128,7 @@ def test_a_render_that_dies_reports_pass_failed_and_never_finishes(tmp_path):
     (tree / "PLAN.md").mkdir()
 
     job = job_for()
-    with pytest.raises(IsADirectoryError):
+    with pytest.raises(pipeline.PlanRefused):
         pipeline.run_plan(job, tree)
 
     assert kinds(job) == [("plan", ""), ("pass_started", "render"), ("pass_failed", "render")]
@@ -153,7 +154,7 @@ def test_the_console_fold_shows_a_failed_pass_as_failed_and_unfinished(tmp_path)
     (tree / "PLAN.md").unlink()
     (tree / "PLAN.md").mkdir()
     job = job_for()
-    with pytest.raises(IsADirectoryError):
+    with pytest.raises(pipeline.PlanRefused):
         pipeline.run_plan(job, tree)
     folded = progress.fold(job.events)
     assert [(p.name, p.state) for p in folded.passes] == [("render", progress.FAILED)]
@@ -163,7 +164,7 @@ def test_the_console_fold_shows_a_failed_pass_as_failed_and_unfinished(tmp_path)
 def test_a_render_that_dies_on_a_fresh_run_leaves_a_tree_that_rerenders(tmp_path):
     tree = tmp_path / "tree"
     blocked = RenderBlocked(id="test", idea=IDEA)
-    with pytest.raises(IsADirectoryError):
+    with pytest.raises(pipeline.PlanRefused):
         pipeline.run_plan(blocked, tree)
     assert kinds(blocked)[-1] == ("pass_failed", "render")
     assert plan_path(tree).is_file()
@@ -173,13 +174,38 @@ def test_a_render_that_dies_on_a_fresh_run_leaves_a_tree_that_rerenders(tmp_path
     assert snapshot(tree) == snapshot(built(tmp_path / "clean"))
 
 
-def test_a_failed_pass_reaches_the_cli_as_an_error_exit(tmp_path):
-    tree = built(tmp_path / "tree")
+def blocked_page(tree: Path) -> Path:
     (tree / "PLAN.md").unlink()
     (tree / "PLAN.md").mkdir()
+    return tree / "PLAN.md"
+
+
+def blocked_topic_page(tree: Path) -> Path:
+    (tree / "topics" / "scope.md").unlink()
+    (tree / "topics" / "scope.md").mkdir()
+    return tree / "topics" / "scope.md"
+
+
+def blocked_topics_folder(tree: Path) -> Path:
+    shutil.rmtree(tree / "topics")
+    (tree / "topics").write_text("in the way")
+    return tree / "topics"
+
+
+@pytest.mark.parametrize("block", [blocked_page, blocked_topic_page, blocked_topics_folder])
+def test_a_name_in_the_way_of_a_page_reaches_the_cli_as_a_sentence(tmp_path, block):
+    tree = built(tmp_path / "tree")
+    blocker = block(tree)
+    before = snapshot(tree)
+
     result = CliRunner().invoke(cli.main, ["plan", IDEA, "--offline", "--yes", "--dir", str(tree)])
+
+    said = " ".join(result.output.split())
     assert result.exit_code == 1
-    assert "IsADirectoryError" in result.output
+    assert f"a page needs this name: {blocker}." in said
+    assert "Move it out of the way and rerun" in said
+    assert "Error: PlanRefused" not in said and "Errno" not in said and "maybe not every page" not in said
+    assert snapshot(tree) == before
 
 
 # -- refusals, reached through run_plan -----------------------------------

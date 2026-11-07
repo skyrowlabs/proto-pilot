@@ -112,6 +112,13 @@ def _refuse_if_taken(job, tree: Path) -> None:
         raise PlanRefused(f"{tree} gained a plan while this one was being made; leaving it alone")
 
 
+def _drawn(plan: Plan, tree: Path) -> list[str]:
+    try:
+        return render.write(plan, tree)
+    except render.PageBlocked as exc:
+        raise PlanRefused(str(exc)) from exc
+
+
 def build(job, tree: Path, plan: Plan, llm: LLM) -> None:
     """Everything after the review, whether a person approved it or nobody was asked."""
     tree = Path(tree)
@@ -126,7 +133,7 @@ def build(job, tree: Path, plan: Plan, llm: LLM) -> None:
 
     def written() -> tuple[None, list[str]]:
         saved = plan.save(tree)
-        return None, [str(saved.relative_to(tree)), *render.write(plan, tree)]
+        return None, [str(saved.relative_to(tree)), *_drawn(plan, tree)]
 
     _pass(job, RENDER, _names(), written)
     _finish(job, tree, plan)
@@ -146,7 +153,7 @@ def rerender(job, tree: Path) -> None:
     job.log(f"{tree} already holds this plan; drawing it again, with no model call.")
     job.event("plan", passes=[RENDER])
     plan = Plan.load(tree)
-    _pass(job, RENDER, [RENDER], lambda: (None, render.write(plan, tree)))
+    _pass(job, RENDER, [RENDER], lambda: (None, _drawn(plan, tree)))
     _finish(job, tree, plan)
 
 
