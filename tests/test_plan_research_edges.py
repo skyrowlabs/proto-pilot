@@ -437,3 +437,158 @@ def test_red_re_renders_in_a_row_say_a_re_render_ran_once(tmp_path):
         assert not pipeline.rerender(job_for(), tree).ok
     tried = (tree / render.RUNBOOK_FILE).read_text(encoding="utf-8").split("## What was tried\n\n")[1].split("\n\n")[0]
     assert tried == f"1. {pipeline.RERENDER_TRIED}"
+
+
+# -- the fixes, attacked --------------------------------------------------
+
+
+def init_event(**fields: object) -> str:
+    return json.dumps({"type": "system", "subtype": "init", "tools": ["WebFetch"], "mcp_servers": [], **fields})
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [{"tools": "WebFetch"}, {"tools": [1]}, {"mcp_servers": {}}, {"mcp_servers": ""}, {"mcp_servers": None}],
+    ids=["tools-a-string", "tools-not-names", "servers-a-dict", "servers-a-string", "servers-null"],
+)
+def test_an_init_event_that_does_not_list_names_is_refused(fields: dict):
+    from protopilot.llm import research_result
+
+    said = init_event(**fields) + "\n" + transcript().split("\n", 1)[1]
+    with pytest.raises(LLMError, match="unknown"):
+        research_result(said, "r")
+
+
+@pytest.mark.parametrize(("depth", "most"), [("shallow", 4), (None, 6)], ids=["shallow", "no-depth-is-standard"])
+def test_exactly_the_most_findings_is_kept_and_one_more_is_refused(depth: str | None, most: int):
+    plan = outline_plan(depth=depth)
+    kept, _ = research.apply(plan, "members", {"findings": [assumed(f"F{n}.") for n in range(most)]}, [])
+    assert len(kept.topics[0].findings) == most
+    with pytest.raises(ValueError, match=f"past the {most}"):
+        research.apply(plan, "members", {"findings": [assumed(f"F{n}.") for n in range(most + 1)]}, [])
+
+
+@pytest.mark.parametrize(
+    ("said", "drawn"),
+    [
+        ("a\\b", "a\\\\b"),
+        ("x | y", "x \\| y"),
+        ("<script>alert(1)</script>", "\\<script\\>alert(1)\\</script\\>"),
+        ("![img](https://evil.test)", "\\!\\[img\\](https://evil.test)"),
+        ("snake_case **bold**", "snake\\_case \\*\\*bold\\*\\*"),
+    ],
+)
+def test_md_text_escapes_backslashes_pipes_html_and_images(said: str, drawn: str):
+    assert render.md_text(said) == drawn
+
+
+def test_a_failed_fetch_url_shows_as_one_code_span_with_nothing_closing_it(tmp_path):
+    tree = tmp_path / "tree"
+    bad = "https://x.test/a`b\n# H"
+    said = transcript(fetches=[fetched(), fetched(bad, code=403)])
+    assert run(tree, ResearchingLLM(script(), {"members": said})).ok
+    page = (tree / "sources.md").read_text(encoding="utf-8")
+    assert "- Members: `https://x.test/a%60b%20#%20H` (HTTP 403)" in page and "\n# H" not in page
+
+
+def test_a_failure_reason_is_one_escaped_line_on_the_topic_page_and_the_entry(tmp_path):
+    tree = tmp_path / "tree"
+    assert run(tree, ResearchingLLM(script(), {"money": LLMError("<b>x</b>\n# H [a](b)")})).ok
+    for page in ("topics/money.md", "PLAN.md"):
+        text = (tree / page).read_text(encoding="utf-8")
+        assert "failed: \\<b\\>x\\</b\\> # H \\[a\\](b)." in text and "\n# H" not in text and "<b>" not in text
+
+
+def test_a_cited_url_with_parentheses_is_a_source_linked_without_breaking(tmp_path):
+    tree = tmp_path / "tree"
+    wiki = "https://en.wikipedia.org/wiki/Tool_library_(lending)"
+    said = transcript(findings=[cited(url=wiki), assumed()], fetches=[fetched(wiki)])
+    assert run(tree, ResearchingLLM(script(), dict.fromkeys(SLUGS, said))).ok
+    assert [s.url for s in Plan.load(tree).sources] == [wiki]
+    assert "(https://en.wikipedia.org/wiki/Tool_library_%28lending%29)" in (tree / "sources.md").read_text(
+        encoding="utf-8"
+    )
+
+
+def test_a_nothing_cited_record_flipped_to_researched_is_drawn_as_nothing_cited(tmp_path):
+    tree = tmp_path / "tree"
+    nothing = transcript(findings=[assumed()], fetches=[fetched(OTHER)])
+    assert run(tree, ResearchingLLM(script(), {"safety": nothing})).ok
+    edited(tree, lambda d: next(r for r in d["research"] if r["topic"] == "safety").update(state="researched"))
+    assert pipeline.rerender(job_for(), tree).ok
+    assert "Research ran and cited no page it fetched." in (tree / "topics" / "safety.md").read_text(encoding="utf-8")
+
+
+def test_a_record_whose_own_transcript_is_gone_says_its_evidence_is_gone(tmp_path):
+    tree = tmp_path / "tree"
+    nothing = transcript(findings=[assumed()], fetches=[fetched(OTHER)])
+    assert run(tree, ResearchingLLM(script(), {"safety": nothing})).ok
+    (ledger.research_dir(tree) / "safety.jsonl").unlink()
+    assert pipeline.rerender(job_for(), tree).ok
+    page = (tree / "topics" / "safety.md").read_text(encoding="utf-8")
+    assert f"Research for this topic failed: {ledger.NO_EVIDENCE}." in page
+
+
+def test_a_deleted_record_cannot_carry_a_citation(tmp_path):
+    tree = tmp_path / "tree"
+    assert run(tree, ResearchingLLM(script(), {})).ok
+    edited(tree, lambda d: d.update(research=[r for r in d["research"] if r["topic"] != "members"]))
+    result = pipeline.rerender(job_for(), tree)
+    assert result.stage == "sources_fetched" and "topic members cites s1" in result.summary
+
+
+@pytest.mark.parametrize("keep_sources", [True, False], ids=["sources-kept", "sources-gone"])
+def test_a_ledger_deleted_whole_never_leaves_a_researched_plan_green(tmp_path, keep_sources: bool):
+    tree = tmp_path / "tree"
+    assert run(tree, ResearchingLLM(script(), {})).ok
+
+    def forget(data: dict) -> None:
+        data["research"] = []
+        if not keep_sources:
+            data["sources"] = []
+            for finding in (f for t in data["topics"] for f in t["findings"]):
+                finding.update(assumption=True, source_ids=[])
+
+    edited(tree, forget)
+    result = pipeline.rerender(job_for(), tree)
+    assert result.stage == "sources_fetched"
+    assert keep_sources or "researched, and it holds no source" in result.summary
+
+
+class _NoWeb(ResearchingLLM):
+    research_refusal = "no web here."
+
+
+@pytest.mark.parametrize("backend", ["refuses", "has-no-research-call"])
+def test_the_pipeline_refuses_to_resume_on_a_backend_that_cannot_research(tmp_path, backend: str):
+    from fakes import FakeLLM
+
+    tree = tmp_path / "tree"
+    interrupted(tree)
+    before = sorted(p.name for p in ledger.research_dir(tree).iterdir())
+    llm = _NoWeb(script()[2:], {}) if backend == "refuses" else FakeLLM(script()[2:])
+    with pytest.raises(pipeline.PlanRefused, match="cannot resume it"):
+        pipeline.run_plan(job_for(), tree, llm)  # type: ignore[arg-type]
+    assert sorted(p.name for p in ledger.research_dir(tree).iterdir()) == before and not plan_path(tree).exists()
+
+
+def test_a_cited_findings_markdown_is_escaped_on_its_topic_page(tmp_path):
+    tree = tmp_path / "tree"
+    said = transcript(findings=[cited("See [click](https://evil.test) <b>now</b>."), assumed()])
+    assert run(tree, ResearchingLLM(script(), {"members": said})).ok
+    page = (tree / "topics" / "members.md").read_text(encoding="utf-8")
+    assert "- See \\[click\\](https://evil.test) \\<b\\>now\\</b\\>. (sources: s1)" in page
+
+
+def test_every_citation_demoted_by_hand_re_renders_stamped_not_researched(tmp_path):
+    tree = tmp_path / "tree"
+    assert run(tree, ResearchingLLM(script(), {})).ok
+
+    def demote(data: dict) -> None:
+        for finding in (f for t in data["topics"] for f in t["findings"]):
+            finding.update(assumption=True, source_ids=[])
+
+    edited(tree, demote)
+    pipeline.rerender(job_for(), tree)
+    entry = (tree / "PLAN.md").read_text(encoding="utf-8")
+    assert render.NOT_RESEARCHED in entry and render.RESEARCHED not in entry
