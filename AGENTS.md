@@ -188,7 +188,7 @@ because the baseline cannot read a change request.
 | `protopilot/verify_tui.py` | **Terminal:** import, boot under `App.run_test`, smoke run, blank-screen check; `tui_probe.py` is the half that runs inside the tree |
 | `protopilot/baseline.py` | The deterministic offline implementation of every pass |
 | `protopilot/llm.py` | `LLM` Protocol + three backends |
-| `protopilot/plan/` | `proto plan`: a sibling pipeline to `Spec`, offline baseline only so far. `model.py` is `plan.json`, the truth; `render.py` draws the markdown from it — see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#the-plan-pipeline) |
+| `protopilot/plan/` | `proto plan`: a sibling pipeline to `Spec`, with no research, dreaming or verification yet. `passes/` holds its model passes and `pipeline.py` runs them; `model.py` is `plan.json`, the truth; `render.py` draws the markdown from it — see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#the-plan-pipeline) |
 | `protopilot/registry.py` | Tracked prototypes — see the `prune()` trap in `NOTES.md`. Plan trees are not in it |
 | `protopilot/targets/` | What medium a spec is built in — fifteen things, of which the plan predicted four; the contract is in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#what-a-target-owns) and a test recomputes it |
 | `skeleton/<target>/` | Copied byte-for-byte into every generated app; one tree per target |
