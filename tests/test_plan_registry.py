@@ -9,6 +9,8 @@ import pytest
 from click.testing import CliRunner
 
 from protopilot import cli, registry
+from protopilot.jobs import Job
+from protopilot.plan import pipeline, render
 
 pytestmark = pytest.mark.unit
 
@@ -81,3 +83,14 @@ def test_delete_refuses_a_tree_with_research_in_progress_but_no_plan(tmp_path):
     with pytest.raises(registry.NotAProject):
         registry.delete(stopped, runner=lambda argv, cwd: None)
     assert stopped.exists()
+
+
+def test_a_plan_whose_render_is_blocked_after_saving_is_still_registered(tmp_path, monkeypatch):
+    def blocked(plan, tree, runbook=""):
+        raise render.PageBlocked("a page is blocked")
+
+    monkeypatch.setattr(render, "write", blocked)
+    tree = tmp_path / "tree"
+    with pytest.raises(pipeline.PlanRefused):
+        pipeline.run_plan(Job(id="t", idea=IDEA), tree)
+    assert [(e.kind, e.path) for e in registry.load()] == [("plan", str(tree.resolve()))]

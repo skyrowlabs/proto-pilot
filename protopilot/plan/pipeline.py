@@ -471,13 +471,16 @@ def build(job, tree: Path, plan: Plan, llm: LLM, dream: bool = True, researching
     # Again, because those passes take minutes. What is left is the instant between
     # here and the save's rename, in which another run's plan would still be replaced.
     _refuse_if_taken(job, tree)
-    result = _hand_back(job, tree, names, checked, save=True)
-    _register(checked.plan, tree)
-    return result
+    try:
+        return _hand_back(job, tree, names, checked, save=True)
+    finally:
+        _register(checked.plan, tree)  # a page blocked after the save still hands the tree back
 
 
 def _register(plan: Plan, tree: Path) -> None:
     """List a landed plan, red or green, so `proto ls` and `proto rm` can find it; a listed one keeps its date."""
+    if not plan_path(tree).exists():
+        return
     resolved = str(tree.resolve())
     if any(e.path == resolved and e.kind == registry.PLAN for e in registry.load()):
         return
@@ -542,9 +545,10 @@ def rerender(job, tree: Path) -> verify.PlanVerdict:
     tried = [] if result.ok else [*earlier, *([] if earlier[-1:] == [RERENDER_TRIED] else [RERENDER_TRIED])]
     if not result.ok:
         job.event("exhausted", attempts=1, stage=result.stage)
-    verdict = _hand_back(job, tree, [RENDER], Checked(plan, result, 1, tried), save=False)
-    _register(plan, tree)  # a plan made before plans were listed joins the list here
-    return verdict
+    try:
+        return _hand_back(job, tree, [RENDER], Checked(plan, result, 1, tried), save=False)
+    finally:
+        _register(plan, tree)  # a plan made before plans were listed joins the list here
 
 
 def resume_refusal(
