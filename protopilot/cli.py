@@ -224,7 +224,7 @@ def _compose(project_dir: Path, *args: str) -> int:
 @click.group()
 @click.version_option(__version__, prog_name="proto-pilot")
 def main() -> None:
-    """Turn an idea and a little direction into a running prototype."""
+    """Turn an idea and a little direction into a plan you can work from."""
 
 
 @main.command()

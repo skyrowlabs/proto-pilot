@@ -1,6 +1,6 @@
 # proto.pilot
 
-A framework for prototyping ideas with agents.
+A framework for planning ideas with agents.
 
 > **Before making changes**: load docs on-demand via `docs/README.md` or `.github/DOCS_INDEX.md`.
 > Never load the whole tree — a typical task needs one or two documents.
