@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from pathlib import Path
 
 import pytest
@@ -12,6 +14,15 @@ from protopilot import cli
 pytestmark = [pytest.mark.unit]
 
 IDEA = "start a community tool library"
+#: Hashes of what the Phase 2 code wrote, before the passes existed (proto-pilot@df89ea9).
+GOLDEN = Path(__file__).resolve().parent / "golden" / "plan_offline_manifest.json"
+GOLDEN_RUNS = {
+    "plain": (IDEA,),
+    "direction": (IDEA, "--direction", "one town only"),
+    "whitespace": ("  spaced   out	idea  ", "--direction", "  a   direction "),
+    "unicode": ("日本語のアイデア",),
+    "punctuation": ('"quoted" {braces} <tags> & 100%', "--direction", "with {odd} direction"),
+}
 
 
 def plan(*args: str):
@@ -30,6 +41,15 @@ def test_two_fresh_runs_are_byte_identical(tmp_path):
     assert written == snapshot(second)
     assert {"PLAN.md", "dreams.md", "sources.md", ".protopilot/plan.json", "topics/audience.md"} <= set(written)
     assert b"Not researched" in written["PLAN.md"]
+
+
+def test_the_passes_write_the_offline_baseline_byte_for_byte(tmp_path):
+    written = {}
+    for name, args in GOLDEN_RUNS.items():
+        assert plan(*args, "--offline", "--yes", "--dir", str(tmp_path / name)).exit_code == 0
+        for page, data in snapshot(tmp_path / name).items():
+            written[f"{name}/{page}"] = hashlib.sha256(data).hexdigest()
+    assert written == json.loads(GOLDEN.read_text(encoding="utf-8"))
 
 
 def test_default_directory_is_named_from_the_idea(tmp_path, monkeypatch):
