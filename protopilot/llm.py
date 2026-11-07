@@ -280,11 +280,21 @@ def stream_events(transcript: str) -> list[dict]:
     return events
 
 
+def _tool_uses(events: list[dict]) -> list[dict]:
+    """Every `tool_use` block an assistant event holds, whatever its name."""
+    blocks = []
+    for event in events:
+        content = (event.get("message") or {}).get("content") if event.get("type") == "assistant" else None
+        if isinstance(content, list):
+            blocks += [b for b in content if isinstance(b, dict) and b.get("type") == "tool_use"]
+    return blocks
+
+
 def research_result(transcript: str, label: str) -> dict:
     """The structured object a research stream ends on, refused unless the session held only its tools.
 
-    The tools are read from the stream's own `init` event, so a flag that stopped working
-    is caught on the run it stopped working on, not by a test of the argv.
+    The tools are read from the stream's own `init` events and from every tool it used, so
+    a flag that stopped working is caught on the run it stopped working on, not by a test.
     """
     events = stream_events(transcript)
     inits = [e for e in events if e.get("type") == "system" and e.get("subtype") == "init"]
@@ -301,6 +311,9 @@ def research_result(transcript: str, label: str) -> dict:
         if extra or servers:
             held = ", ".join(extra) or "an MCP server"
             raise LLMError(f"pass {label!r}: the research session held {held}, so its answer was not used")
+    used = sorted({str(block.get("name")) for block in _tool_uses(events)} - RESEARCH_HELD)
+    if used:
+        raise LLMError(f"pass {label!r}: the research session used {', '.join(used)}, so its answer was not used")
     result = next((e for e in reversed(events) if e.get("type") == "result"), None)
     if result is None:
         raise LLMError(f"pass {label!r}: the research stream ended without a result")
