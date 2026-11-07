@@ -534,9 +534,42 @@ def rerender(job, tree: Path) -> verify.PlanVerdict:
     return _hand_back(job, tree, [RENDER], Checked(plan, result, 1, tried), save=False)
 
 
-def resume(job, tree: Path, draft: Plan, llm: LLM, dream: bool = True) -> verify.PlanVerdict:
+def resume_refusal(
+    tree: Path, draft: Plan, llm: LLM | None, researching: bool = True, depth: Depth | None = None
+) -> str:
+    """Why this run may not resume `draft`, or an empty string. A resume that skipped research would delete it.
+
+    With no `llm`, only what needs no backend is judged, so a caller can refuse before building one.
+    """
+    if not researching:
+        return f"{tree} holds research in progress. Rerun without --no-research to resume it, or pick another --dir."
+    if depth and depth != draft.depth:
+        return (
+            f"{tree} holds research in progress at depth {draft.depth}, and a resumed run keeps it. "
+            "Drop --depth, or pick another --dir."
+        )
+    if llm is None:
+        return ""
+    if llm.offline:
+        return f"{tree} holds research in progress, and offline cannot research. Resume with a model backend."
+    refusal = research_refusal(llm)
+    return f"{tree} holds research in progress, and this backend cannot resume it: {refusal}" if refusal else ""
+
+
+def resume(
+    job,
+    tree: Path,
+    draft: Plan,
+    llm: LLM,
+    dream: bool = True,
+    researching: bool = True,
+    depth: Depth | None = None,
+) -> verify.PlanVerdict:
     """Pick up a run that stopped after its review: topics with a transcript are replayed, the rest researched."""
     tree = Path(tree)
+    refusal = resume_refusal(tree, draft, llm, researching, depth)
+    if refusal:
+        raise PlanRefused(refusal)
     done = [t.slug for t in draft.topics if ledger.read_transcript(tree, t.slug) is not None]
     job.log(f"{tree} holds a reviewed outline; resuming, with {len(done)} of {len(draft.topics)} topics researched.")
     job.event("plan", passes=_names(dream))
@@ -553,7 +586,7 @@ def run_plan(
     llm = llm or OfflineLLM()
     draft = resumable(tree, job.idea, job.direction)
     if draft is not None:
-        return resume(job, tree, draft, llm, dream)
+        return resume(job, tree, draft, llm, dream, researching, depth)
     plan = outlined(job, llm, scoped(job, llm, depth, dream, researching), dream, researching)
     return build(job, tree, plan, llm, dream, researching)
 

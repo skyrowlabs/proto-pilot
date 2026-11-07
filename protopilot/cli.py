@@ -568,26 +568,20 @@ def _resume(target: Path, draft, depth: str | None, offline: bool, backend: str 
     from protopilot.jobs import STORE
     from protopilot.plan import pipeline
 
-    if depth and depth != draft.depth:
-        raise click.ClickException(
-            f"{target} holds research in progress at depth {draft.depth}, and a resumed run keeps it. "
-            "Drop --depth, or pick another --dir."
-        )
-    if not researching:
-        raise click.ClickException(
-            f"{target} holds research in progress. Rerun without --no-research to resume it, or pick another --dir."
-        )
+    # The pipeline holds the same guard, so no caller can land an unresearched plan over it.
+    asked = cast("Depth | None", depth)
+    refusal = pipeline.resume_refusal(target, draft, None, researching, asked)
+    if refusal:
+        raise click.ClickException(refusal)  # before any backend is built
     try:
         llm = build_llm(offline=offline, backend=backend)
     except LLMError as exc:
         raise click.ClickException(str(exc)) from exc
-    if llm.offline:
-        raise click.ClickException(
-            f"{target} holds research in progress, and offline cannot research. Resume with a model backend."
-        )
-    _refuse_unresearchable(llm, True)
+    refusal = pipeline.resume_refusal(target, draft, llm, researching, asked)
+    if refusal:
+        raise click.ClickException(refusal)
     job = STORE.create(draft.idea, draft.direction)
-    result = _plan_step(job, target, lambda j: pipeline.resume(j, target, draft, llm, dream))
+    result = _plan_step(job, target, lambda j: pipeline.resume(j, target, draft, llm, dream, researching))
     if not result.ok:
         sys.exit(1)
 
