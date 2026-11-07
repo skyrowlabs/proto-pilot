@@ -68,7 +68,7 @@ One generation, end to end. Every arrow is a place something can be refused.
 
 | Component | Responsibility | Talks to |
 | --------- | -------------- | -------- |
-| `protopilot/cli.py` | The `proto` command: generation and prototype lifecycle | everything below |
+| `protopilot/cli.py` | The `proto` command: generation, prototype lifecycle and `proto plan` | everything below |
 | `protopilot/web/` | `proto serve` — a web face on `proto new`, **pinned to `--target web`** | the same functions the CLI calls |
 | `protopilot/spec.py` | **The contract.** The only thing downstream reads about user intent | every pass |
 | `protopilot/passes/` | One module per pass; prompt, JSON Schema, and the previous pass's source. `passes/tui/` is the terminal set | `llm.py`, `files.py` |
@@ -87,7 +87,8 @@ One generation, end to end. Every arrow is a place something can be refused.
 | `protopilot/render.py` | a target's skeleton ▶ a project directory, substituting `@@TOKEN@@` | `targets/`, `skeleton/` |
 | `protopilot/archetypes/` | What SHAPE a spec is: questions, screen rule, prompt fragment, baseline | `spec.py`, `baseline.py` |
 | `protopilot/targets/` | What MEDIUM it is built in — fifteen things, listed below | `passes/`, `verify.py`, `verify_tui.py` |
-| `protopilot/jobs.py` | In-process job store so the web front end can run work in the background | `web/` |
+| `protopilot/jobs.py` | In-process job store: the web front end runs generations on it in the background, and `proto plan` runs on it from the CLI | `web/`, `cli.py` |
+| `protopilot/plan/` | `proto plan`, a sibling pipeline to `Spec` — [below](#the-plan-pipeline) | `jobs.py`, `spec.py` |
 | `skeleton/` | The fixed application tree copied into every generated app, one directory per target. **Not generated** | — |
 | `cli/`, `scripts/` | This repo's own gates and jobs. Never shipped to a user | — |
 
@@ -154,6 +155,30 @@ They are separate constants and
 `tests/test_targets.py::test_the_cli_default_and_the_field_default_are_separate_constants`
 pins both literals. Collapsing them into one would make the next flip silently
 rewrite the meaning of every spec on disk.
+
+## The plan pipeline
+
+`proto plan "an idea" --offline` writes a folder of text instead of an app:
+`PLAN.md`, `topics/`, `dreams.md`, `sources.md` and a stored `plan.json`. Why
+is [plans-first](ideas/plans-first.md); the design and what is still to build are
+[plan-prototypes](TODO/plan-prototypes.md).
+
+**It is a sibling of the `Spec` pipeline, not a third target.** It shares the job
+seam and its event vocabulary, the `.protopilot/` directory, the slug rule from
+`spec.py`, and the rule that a pass has an offline twin. It reads no `Spec`, no
+target and no skeleton, and the write guard does not apply: no model output
+reaches `render.write`.
+
+- **`plan.json` is the truth.** `model.py` defines it; every markdown file is
+  drawn from it, and a re-render overwrites them, so an edit belongs in `plan.json`.
+- **Rendering is deterministic.** `render.py` uses no model and no clock, so one
+  plan is one set of bytes; `tests/test_plan_render.py` holds that.
+- **The baseline is all that exists.** `baseline.py` builds a generic plan from the
+  idea's words, with every finding an assumption and every page stamped not
+  researched. Without `--offline` the command refuses and calls no model.
+- **A plan tree is not a prototype.** It is not in the registry, so `proto ls`
+  omits it, and `proto rm`, `up` and the other app commands refuse it for having no
+  `spec.json`.
 
 ## Critical Patterns
 
@@ -249,8 +274,8 @@ path and not evidence that `paint` is broken.
   are argued in [`README.md`](../README.md#how-it-works).
 - **What is unfinished, and what bit us** — [`NOTES.md`](../NOTES.md), the live
   parking lot, including traps that are fixed but worth knowing.
-- **Planned work** — [`TODO/README.md`](TODO/README.md). The holding tank is
-  empty; the next plan goes there before any code does.
+- **Planned work** — [`TODO/README.md`](TODO/README.md). A new plan goes
+  there before any code does.
 - **Completed plans** — [`implementations/README.md`](implementations/README.md).
   [Archetypes and Theme](implementations/spec/archetypes-and-theme.md) is the
   first one filed, and the one to read before touching the spec: it is what

@@ -7,11 +7,13 @@
       "drawing-freedom",
       "improvement-loop"
     ],
-    "planned": [
+    "ready": [
       "plan-prototypes"
     ]
   },
-  "ready_queue": [],
+  "ready_queue": [
+    "plan-prototypes"
+  ],
   "plans": [
     {
       "slug": "drawing-freedom",
@@ -57,9 +59,9 @@
       "slug": "plan-prototypes",
       "title": "Plan Prototypes and Dreaming",
       "path": "docs/TODO/plan-prototypes.md",
-      "shelf_status": "planned",
+      "shelf_status": "ready",
       "priority": "high",
-      "queue_order": null,
+      "queue_order": 10,
       "blocked_on": null,
       "updated": "2026-11-06",
       "tags": [
@@ -69,7 +71,7 @@
         "pipeline"
       ],
       "summary": "Add `proto plan`, which turns an idea into a researched, connected, organised set of text plans, plus a dreaming step that collects, evaluates and proposes lighter extensions of the idea.",
-      "open_tasks": 39,
+      "open_tasks": 32,
       "auto_generated": false
     }
   ]

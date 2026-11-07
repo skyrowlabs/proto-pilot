@@ -115,6 +115,7 @@ back a link you click and a terminal app has no link.
 |---|---|
 | `proto new IDEA` | generate, boot, verify, hand it back |
 | `proto add CHANGE` | amend the spec, regenerate, re-verify |
+| `proto plan IDEA --offline` | write a generic, unresearched plan folder; the offline baseline is all that exists so far |
 | `proto up` / `down` / `logs` / `test` | the obvious things |
 | `proto spec` | what this project actually promised |
 | `proto archetypes` | what shapes this build can generate, and what each asks |
@@ -288,7 +289,7 @@ does not abandon a generation that is most of the way done. Override with
 **The direction changed on 2026-11-06.** proto.pilot is becoming a planning tool,
 and the prototyping described here is tabled: it works, and gets upkeep but no new
 features. [`docs/ideas/plans-first.md`](docs/ideas/plans-first.md) has why, and
-`proto plan` is not built yet.
+`proto plan` is only an offline baseline so far.
 
 Early, and honest about it. Known gaps, in the order they will bite:
 

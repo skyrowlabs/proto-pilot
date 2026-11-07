@@ -2,6 +2,7 @@
 
 proto new "an app for tracking camping gear across trips"
 proto add "let people mark items as packed"
+proto plan "start a community tool library" --offline
 proto up | down | logs | test | spec | doctor
 """
 
@@ -11,6 +12,7 @@ import re
 import socket
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import click
@@ -25,6 +27,7 @@ from protopilot.runner import SubprocessRunner, docker_available
 from protopilot.spec import SPEC_DIR, SPEC_FILENAME, Spec, Theme
 
 PORT_RANGE = range(8080, 8180)
+FOLLOW_INTERVAL = 0.02
 
 
 def _echo(message: str) -> None:
@@ -350,6 +353,52 @@ def new(
         return
 
     _finish(spec, ctx, llm, target, attempts)
+
+
+def _follow(job) -> None:
+    """Print a job's log as it grows, until the job has finished."""
+    shown = 0
+    while True:
+        # Read before draining: `finished_at` is set last, so nothing logged is missed.
+        finished = bool(job.finished_at)
+        lines = job.lines[shown:]
+        for line in lines:
+            _echo(line)
+        shown += len(lines)
+        if finished:
+            return
+        time.sleep(FOLLOW_INTERVAL)
+
+
+@main.command(name="plan")
+@click.argument("idea")
+@click.option("--dir", "directory", default=None, help="Target directory (default: ./<slug>).")
+@click.option("--direction", default="", help="Extra steer: scope, emphasis, constraints.")
+@click.option("--offline", is_flag=True, help="Deterministic baseline; no API calls. The only mode so far.")
+@click.option("--yes", "-y", is_flag=True, help="Accepted for scripts; there is no review checkpoint yet.")
+def plan_command(idea: str, directory: str | None, direction: str, offline: bool, yes: bool) -> None:
+    """Turn IDEA into an organised set of text plans."""
+    from protopilot.jobs import STORE
+    from protopilot.plan import baseline, pipeline
+
+    if not offline:
+        raise click.ClickException(
+            "only the offline baseline of `proto plan` exists so far; pass --offline. No model was called."
+        )
+    if not baseline.clean(idea):
+        raise click.ClickException("`proto plan` needs an idea; it was given an empty one")
+
+    target = Path(directory).resolve() if directory else Path.cwd() / baseline.slug_for(idea)
+    try:
+        pipeline.existing_plan(target, idea, direction)
+    except pipeline.PlanRefused as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    job = STORE.create(idea, direction)
+    STORE.run(job, lambda j: pipeline.run_plan(j, target))
+    _follow(job)
+    if job.status != "done":
+        raise click.ClickException(job.error)
 
 
 @main.command()
