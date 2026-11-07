@@ -289,7 +289,7 @@ does not abandon a generation that is most of the way done. Override with
 **The direction changed on 2026-11-06.** proto.pilot is becoming a planning tool,
 and the prototyping described here is tabled: it works, and gets upkeep but no new
 features. [`docs/ideas/plans-first.md`](docs/ideas/plans-first.md) has why, and
-`proto plan` is not built yet.
+`proto plan` is only an offline baseline so far.
 
 Early, and honest about it. Known gaps, in the order they will bite:
 
