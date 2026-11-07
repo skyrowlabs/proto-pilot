@@ -19,8 +19,9 @@ SYSTEM = BRIEF + """
 Say where to begin. You are given only the topics that depend on nothing, so every
 one of them can be started now. Prefer whichever retires the riskiest unknown soonest.
 
-Return an ordered 1 to 5 steps. Each names one of those topics, an `action` someone
-could take this week, and a `why` that says why it comes at this point.
+Return an ordered list of steps, no more than you are told, and never name a topic
+twice. Each names one of those topics, an `action` someone could take this week, and
+a `why` that says why it comes at this point.
 """
 
 
@@ -39,6 +40,10 @@ def ready(plan: Plan) -> list[Topic]:
     return [topic for topic in plan.topics if not needs[topic.slug]]
 
 
+def _most_steps(plan: Plan) -> int:
+    return min(MAX_STEPS, len(ready(plan)))
+
+
 def schema(plan: Plan) -> dict:
     return {
         "type": "object",
@@ -46,7 +51,7 @@ def schema(plan: Plan) -> dict:
             "steps": {
                 "type": "array",
                 "minItems": 1,
-                "maxItems": MAX_STEPS,
+                "maxItems": _most_steps(plan),
                 "items": {
                     "type": "object",
                     "properties": {
@@ -68,7 +73,8 @@ def build(plan: Plan) -> tuple[str, str]:
     topics = ready(plan)
     if not topics:
         raise PlanPassError("every topic depends on another, so `depends-on` has a cycle and nothing can go first")
-    return SYSTEM, f"{scope_block(plan)}\n\n{topics_block(topics, 'risks', 'unknowns')}"
+    block = topics_block(topics, "risks", "unknowns")
+    return SYSTEM, f"{scope_block(plan)}\n\n{block}\n\nReturn at most {_most_steps(plan)} steps."
 
 
 def offline(plan: Plan) -> dict:
@@ -89,6 +95,8 @@ def apply(plan: Plan, data: dict) -> Plan:
     for number, step in enumerate(steps, start=1):
         if step.topic not in needs:
             raise ValueError(f"step {number} names a topic that does not exist: {step.topic}")
+        if step.topic in covered:
+            raise ValueError(f"step {number} ({step.topic}) repeats a topic")
         waiting = sorted(needs[step.topic] - covered)
         if waiting:
             raise ValueError(

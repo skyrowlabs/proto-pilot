@@ -307,15 +307,15 @@ def test_a_step_inside_a_partial_cycle_or_behind_one_is_refused(tmp_path, topic)
     assert "waits on" in refused(tmp_path / "tree", connect=LOOP, start={"steps": [step(topic)]})
 
 
-def test_a_cycle_over_every_topic_fails_the_start_pass_by_name(tmp_path):
+def test_a_cycle_over_every_topic_fails_connect_before_consider_is_spent(tmp_path):
     ring = [edge(a, b) for a, b in zip(SLUGS, [*SLUGS[1:], SLUGS[0]])]
     job = job_for()
     llm = FakeLLM(script(connect={"edges": ring}))
     with pytest.raises(PlanPassError, match="has a cycle"):
         pipeline.run_plan(job, tmp_path / "tree", llm)
     failed = job.events[-1]
-    assert (failed["kind"], failed["name"]) == ("pass_failed", "start")
-    assert "start" not in [call["label"] for call in llm.calls]
+    assert (failed["kind"], failed["name"]) == ("pass_failed", "connect")
+    assert [call["label"] for call in llm.calls][-1] == "connect"
     assert list(tmp_path.iterdir()) == []
 
 
@@ -526,3 +526,114 @@ def test_an_unknown_topic_is_refused_by_drop_and_rename(which):
 def test_scope_seed_carries_no_baseline_content_for_a_model_to_inherit():
     plan = scope.seed(IDEA, "", "standard")
     assert (plan.goal, plan.constraints, plan.topics, plan.edges, plan.steps) == ("", [], [], [], [])
+
+
+# -- what the tester found ------------------------------------------------
+
+
+@pytest.mark.parametrize("bare", ["a bare string", {"a": "dict"}])
+@pytest.mark.parametrize(
+    ("name", "spoil"),
+    [
+        ("scope", lambda bare: {**GOOD["scope"], "constraints": bare}),
+        ("scope", lambda bare: {**GOOD["scope"], "questions": bare}),
+        ("consider", lambda bare: {"topics": [{**row, "risks": bare} for row in GOOD["consider"]["topics"]]}),
+    ],
+    ids=["constraints", "questions", "risks"],
+)
+def test_a_list_field_refuses_a_string_or_dict_rather_than_iterating_it(tmp_path, name, spoil, bare):
+    assert "must be a list" in refused(tmp_path / "tree", **{name: spoil(bare)})
+
+
+@pytest.mark.parametrize("empty", ["", {}])
+def test_an_empty_string_or_dict_is_not_an_empty_list_of_edges(tmp_path, empty):
+    assert "must be a list" in refused(tmp_path / "tree", connect={"edges": empty})
+
+
+def test_the_summary_counts_the_topics_a_review_left():
+    plan = scope.seed(IDEA, "", "standard").revised(topics=baseline.build_plan(IDEA).topics)
+    assert "depth: standard (7 topics)" in outline.add(plan, "One more", "It matters.").summary()
+
+
+def test_identical_edges_collapse_and_different_kinds_do_not(tmp_path):
+    edges = [edge("lending", "members"), edge("lending", "members"), edge("lending", "members", "informs")]
+    plan = run(tmp_path / "tree", connect={"edges": edges})
+    assert [(e.from_topic, e.kind) for e in plan.edges] == [("lending", "depends-on"), ("lending", "informs")]
+
+
+def test_the_same_topic_twice_in_start_is_refused(tmp_path):
+    said = refused(tmp_path / "tree", start={"steps": [step("members"), step("space"), step("members")]})
+    assert "step 3 (members) repeats a topic" in said
+
+
+def test_start_is_asked_for_no_more_steps_than_there_are_ready_topics():
+    plan = baseline.build_plan(IDEA)
+    assert start.schema(plan)["properties"]["steps"]["maxItems"] == len(start.ready(plan)) == 2
+    assert "at most 2 steps" in start.build(plan)[1]
+
+
+@pytest.mark.parametrize("opener", ["<!-- gone", "<!DOCTYPE x", "<?php", "<script>", "<STYLE>", "<details>", "</div>"])
+def test_model_text_cannot_open_an_html_block_that_hides_the_page(tmp_path, opener):
+    tree, spoilt = tmp_path / "tree", outline_of(SLUGS)
+    spoilt["topics"][0]["why"] = opener
+    run(tree, outline=spoilt)
+    for page in ("PLAN.md", "topics/members.md"):
+        body = (tree / page).read_text(encoding="utf-8").split("-->", 1)[1]
+        assert opener not in body and "&lt;" + opener[1:] in body
+    assert Plan.load(tree).topics[0].why == opener
+
+
+class Finishes(FakeLLM):
+    """A model that is overtaken: another run's plan lands while `start` is thinking."""
+
+    def __init__(self, tree: Path, rival: Plan):
+        super().__init__(script())
+        self.tree, self.rival = tree, rival
+
+    def structured(self, *, system: str, user: str, schema: dict, label: str) -> dict:
+        if label == "start":
+            self.rival.save(self.tree)
+        return super().structured(system=system, user=user, schema=schema, label=label)
+
+
+def test_a_plan_that_appears_during_the_passes_is_not_overwritten(tmp_path):
+    tree, rival = tmp_path / "tree", baseline.build_plan(IDEA)
+    with pytest.raises(pipeline.PlanRefused, match="gained a plan"):
+        pipeline.run_plan(job_for(), tree, Finishes(tree, rival))
+    assert Plan.load(tree) == rival
+
+
+def half_a_write(monkeypatch) -> None:
+    """Writes to plan.json, or to anything beside it, die after half the text has landed."""
+    real = Path.write_text
+
+    def dies(self, text, *args, **kwargs):
+        if "plan.json" in self.name:
+            real(self, text[: len(text) // 2], *args, **kwargs)
+            raise OSError("disk full")
+        return real(self, text, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", dies)
+
+
+def test_a_save_that_dies_keeps_the_plan_that_was_there(tmp_path, monkeypatch):
+    tree, plan = tmp_path / "tree", baseline.build_plan(IDEA)
+    plan.save(tree)
+    before = snapshot(tree)
+    half_a_write(monkeypatch)
+    with pytest.raises(OSError, match="disk full"):
+        plan.revised(goal="Another goal.").save(tree)
+    assert snapshot(tree) == before
+
+
+def test_a_first_save_that_dies_leaves_no_directory_behind(tmp_path, monkeypatch):
+    half_a_write(monkeypatch)
+    with pytest.raises(OSError, match="disk full"):
+        baseline.build_plan(IDEA).save(tmp_path / "deep" / "tree")
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_after_failure_says_so_when_a_tree_holds_no_plan(tmp_path):
+    said = pipeline.after_failure(tmp_path)
+    assert "holds no plan" in said and "refused" in said
+    assert "Nothing was written" not in said

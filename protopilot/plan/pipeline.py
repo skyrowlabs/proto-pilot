@@ -107,15 +107,22 @@ def outlined(job, llm: LLM, plan: Plan) -> Plan:
     return plan
 
 
+def _refuse_if_taken(job, tree: Path) -> None:
+    if existing_plan(tree, job.idea, job.direction) is not None:
+        raise PlanRefused(f"{tree} gained a plan while this one was being made; leaving it alone")
+
+
 def build(job, tree: Path, plan: Plan, llm: LLM) -> None:
     """Everything after the review, whether a person approved it or nobody was asked."""
     tree = Path(tree)
-    if existing_plan(tree, job.idea, job.direction) is not None:
-        raise PlanRefused(f"{tree} gained a plan while this one was being made; leaving it alone")
+    _refuse_if_taken(job, tree)
     job.project_dir = str(tree)
 
     for module in (connect, consider, start):
         plan = _model_pass(job, module, plan, llm)
+    # Again, because those passes take minutes. What is left is the instant between
+    # here and the save's rename, in which another run's plan would still be replaced.
+    _refuse_if_taken(job, tree)
 
     def written() -> tuple[None, list[str]]:
         saved = plan.save(tree)
@@ -157,4 +164,6 @@ def after_failure(tree: Path) -> str:
     """What a failed run left in `tree`, and what running the command again does."""
     if plan_path(tree).exists():
         return f"{tree} holds the whole plan but maybe not every page. Rerun to draw it again, with no model call."
+    if tree.exists():
+        return f"{tree} exists and holds no plan, so a rerun would be refused. Remove it, or pick another --dir."
     return f"Nothing was written to {tree}. Rerunning starts over from scope, and any review edits are lost."

@@ -10,7 +10,7 @@ from typing import get_args
 
 from protopilot.plan import baseline
 from protopilot.plan.model import Edge, EdgeKind, Plan
-from protopilot.plan.passes import BRIEF, scope_block, topics_block
+from protopilot.plan.passes import BRIEF, listed, scope_block, topics_block
 
 NAME = "connect"
 
@@ -63,7 +63,8 @@ def offline(plan: Plan) -> dict:
 
 
 def apply(plan: Plan, data: dict) -> Plan:
-    edges = [Edge(from_topic=r["from_topic"], to_topic=r["to_topic"], kind=r["kind"]) for r in data["edges"]]
+    rows = [Edge(from_topic=r["from_topic"], to_topic=r["to_topic"], kind=r["kind"]) for r in listed(data["edges"])]
+    edges = list({(e.from_topic, e.to_topic, e.kind): e for e in rows}.values())
     known = {topic.slug for topic in plan.topics}
     for edge in edges:
         unknown = sorted({edge.from_topic, edge.to_topic} - known)
@@ -71,4 +72,6 @@ def apply(plan: Plan, data: dict) -> Plan:
             raise ValueError(f"an edge names topics that do not exist: {', '.join(unknown)}")
         if edge.from_topic == edge.to_topic:
             raise ValueError(f"an edge joins {edge.from_topic!r} to itself")
+    if known <= {edge.from_topic for edge in edges if edge.kind == "depends-on"}:
+        raise ValueError("every topic depends on another, so `depends-on` has a cycle and nothing can go first")
     return plan.revised(edges=edges)

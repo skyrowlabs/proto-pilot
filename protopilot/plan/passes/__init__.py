@@ -44,9 +44,16 @@ def text(value: str) -> str:
     return line
 
 
+def listed(values: list) -> list:
+    """`values`, refused unless a list: a string or a dict would iterate without complaint."""
+    if not isinstance(values, list):
+        raise ValueError(f"a field that must be a list held {type(values).__name__}")
+    return values
+
+
 def lines(values: list[str]) -> list[str]:
     """A list of one-line items, with the blank ones dropped."""
-    return [line for line in (clean(value) for value in values) if line]
+    return [line for line in (clean(value) for value in listed(values)) if line]
 
 
 def scope_block(plan: Plan) -> str:

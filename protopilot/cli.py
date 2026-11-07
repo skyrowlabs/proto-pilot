@@ -385,10 +385,21 @@ def _plan_step(job, target: Path, work):
     from protopilot.plan import pipeline
 
     produced: list = []
+    refused: list[str] = []
+
+    def run(j) -> None:
+        try:
+            produced.append(work(j))
+        except pipeline.PlanRefused as exc:
+            refused.append(str(exc))
+            raise
+
     shown = len(job.lines)
     job.finished_at = ""  # the halves share a job, and `_follow` waits on this
-    STORE.run(job, lambda j: produced.append(work(j)))
+    STORE.run(job, run)
     _follow(job, shown)
+    if refused:
+        raise click.ClickException(refused[0])  # it says all there is: this run wrote nothing
     if job.status != "done":
         raise click.ClickException(f"{job.error}\n  {pipeline.after_failure(target)}")
     return produced[0]
@@ -413,6 +424,7 @@ def _review_edit(plan, line: str):
     if verb == "add":
         if not rest:
             raise ValueError("add needs a title: add TITLE")
+        outline.addable(plan, rest)
         return outline.add(plan, rest, click.prompt("Why does it matter?", default="", show_default=False))
     if verb == "drop":
         return outline.drop(plan, rest)
@@ -499,8 +511,8 @@ def plan_command(
         raise click.ClickException(str(exc)) from exc
     if llm.offline and depth:
         raise click.ClickException(
-            "--depth needs the model: the offline baseline always writes the same six topics. "
-            "Drop --depth, or drop --offline."
+            "--depth needs the model, and the backend for this run is offline, which always writes "
+            "the same six topics. Drop --depth, or choose a backend that calls the model."
         )
 
     job = STORE.create(idea, direction)

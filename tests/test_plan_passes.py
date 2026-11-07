@@ -168,12 +168,12 @@ def test_no_steps_is_refused(tmp_path):
     assert "no steps" in fail_at(tmp_path / "tree", start={"steps": []})
 
 
-def test_a_cycle_leaving_nothing_ready_is_refused_before_the_call(tmp_path):
+def test_a_cycle_leaving_nothing_ready_is_refused_before_consider(tmp_path):
     ring = [{"from_topic": a, "to_topic": b, "kind": "depends-on"} for a, b in zip(SLUGS, [*SLUGS[1:], SLUGS[0]])]
     llm = FakeLLM(script(connect={"edges": ring}))
     with pytest.raises(PlanPassError, match="cycle"):
         pipeline.run_plan(job_for(), tmp_path / "tree", llm)
-    assert [c["label"] for c in llm.calls][-1] == "consider"
+    assert [c["label"] for c in llm.calls][-1] == "connect"
     assert not (tmp_path / "tree").exists()
 
 

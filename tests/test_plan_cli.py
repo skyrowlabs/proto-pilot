@@ -567,3 +567,71 @@ def test_a_model_plan_with_a_direction_and_an_answer_rerenders_from_its_own_comm
     assert Plan.load(tree).constraints == ["one town", "Who runs it? volunteers"]
     no_backend()
     assert invoke(*args).exit_code == 0
+
+
+# -- what the tester found ------------------------------------------------
+
+
+def test_a_plan_json_that_cannot_be_written_means_what_the_message_says(tmp_path, model, monkeypatch):
+    tree, real = tmp_path / "tree", Path.write_text
+
+    def dies(self, text, *args, **kwargs):
+        if "plan.json" in self.name:
+            raise OSError("disk full")
+        return real(self, text, *args, **kwargs)
+
+    model()
+    monkeypatch.setattr(Path, "write_text", dies)
+    failed = invoke(IDEA, "--yes", "--dir", str(tree))
+    assert failed.exit_code == 1
+    assert f"Nothing was written to {tree}." in said(failed)
+    assert list(tmp_path.iterdir()) == []
+
+    monkeypatch.setattr(Path, "write_text", real)
+    model()
+    assert invoke(IDEA, "--yes", "--dir", str(tree)).exit_code == 0
+
+
+class Overtaken(Recording):
+    """Another run takes the tree while `start` is thinking."""
+
+    def __init__(self, tree: Path):
+        super().__init__(script())
+        self.tree = tree
+
+    def structured(self, *, system: str, user: str, schema: dict, label: str) -> dict:
+        if label == "start":
+            self.tree.mkdir()
+        return super().structured(system=system, user=user, schema=schema, label=label)
+
+
+def test_a_refusal_from_the_last_half_says_only_the_refusal(tmp_path, monkeypatch):
+    tree = tmp_path / "tree"
+    monkeypatch.setattr(cli, "build_llm", lambda **_: Overtaken(tree))
+    result = invoke(IDEA, "--yes", "--dir", str(tree))
+    assert result.exit_code == 1
+    assert "holds no plan; refusing to overwrite it" in said(result)
+    assert "Rerun" not in said(result) and "whole plan" not in said(result) and "PlanRefused" not in said(result)
+
+
+@pytest.mark.parametrize("flags", [["--backend", "offline"], ["--offline"]])
+def test_the_depth_refusal_names_no_flag_the_person_did_not_type(tmp_path, backends, flags):
+    result = invoke(IDEA, "--yes", "--depth", "deep", "--dir", str(tmp_path / "tree"), *flags)
+    assert result.exit_code == 1
+    assert "the backend for this run is offline" in said(result)
+    assert "--offline" not in said(result)
+
+
+@pytest.mark.parametrize(
+    ("stdin", "why_asked", "reason"),
+    [
+        ("add One\na\nadd Two\nb\nadd Three\n\n", 2, "at most 8"),
+        ("add Scope\n\n", 0, "already a topic 'scope'"),
+    ],
+    ids=["limit", "collision"],
+)
+def test_an_add_that_cannot_land_is_refused_before_asking_why(tmp_path, at_a_terminal, stdin, why_asked, reason):
+    result = invoke(IDEA, "--offline", "--dir", str(tmp_path / "tree"), stdin=stdin)
+    assert result.exit_code == 0, result.output
+    assert reason in said(result)
+    assert result.output.count("Why does it matter?") == why_asked

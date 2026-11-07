@@ -9,6 +9,9 @@ because the verifier has to load a broken plan to name what is wrong with it.
 from __future__ import annotations
 
 import json
+import os
+import uuid
+from contextlib import suppress
 from pathlib import Path
 from typing import Literal
 
@@ -138,7 +141,7 @@ class Plan(_Record):
         lines += [f"  constraint: {item}" for item in self.constraints]
         lines += [f"  open question: {item}" for item in self.questions]
         if self.depth:
-            lines.append(f"  depth: {self.depth} ({TOPIC_COUNTS[self.depth]} topics)")
+            lines.append(f"  depth: {self.depth} ({len(self.topics)} topics)")
         lines.append("  topics:")
         lines += [f"    {n}. {t.title} ({t.slug}): {t.why}" for n, t in enumerate(self.topics, start=1)]
         return "\n".join(lines)
@@ -150,12 +153,23 @@ class Plan(_Record):
         return cls.model_validate_json(plan_path(tree).read_text(encoding="utf-8"))
 
     def save(self, tree: Path) -> Path:
+        """Land plan.json whole or not at all; a save that fails leaves the disk as it found it."""
         path = plan_path(tree)
-        path.parent.mkdir(parents=True, exist_ok=True)
         data = self.model_dump(mode="json")
         if self.depth is None:
             del data["depth"]
-        path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        absent = [folder for folder in (path.parent, *path.parent.parents) if not folder.exists()]
+        temp = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            temp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+            os.replace(temp, path)
+        except BaseException:
+            with suppress(OSError):
+                temp.unlink(missing_ok=True)
+                for folder in absent:
+                    folder.rmdir()
+            raise
         return path
 
 

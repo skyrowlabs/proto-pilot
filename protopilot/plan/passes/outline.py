@@ -82,16 +82,24 @@ def _find(plan: Plan, which: str) -> Topic:
     raise ValueError(f"no topic {which!r}; use a number from the list, or a slug")
 
 
-def add(plan: Plan, title: str, why: str) -> Plan:
+def addable(plan: Plan, title: str) -> str:
+    """The slug `title` would take, or a refusal: what can be said before asking why it matters."""
     if len(plan.topics) >= MAX_TOPICS:
         raise ValueError(f"an outline holds at most {MAX_TOPICS} topics; drop one first")
-    title, why = baseline.clean(title), baseline.clean(why)
-    if not title or not why:
+    if not baseline.clean(title):
         raise ValueError("a topic needs a title and a line on why it matters")
-    slug = baseline.slug_for(title)
+    slug = baseline.slug_for(baseline.clean(title))
     if any(topic.slug == slug for topic in plan.topics):
         raise ValueError(f"there is already a topic {slug!r}")
-    return plan.revised(topics=[*plan.topics, Topic(slug=slug, title=title, why=why)])
+    return slug
+
+
+def add(plan: Plan, title: str, why: str) -> Plan:
+    slug = addable(plan, title)
+    if not baseline.clean(why):
+        raise ValueError("a topic needs a title and a line on why it matters")
+    topic = Topic(slug=slug, title=baseline.clean(title), why=baseline.clean(why))
+    return plan.revised(topics=[*plan.topics, topic])
 
 
 def drop(plan: Plan, which: str) -> Plan:
