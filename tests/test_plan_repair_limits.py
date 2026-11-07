@@ -629,6 +629,22 @@ def test_the_floor_is_never_worse_than_what_repair_started_with(tmp_path):
     assert sum(len(check.problems) for check in result.failed) == 1
 
 
+# -- what a repair says about its steps -----------------------------------
+
+
+def test_a_repair_that_only_rewords_a_step_says_so_and_claims_no_reorder():
+    entry = plan_of(GOOD_EDGES, ["lending", "members"])
+    moved = entry.steps[0].model_copy(update={"why": "Said better."})
+    assert repair.changes(entry, entry.revised(steps=[moved, entry.steps[1]])) == "reworded lending"
+
+
+def test_a_repair_that_moves_and_rewords_says_both():
+    entry = plan_of(GOOD_EDGES, ["lending", "members"])
+    moved = entry.steps[0].model_copy(update={"why": "Said better."})
+    said = repair.changes(entry, entry.revised(steps=[entry.steps[1], moved]))
+    assert said == "steps now members, lending; reworded lending"
+
+
 # -- what a repair is labelled with ---------------------------------------
 
 

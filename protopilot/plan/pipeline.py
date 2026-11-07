@@ -172,7 +172,10 @@ def _repair_once(job, llm: LLM, checked: Checked, entry: Plan, rejection: str) -
         return None
     change = repair.changes(plan, after)
     if not change:
-        notes = "offline mode cannot repair; rerun without --offline" if llm.offline else "the repair changed nothing"
+        retry = "remove this directory and run the command with a model backend"
+        notes = (
+            f"offline mode cannot repair; to have a model try, {retry}" if llm.offline else "the repair changed nothing"
+        )
         job.log(f"    repair produced no changes: {notes}")
         job.event("repair_empty", attempt=attempt, notes=notes)
         checked.tried.append(f"{label}: {notes}")

@@ -234,6 +234,8 @@ def test_the_offline_twin_changes_nothing_and_stops_the_loop_saying_so():
     assert not checked.verdict.ok
     assert checked.attempts == 1
     assert "offline mode cannot repair" in checked.tried[0]
+    assert "remove this directory and run the command with a model backend" in checked.tried[0]
+    assert "rerun without --offline" not in checked.tried[0]
     assert kinds(job) == ["verify_started", "verify_failed", "repair_started", "repair_empty", "exhausted"]
 
 

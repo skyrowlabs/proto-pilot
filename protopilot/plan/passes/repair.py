@@ -135,6 +135,11 @@ def changes(before: Plan, after: Plan) -> str:
     """What the repair did, from the data rather than the model's account of it. Empty if nothing."""
     was, now = {_key(edge) for edge in before.edges}, {_key(edge) for edge in after.edges}
     parts = [f"removed {key}" for key in sorted(was - now)] + [f"added {key}" for key in sorted(now - was)]
-    if before.steps != after.steps:
-        parts.append(f"steps now {', '.join(step.topic for step in after.steps)}")
+    order = [step.topic for step in after.steps]
+    if order != [step.topic for step in before.steps]:
+        parts.append(f"steps now {', '.join(order)}")
+    was_said = {step.topic: step for step in before.steps}
+    reworded = [step.topic for step in after.steps if was_said.get(step.topic, step) != step]
+    if reworded:
+        parts.append(f"reworded {', '.join(reworded)}")
     return "; ".join(parts)
