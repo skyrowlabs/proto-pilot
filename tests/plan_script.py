@@ -34,6 +34,11 @@ GOOD = {
 }
 
 
+def repair_of(edges: list[dict], topics: list[str]) -> dict:
+    """A repair response: the complete edges, and a step for each of `topics`."""
+    return {"edges": edges, "steps": [step(topic) for topic in topics]}
+
+
 def script(**overrides: object) -> list:
     """The five responses of a good run, in pass order, with any replaced by name."""
     return [copy.deepcopy({**GOOD, **overrides}[name]) for name in PASS_NAMES]

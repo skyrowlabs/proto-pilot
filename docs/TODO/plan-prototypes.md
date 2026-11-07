@@ -188,9 +188,9 @@ Decision 5 is confirmed.
 
 ## Phase 4 — Verifier and repair
 
-- [ ] One check per bullet in *What "verified" means*, each with a planted-failure test
-- [ ] Repair pass bounded as `proto new`'s is, editing `plan.json` only
-- [ ] Green line states the limit in words
+- [x] One check per bullet in *What "verified" means*, each with a planted-failure test
+- [x] Repair pass bounded as `proto new`'s is, editing `plan.json` only
+- [x] Green line states the limit in words
 
 ## Phase 5 — Dreaming
 

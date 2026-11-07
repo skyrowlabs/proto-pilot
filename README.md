@@ -55,6 +55,7 @@ Write this plan? Enter accepts, or: add TITLE | drop N | rename N TITLE | quit:
   pass start...
   pass render...
 Not researched: nothing here was checked against a source.
+Green: this plan's structure holds, which is not the same as true. Nothing in it traces to a source.
 
 Plan at open_small_bakery_that. Start with PLAN.md.
 ```
@@ -100,7 +101,7 @@ Planning needs nothing else. Docker is only for `proto new --target web`.
 
 | | |
 |---|---|
-| `proto plan IDEA` | scope it, outline it with you, connect the topics, weigh the risks, pick first steps, write the folder |
+| `proto plan IDEA` | scope it, outline it with you, connect the topics, weigh the risks, pick first steps, check the structure, write the folder |
 | `proto doctor` | why it will not work here |
 
 Useful flags on `plan`: `--direction` (scope, emphasis, constraints), `--depth`
@@ -109,7 +110,7 @@ Useful flags on `plan`: `--direction` (scope, emphasis, constraints), `--depth`
 
 Off a terminal, `--yes` is required, so a script is refused rather than left waiting.
 Run on a folder that already holds a plan for the same idea and direction, it redraws
-the pages from the plan and calls no model.
+the pages and checks the plan again with no model call, and exits 1 if the plan is red.
 
 **Rendered pages are not for editing.** The plan is stored as data in the folder, every
 page is drawn from it, and a re-render overwrites them.
@@ -127,7 +128,7 @@ The prototype commands are under [Prototypes come later](#prototypes-come-later)
 | `consider` | per topic: risks, unknowns, decisions someone must make | built |
 | `start` | the first few steps, each with its reason | built |
 | `dream` | extensions of the idea, collected, evaluated and proposed | coming |
-| `verify` | structural checks, with a bounded repair | coming |
+| `verify` | structural checks, with a bounded repair | built |
 | render | every page | built, no model call |
 
 **The review sits at the outline** because that is the last cheap place to fix a
@@ -135,16 +136,24 @@ misreading. A topic list can be read in thirty seconds and a finished document c
 Add, drop or rename topics there before the rest is written.
 
 **Where to start is checked, not just written.** The first step must have no unmet
-dependency and each later step must follow what it depends on. A plan that breaks that
-is refused, not written. So is one naming a topic that does not exist, or one where every
-topic waits on another.
+dependency, each later step must follow what it depends on, and `depends-on` links may
+not form a loop. Output naming a topic that does not exist is refused outright.
+
+**Verified means the structure holds, never that the plan is true.** The checks prove
+the topics, links and steps agree with each other, and the green line says only what
+held. A check with nothing to read reports that, and never counts as passed.
+
+**Red gets a bounded repair, then a floor.** Repair has three attempts and can only
+change links and steps. It cannot reword a healthy step, drop a real dependency or make
+things worse. If the plan is still red you get the whole folder anyway, with a
+`RUNBOOK.md` saying what is wrong, "Not verified" banners on the pages, and exit 1.
 
 **Model output is data, not authority.** A pass can only fill the fields it owns. It
 cannot mark a plan researched, add a source or remove the stamp, and the only model text
 that reaches a file name is a checked slug.
 
-**Nothing is written until every model pass has worked.** A failed run leaves no folder,
-so a rerun starts over from `scope`, and review edits are lost.
+**A pass that fails leaves no folder.** A rerun starts over from `scope`, and review
+edits are lost.
 
 ### What a plan does not know yet
 
@@ -153,10 +162,8 @@ sourced findings. Treat what it says as a well-organised set of questions and re
 not as facts. Only the prompt stops a model stating a fact inside a risk or a reason, and
 the stamp is there for that.
 
-Three things are next, in [the plan for this work](docs/TODO/plan-prototypes.md):
+Two things are next, in [the plan for this work](docs/TODO/plan-prototypes.md):
 
-- **A verifier**, to prove a plan is coherent and traceable. It will never prove a plan
-  true, and its green line will say so.
 - **Dreaming**, because every pass here narrows. It collects lighter extensions of the
   idea through fixed lenses, scores them in a separate call, and keeps them in their own
   file so a guess can never read as a finding. Only a person promotes one into the plan.
@@ -236,7 +243,7 @@ per pass. Override with `PROTOPILOT_MODEL` / `PROTOPILOT_EFFORT`.
 until a plan is concrete enough to feed it.
 
 Early, and honest about it. `proto plan` runs against a real model today and writes a
-real plan, with no research, dreaming or verification yet. `NOTES.md` is the live parking
+real plan with its structure checked, with no research or dreaming yet. `NOTES.md` is the live parking
 lot: open items, what got resolved, and what is worth doing next.
 
 ## Working on this repo

@@ -69,9 +69,22 @@ proto plan "start a community tool library" --offline --yes
 | `--yes`, `-y` | Skip scope's questions, which stay open in `PLAN.md`, and the outline review |
 
 A run calls a model by default: `scope`, `outline`, the review, `connect`, `consider`,
-`start`, then render. **It does no research, dreaming or verification yet**, so every
-plan is stamped *Not researched* and holds no findings beyond the offline baseline's
-assumptions.
+`start`, verification, any repair, then render. **It does no research or dreaming
+yet**, so every plan is stamped *Not researched* and holds no findings beyond the
+offline baseline's assumptions.
+
+**Verification proves structure, never truth.** A green run ends on a line built from
+what held: it names those checks and claims nothing past them. A check with nothing
+to read is reported as *no subject*, which is not a pass.
+
+**Red gets up to 3 repair attempts, on links and steps only.** The checkpoint's
+estimate counts them as 0 to 3 extra calls. Repair can mend a `depends-on` loop or the
+order of the steps, so any other failure goes unrepaired, and offline it changes
+nothing.
+
+**When repair runs out, the whole tree is still written, and the run exits 1.** It
+holds a `RUNBOOK.md` saying what is wrong and what was tried, `PLAN.md` and every topic
+page carry a *Not verified* banner, and there is no green line.
 
 At the review, Enter accepts, `add TITLE`, `drop N` and `rename N TITLE` edit, and
 `quit` stops with nothing written. Edits can leave the outline anywhere from four to
@@ -81,9 +94,20 @@ eight topics, whatever `--depth` asked for.
 refuses before calling a model.
 
 **A failed model pass leaves no tree.** A rerun starts from scope, and any review
-edits are lost. A render that fails after saving `plan.json` keeps it, so a rerun
-redraws it with no model call.
+edits are lost. A failed repair pass is not one of these: it ends repair, and the tree
+is written as above. A render that fails after saving `plan.json` keeps it, so a rerun
+redraws it with no model call. A write that dies partway can leave old topic pages
+behind, and the error says any page may be out of date until that rerun.
 
-**Rerunning a finished plan re-renders it.** It calls no model and needs neither
-`--yes` nor a terminal. The same target with another idea or direction is refused, as
-is a `--depth` other than the plan's.
+**Rerunning a finished plan verifies it again and re-renders it.** It calls no model
+and needs neither `--yes` nor a terminal. It exits 1 if the plan is red, with the same
+runbook and banners, so it is how a hand edit to `plan.json` gets checked. With no
+model there is no repair: to have one try again, remove the directory and start over.
+The same target with another idea or direction is refused, as is a `--depth` other
+than the plan's.
+
+**A page's name belongs to the plan.** A `RUNBOOK.md` of your own is left alone on
+green, and blocks a red plan: every other page is drawn and marked, and the command
+refuses with exit 1 until it is moved. A link at a page path is refused the same way,
+as is a directory there, except that on green nothing is drawn. Nothing is written
+outside the tree. A green run removes only a runbook this tool wrote.

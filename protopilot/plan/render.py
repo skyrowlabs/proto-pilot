@@ -16,10 +16,15 @@ from protopilot.plan.model import Dream, Edge, Finding, Plan, Source, Topic
 PLAN_FILE = "PLAN.md"
 DREAMS_FILE = "dreams.md"
 SOURCES_FILE = "sources.md"
+RUNBOOK_FILE = "RUNBOOK.md"
 TOPICS_DIR = "topics"
 
 HEADER = "<!-- Rendered from .protopilot/plan.json. A re-render overwrites this file: do not edit it. -->"
 NOT_RESEARCHED = "> **Not researched.** Nothing here was checked against a source; every finding is an assumption."
+#: Opens every runbook this tool writes, and is how a green run tells one from a person's own.
+RUNBOOK_MARK = "<!-- Written by proto plan because this plan failed its checks. A green run removes this file. -->"
+NOT_VERIFIED = f"> **Not verified.** This plan failed its checks; [{RUNBOOK_FILE}]({RUNBOOK_FILE}) says what is wrong."
+NOT_VERIFIED_TOPIC = NOT_VERIFIED.replace(f"]({RUNBOOK_FILE})", f"](../{RUNBOOK_FILE})")
 UNSET = "Not established."
 
 #: What opens an HTML block in CommonMark, whose types 1 to 6 this lists: a comment or
@@ -32,6 +37,10 @@ HTML_OPENER = re.compile(
     r"|section|style|summary|table|tbody|td|textarea|tfoot|th|thead|title|tr|track|ul)(?![a-z0-9-]))",
     re.IGNORECASE,
 )
+
+
+class PageBlocked(Exception):
+    """Something that is not a page sits where a page must go; the message says what to do."""
 
 
 def _inert(value: object) -> object:
@@ -67,7 +76,7 @@ def _edge_line(edge: Edge, titles: dict[str, str]) -> str:
     return f"{subject} {edge.kind.replace('-', ' ')} {titles.get(edge.to_topic, edge.to_topic)}"
 
 
-def _plan_page(plan: Plan) -> str:
+def _plan_page(plan: Plan, verified: bool) -> str:
     titles = {t.slug: t.title for t in plan.topics}
     scope = [
         f"**Goal:** {plan.goal or UNSET}",
@@ -81,6 +90,7 @@ def _plan_page(plan: Plan) -> str:
     return _page(
         f"# {plan.title}",
         _stamp(plan),
+        "" if verified else NOT_VERIFIED,
         f"## The idea\n\n{plan.idea}",
         "\n\n".join(scope),
         f"## Constraints\n\n{_bullets(plan.constraints)}",
@@ -100,13 +110,14 @@ def _finding_line(finding: Finding, known_sources: set[str]) -> str:
     return f"{label}{finding.text}{cited}"
 
 
-def _topic_page(plan: Plan, topic: Topic) -> str:
+def _topic_page(plan: Plan, topic: Topic, verified: bool) -> str:
     titles = {t.slug: t.title for t in plan.topics}
     links = [_edge_line(e, titles) for e in _edges(plan) if topic.slug in (e.from_topic, e.to_topic)]
     known_sources = {s.id for s in plan.sources}
     return _page(
         f"# {topic.title}",
         _stamp(plan),
+        "" if verified else NOT_VERIFIED_TOPIC,
         f"Part of [{plan.title}](../{PLAN_FILE}).",
         topic.why,
         f"## Findings\n\n{_bullets([_finding_line(f, known_sources) for f in topic.findings])}",
@@ -156,25 +167,93 @@ def _sources_page(plan: Plan) -> str:
     return _page("# Sources", _stamp(plan), _bullets(sources, empty="No sources."))
 
 
-def render(plan: Plan) -> dict[str, str]:
-    """Every markdown file, by path relative to the tree."""
+def render(plan: Plan, runbook: str = "") -> dict[str, str]:
+    """Every markdown file, by path relative to the tree. A `runbook` marks the plan unverified."""
     plan = Plan.model_validate(_inert(plan.model_dump()))
-    pages = {PLAN_FILE: _plan_page(plan)}
-    pages.update({f"{TOPICS_DIR}/{t.slug}.md": _topic_page(plan, t) for t in plan.topics})
+    verified = not runbook
+    pages = {PLAN_FILE: _plan_page(plan, verified)}
+    pages.update({f"{TOPICS_DIR}/{t.slug}.md": _topic_page(plan, t, verified) for t in plan.topics})
     pages[DREAMS_FILE] = _dreams_page(plan)
     pages[SOURCES_FILE] = _sources_page(plan)
+    if runbook:
+        pages[RUNBOOK_FILE] = f"{RUNBOOK_MARK}\n\n{_inert(runbook)}"
     return pages
 
 
-def write(plan: Plan, tree: Path) -> list[str]:
-    """Overwrite the rendered files, and drop topic pages the plan no longer has."""
-    pages = render(plan)
-    topics = Path(tree) / TOPICS_DIR
-    topics.mkdir(parents=True, exist_ok=True)
-    for stale in topics.glob("*.md"):
-        if stale.is_file() and f"{TOPICS_DIR}/{stale.name}" not in pages:
-            stale.unlink()
-    # The entry page goes last, so a fresh tree holding PLAN.md holds every page.
-    for name in sorted(pages, key=lambda page: page == PLAN_FILE):
-        (Path(tree) / name).write_text(pages[name], encoding="utf-8")
+def _is_ours(path: Path) -> bool:
+    """A runbook this tool wrote, read without following a link."""
+    if path.is_symlink() or not path.is_file():
+        return False
+    return path.read_text(encoding="utf-8", errors="replace").startswith(RUNBOOK_MARK)
+
+
+def _blockers(pages: dict[str, str], tree: Path) -> list[Path]:
+    """What stands where a page must go: a link, dangling or not, a directory, a person's runbook."""
+    folder = tree / TOPICS_DIR
+    blocked = [folder] if folder.is_symlink() or (folder.exists() and not folder.is_dir()) else []
+    for name in pages:
+        path = tree / name
+        if name.startswith(f"{TOPICS_DIR}/") and blocked[:1] == [folder]:
+            continue
+        foreign = name == RUNBOOK_FILE and path.exists() and not _is_ours(path)
+        if path.is_symlink() or path.is_dir() or foreign:
+            blocked.append(path)
+    return blocked
+
+
+def _clear_stale(pages: dict[str, str], tree: Path, folder_free: bool) -> None:
+    """Drop a topic page the plan lost, and a runbook of ours once green. A link is never followed or removed."""
+    stale = [path for path in (tree / TOPICS_DIR).glob("*.md") if f"{TOPICS_DIR}/{path.name}" not in pages]
+    stale = stale if folder_free else []
+    if RUNBOOK_FILE not in pages and _is_ours(tree / RUNBOOK_FILE):
+        stale.append(tree / RUNBOOK_FILE)
+    for path in stale:
+        if path.is_file() and not path.is_symlink():
+            path.unlink()
+
+
+def write(plan: Plan, tree: Path, runbook: str = "") -> list[str]:
+    """Overwrite the rendered files and drop stale ones, never through anything `_blockers` names.
+
+    A green plan that is blocked moves nothing. A red one still draws every page it can
+    reach, so no old page goes on reading as verified, and then refuses.
+    """
+    tree = Path(tree)
+    pages = render(plan, runbook)
+    blocked = _blockers(pages, tree)
+    names = ", ".join(str(path) for path in blocked)
+    if blocked and not runbook:
+        raise PageBlocked(
+            f"The plan is saved but nothing was drawn, because a page needs this name: {names}. "
+            "Move it out of the way and rerun, which draws the plan again with no model call."
+        )
+    folder = tree / TOPICS_DIR
+    folder_free = folder not in blocked
+    if folder_free:
+        folder.mkdir(parents=True, exist_ok=True)
+    _clear_stale(pages, tree, folder_free)
+    free = [
+        name for name in pages if tree / name not in blocked and (folder_free or not name.startswith(f"{TOPICS_DIR}/"))
+    ]
+    # The entry page goes last, so a fresh tree holding PLAN.md holds every page. Over an old
+    # one a red plan goes first, so a write that dies midway leaves it marked rather than clean.
+    entry_first = bool(runbook) and (tree / PLAN_FILE).is_file()
+    for name in sorted(free, key=lambda page: (page == PLAN_FILE) != entry_first):
+        (tree / name).write_text(pages[name], encoding="utf-8")
+    if blocked:
+        raise PageBlocked(
+            f"The plan is saved and failed its checks, and a page needs this name: {names}. Every other page is "
+            "drawn and marked not verified. Move it out of the way and rerun, which draws the rest with no model call."
+        )
     return list(pages)
+
+
+def read(tree: Path) -> dict[str, str]:
+    """The pages on disk, in `render`'s shape, so a check reads what landed as it reads what was drawn."""
+    tree = Path(tree)
+    found = [*tree.glob("*.md"), *(tree / TOPICS_DIR).glob("*.md")]
+    return {
+        path.relative_to(tree).as_posix(): path.read_text(encoding="utf-8", errors="replace")
+        for path in found
+        if path.is_file() and not path.is_symlink()
+    }

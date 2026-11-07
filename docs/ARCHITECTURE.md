@@ -159,8 +159,8 @@ rewrite the meaning of every spec on disk.
 ## The plan pipeline
 
 `proto plan "an idea"` writes a folder of text instead of an app:
-`PLAN.md`, `topics/`, `dreams.md`, `sources.md` and a stored `plan.json`. Why
-is [plans-first](ideas/plans-first.md); the design and what is still to build are
+`PLAN.md`, `topics/`, `dreams.md`, `sources.md` and a stored `plan.json`, with a
+`RUNBOOK.md` when the plan ends red. Why is [plans-first](ideas/plans-first.md); the design and what is still to build are
 [plan-prototypes](TODO/plan-prototypes.md); flags are in [CLI.md](CLI.md#proto-plan).
 
 **It is a sibling of the `Spec` pipeline, not a third target.** It shares the job
@@ -175,28 +175,69 @@ HTML opener in plan text.
   drawn from it, and a re-render overwrites them, so an edit belongs in `plan.json`.
 - **Rendering is deterministic.** `render.py` uses no model and no clock, so one
   plan is one set of bytes; `tests/test_plan_render.py` holds that.
-- **A run is `scope`, `outline`, the review, `connect`, `consider`, `start`, then
-  render.** That is five model calls, one per module in `protopilot/plan/passes/`.
-  `pipeline.py` runs them on one job, in halves, so `proto plan` can stop for
+- **A run is `scope`, `outline`, the review, `connect`, `consider`, `start`,
+  verification, any repair, then render.** That is five model calls and up to three
+  repair calls, one module each in `protopilot/plan/passes/`. `pipeline.py` runs them on one job, in halves, so `proto plan` can stop for
   scope's questions and the outline review. `--yes` skips both, and off a terminal
   it is required, `--offline` included, because a prompt there cannot be answered.
-- **Nothing is researched or verified yet.** No research, dreaming or verification
-  pass exists, so every plan is stamped not researched. A pass's `apply` reads only
-  the fields it names, so none can set `researched`, `sources` or a finding: a model
-  run's topics have no findings, and an offline run's have only the baseline's
-  assumptions. `apply` refuses output it cannot use, such as an edge to a missing
-  topic or a step ahead of its dependency, which is not the verifier.
+- **Nothing is researched yet.** No research or dreaming pass exists, so every plan
+  is stamped not researched, green or red. A pass's `apply` reads only the fields it
+  names, so none can set `researched`, `sources` or a finding: a model run's topics
+  have no findings, and an offline run's have only the baseline's assumptions.
+  `apply` refuses what a plan cannot hold, such as an edge or a step naming a missing
+  topic. Order is the verifier's: a step ahead of its dependency lands in the plan and
+  goes red at `start_order`.
+- **Verification proves structure, never truth.** `verify.py` has one check per bullet
+  of [What "verified" means](TODO/plan-prototypes.md#what-verified-means-for-text):
+  `topic_map`, `no_cycles`, `findings_traced`, `sources_fetched`, `start_order`,
+  `dreams_shaped` and `dreams_apart`. Each is a pure function of a plan and its pages,
+  so one check judges the pages drawn in memory and the pages read back from disk, and
+  all of them always run. A check ends passed, failed or no subject, and no subject
+  proved nothing. `green_line` builds its sentence from what held: *coherent and
+  traceable* needs `findings_traced` and `sources_fetched` both to hold, which no
+  run earns until research records a fetch, so green today says the structure holds
+  and that nothing traces to a source.
+- **Repair reaches links and steps, and nothing else.** On red, `repaired` runs
+  `protopilot/plan/passes/repair.py` up to three times, against pages drawn in memory,
+  so repair only ever edits data. Its `apply` is `connect`'s then `start`'s, and `FIXES`
+  names the two checks whose subject that is, `no_cycles` and `start_order`; any other
+  failure goes to the floor with no call made. `rejected` is the plan's shrink guard,
+  judged against the plan repair started from: it throws away a repair that removes an
+  edge on no loop, every link of a loop, or a healthy step, unless the step cap forced
+  that out for a step a kept one waits on. `worsened` throws away one that leaves more
+  wrong than it found. A thrown-away attempt counts, and its reason goes into the next.
+  A repair pass that fails or changes nothing stops the loop, and offline, where the
+  twin returns the plan as it stands, that is the first attempt.
+- **The floor hands back a whole tree.** A plan still red is written anyway, with a
+  `RUNBOOK.md` from `verify.runbook`, a *Not verified* banner on `PLAN.md` and every
+  topic page, and no green line; `finished` says `ok=False` and the CLI exits 1, as
+  `proto new`'s floor does. `_hand_back` then judges what landed, so a plan green in
+  memory and red on disk takes the floor too. A failed pass is a different thing: a
+  pass that returns nothing a plan can hold leaves no tree at all.
 - **The baseline is the offline twin.** `baseline.py` builds a generic plan from the
   idea's words, and each pass's `offline` slices it. It always has the same six
   topics, so `--depth`, which asks for 4, 6 or 8, is refused on an offline backend.
 - **Nothing reaches disk until render.** `plan.json` saves atomically, then the pages
-  follow with `PLAN.md` last. A failed model pass leaves no tree, and a rerun starts
-  from scope, losing any review edits. A render that fails after that save keeps
-  `plan.json`, so a rerun redraws it.
-- **A rerun of a finished plan is a re-render.** No pass runs, and it needs neither
-  `--yes` nor a terminal. Another idea, direction or `--depth` is refused. A directory
-  where a page belongs fails the render with a raw `IsADirectoryError`, and the
-  printed advice to rerun fails the same way until that directory is moved.
+  follow. In a fresh tree `PLAN.md` goes last, so holding it means holding every page;
+  over an old one a red plan draws it first, so a write that dies midway leaves it
+  marked. A failed model pass leaves no tree, and a rerun starts from scope, losing any
+  review edits. A render that fails after that save keeps `plan.json`, so a rerun
+  redraws it. **That order covers `PLAN.md` alone:** a write dying mid-render can leave
+  old topic pages, unmarked, which is why `after_failure` says any page may be out of
+  date and points at the rerun.
+- **A rerun of a finished plan is a re-render, and it verifies.** No pass runs, and it
+  needs neither `--yes` nor a terminal. Another idea, direction or `--depth` is refused.
+  `plan.json` may be hand-edited, so `rerender` judges it as it stands, and red takes
+  the floor and exits 1. With no model there is no repair, so a red tree's rerun never
+  retries one: a fresh attempt means removing the tree.
+- **`render.write` never writes through what it did not make.** `_blockers` names a
+  link, dangling or not, at a page path or at `topics/`, a directory at a page path,
+  and a `RUNBOOK.md` that does not open with `RUNBOOK_MARK`, which is a person's. A
+  green plan that is blocked draws nothing. A red one draws every page it can reach,
+  so no old page goes on reading as verified, then refuses. Both refuse by name with
+  exit 1, nothing is written outside the tree, and a link is neither followed nor
+  removed. A green run removes a runbook only if it carries the mark, so a person's
+  stays.
 - **A plan tree is not a prototype.** It is not in the registry, so `proto ls`
   omits it, and `proto rm`, `up` and the other app commands refuse it for having no
   `spec.json`.
