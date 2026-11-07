@@ -37,19 +37,22 @@ proto plan "open a small bakery that only sells sourdough" --direction "one pers
   pass scope...
   pass outline...
 Open a small bakery that only sells sourdough
-  constraint: Rented kitchen — no owned or dedicated premises; access is on someone else's terms
-  constraint: Sourdough only — a single product category, with no other baked goods as a hedge
-  open question: Is this meant to replace a full-time income, or to run alongside other work?
+  constraint: Rented kitchen rather than owned or purpose-built premises, so access is time-bound and the space is likely shared
+  constraint: Sourdough only — no other product category to spread risk across or to fill slack time in the day
+  open question: Is this meant to replace the person's income, or run alongside other work?
   depth: shallow (4 topics)
   topics:
-    1. The fermentation clock vs. booked kitchen hours
-    2. Kitchen terms and who holds the obligations
-    3. What a loaf must earn, and how it reaches a buyer
-    4. Testing demand cheaply, and the conditions to stop
-Estimated model calls: 8 in all, 6 still to come (connect, consider, start, collect, evaluate, propose), plus 0 to 3 repair calls, only if verification finds something repair can fix. Research does not run in this build, so these numbers exclude it.
+    1. The fermentation clock vs. time-bound kitchen access
+    2. What one person can actually bake in a session
+    3. Getting bread to buyers, and the obligations each route drags in
+    4. Price, break-even and the conditions for not going ahead
+Estimated model calls: 12 in all, 10 still to come (research, connect, consider, start, collect, evaluate, propose), plus 0 to 3 repair calls, only if verification finds something repair can fix. Research is 4 of those calls, one per topic: about 2 minutes and $0.40 reported cost each as measured once, so about 8 minutes and $1.60 here. The reported cost is what the run would be priced at, not a subscription charge.
 
-Write this plan? Enter accepts, or: add TITLE | drop N | rename N TITLE | quit:
-
+  pass research...
+    fermentation_clock_against_rented_hours: 4 cited finding(s), 3 of 4 fetch(es) usable (105s)
+    single_pair_of_hands_output_ceiling: 4 cited finding(s), 3 of 3 fetch(es) usable (64s)
+    route_to_buyer_and_what_it_obliges: 2 cited finding(s), 3 of 3 fetch(es) usable (89s)
+    price_breakeven_and_walkaway_points: 2 cited finding(s), 2 of 4 fetch(es) usable (94s)
   pass connect...
   pass consider...
   pass start...
@@ -58,26 +61,28 @@ Write this plan? Enter accepts, or: add TITLE | drop N | rename N TITLE | quit:
   pass propose...
   verify (attempt 1)...
   pass render...
-Not researched: nothing here was checked against a source.
-Green: this plan's structure holds, which is not the same as true. Nothing in it traces to a source.
-
-Plan at open_small_bakery_that. Start with PLAN.md.
+Researched 4 of 4 topics, citing 10 source(s) fetched this run.
+Green: this plan is coherent and traceable, which is not the same as true. [...] Every source was fetched this run and read through a summary of the page, which is not the page: a citation shows that summary was read, never that the claim is in the source.
 ```
 
-That is a real run, shortened. It predates dreaming, so the call estimate and the three
-dream passes are what `proto plan` prints now, not what that run printed. You get a folder:
+That is a real run with `--backend claude-code --yes`, shortened; it took 13 minutes. You get a folder:
 
 ```
 PLAN.md              the idea, the topic map, how topics connect, where to start
-topics/<topic>.md    one text plan per topic: why it matters, risks, unknowns, decisions
+topics/<topic>.md    one text plan per topic: findings, risks, unknowns, decisions
 dreams.md            guesses at what else the idea could be, kept apart from the plan
-sources.md           what research relied on (not built yet)
+sources.md           every page research cited, each one fetched during the run
 ```
 
 The links between topics are data, not prose, and they decide where the plan starts.
-In that run the bakery's first step was the kitchen's access terms, because every other
-topic depends on them and they are the one thing that could return a flat no. The bread
-comes second.
+In that run the bakery's first step was asking each shared kitchen, in writing, whether
+dough may sit unattended between bookings, because every other topic depends on it and
+it is the one answer that could end the idea in a week.
+
+A finding is cited only if the run fetched that page, which is read through a model's
+summary of it, so a citation shows what was read, not that it is true. Anything else is
+labelled an assumption. `--no-research` makes a plan in a minute or two, stamped
+*Not researched*.
 
 A plan is not a finished answer. It is the cheapest way to see the shape of an idea
 before spending anything on it, and it is what a prototype should be built from later.
@@ -281,7 +286,8 @@ per pass. Override with `PROTOPILOT_MODEL` / `PROTOPILOT_EFFORT`.
 until a plan is concrete enough to feed it.
 
 Early, and honest about it. `proto plan` runs against a real model today and writes a
-real plan with its structure checked and a pool of dreams beside it, with no research yet.
+real plan, researched topic by topic on the `claude-code` backend, with its structure
+checked and a pool of dreams beside it.
 `NOTES.md` is the live parking lot: open items, what got resolved, and what is worth doing next.
 
 ## Working on this repo

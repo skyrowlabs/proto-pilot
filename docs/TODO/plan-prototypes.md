@@ -230,6 +230,12 @@ Comes before research because it needs no tools and can be judged on offline out
 - **A topic is researched only if it cites a page it fetched**; a call that cites nothing
   is recorded `nothing cited`, so `researched` never claims a plan with no source.
 
+**Run once, 2026-11-07,** on the README's bakery idea at `--depth shallow`, `claude-code`:
+764s end to end, research 352s for 4 topics (64–105s each). Green, every check held.
+14 fetches, 11 judged usable (one tool error, one 404, one PDF whose summary said it read
+nothing); 12 findings cited 10 sources, every cited URL matched a usable fetch, and 4
+findings were labelled assumptions. A re-render from disk stayed green.
+
 ## Phase 7 — The surfaces that assume an app
 
 These are the sentences that turn out to be *true only of apps*, which the second
