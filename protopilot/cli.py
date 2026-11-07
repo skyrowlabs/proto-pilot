@@ -190,7 +190,7 @@ def set_port(project_dir: Path, spec: Spec, port: int) -> None:
 
 
 def _down_all(purge: bool) -> None:
-    """Stop every prototype on this machine.
+    """Stop every app on this machine; a plan has nothing to stop.
 
     Registered trees only, and only those still on disk. Resources whose tree
     is gone are `proto gc`'s job -- stopping them here would half-clean them
@@ -841,7 +841,7 @@ def up(directory: str | None, port: int | None) -> None:
 @main.command()
 @click.option("--dir", "directory", default=None)
 @click.option("--purge", is_flag=True, help="Also delete saved data (the database volume).")
-@click.option("--all", "every", is_flag=True, help="Every prototype on this machine, not just this one.")
+@click.option("--all", "every", is_flag=True, help="Every app on this machine, not just this one.")
 def down(directory: str | None, purge: bool, every: bool) -> None:
     """Stop the app. Saved data survives unless --purge."""
     if every:
