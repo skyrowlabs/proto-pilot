@@ -208,7 +208,7 @@ because the baseline cannot read a change request.
 | `protopilot/baseline.py` | The deterministic offline implementation of every pass |
 | `protopilot/llm.py` | `LLM` Protocol + three backends |
 | `protopilot/plan/` | `proto plan` and `proto dream`: a sibling pipeline to `Spec`. `passes/` holds its model passes, research, repair and the dream passes among them, and `pipeline.py` runs them; `model.py` is `plan.json`, the truth; `render.py` draws the markdown from it; `verify.py` checks structure, never truth, and a plan still red is handed back with a `RUNBOOK.md`; `lenses.py` is the fixed lenses as data, `dreaming.py` is the pool's rules, and `ledger.py` reads what research fetched from its transcripts — see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#the-plan-pipeline) |
-| `protopilot/registry.py` | Tracked prototypes — see the `prune()` trap in `NOTES.md`. Plan trees are not in it |
+| `protopilot/registry.py` | Tracked trees, each an `app` or a `plan` by its own files — see the `prune()` trap in `NOTES.md` |
 | `protopilot/targets/` | What medium a spec is built in — fifteen things, of which the plan predicted four; the contract is in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#what-a-target-owns) and a test recomputes it |
 | `skeleton/<target>/` | Copied byte-for-byte into every generated app; one tree per target |
 | `cli/`, `scripts/` | This repo's own tooling — never shipped to a user |
@@ -419,8 +419,8 @@ the point of use, or set the variable at `conftest.py` import time.
 ### 15. Two CLIs, Two Audiences — Never Merge Them
 
 **`proto` is the product.** Installed onto a user's PATH via
-`[project.scripts]`, run from wherever they want a prototype, implemented in
-`protopilot/`. **`./pp` is this repository's own tooling** — gates, generators,
+`[project.scripts]`, run from wherever they want a plan or a prototype,
+implemented in `protopilot/`. **`./pp` is this repository's own tooling** — gates, generators,
 scheduled jobs — implemented in `cli/` and `scripts/`, run from the repo root,
 never shipped.
 
@@ -428,6 +428,8 @@ They keep separate env prefixes for the same reason: `PROTOPILOT_*` configures
 the product, `PP_*` configures the repo. A single `--help` serving both a person
 generating an app and a person maintaining the generator serves neither, and the
 first thing that goes wrong is `proto check docs` appearing in a user's shell.
+The same holds one level down: a plan and an app share `proto ls` and `proto rm`,
+and every verb that only an app can answer refuses a plan by name.
 
 Rule 5 ("keep the CLI in sync") is about `./pp`. A new *product* command belongs
 in `protopilot/cli.py` and in the README's command table.
