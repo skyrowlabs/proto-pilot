@@ -22,6 +22,13 @@ MAX_SLUG_LENGTH = 64
 
 EdgeKind = Literal["depends-on", "informs", "conflicts-with"]
 Verdict = Literal["proposed", "set-aside"]
+Depth = Literal["shallow", "standard", "deep"]
+
+#: The topics an outline holds at each `--depth`. Depth is also the research effort.
+TOPIC_COUNTS: dict[str, int] = {"shallow": 4, "standard": 6, "deep": 8}
+DEFAULT_DEPTH = "standard"
+MIN_TOPICS = min(TOPIC_COUNTS.values())
+MAX_TOPICS = max(TOPIC_COUNTS.values())
 
 
 def _checked_slug(value: str) -> str:
@@ -100,6 +107,9 @@ class Plan(_Record):
     questions: list[str] = Field(default_factory=list)
     # False unless research ran, so a plan that forgets to say is stamped.
     researched: bool = False
+    # What was asked for, and what research will read. None for the offline
+    # baseline, which has no depth, and then plan.json omits the key.
+    depth: Depth | None = None
     topics: list[Topic] = Field(default_factory=list)
     edges: list[Edge] = Field(default_factory=list)
     steps: list[Step] = Field(default_factory=list)
@@ -116,6 +126,23 @@ class Plan(_Record):
             raise ValueError(f"topic slugs must be unique: {', '.join(repeated)}")
         return self
 
+    def revised(self, **changes: object) -> "Plan":
+        """A copy with `changes`, validated: `model_copy` would skip the slug checks."""
+        return Plan.model_validate({**self.model_dump(), **changes})
+
+    def summary(self) -> str:
+        """What the outline checkpoint prints; a topic left out here is one nobody reviews."""
+        lines = [self.title, f"  goal: {self.goal or 'not established'}"]
+        lines += [f"  audience: {self.audience}"] if self.audience else []
+        lines += [f"  horizon: {self.horizon}"] if self.horizon else []
+        lines += [f"  constraint: {item}" for item in self.constraints]
+        lines += [f"  open question: {item}" for item in self.questions]
+        if self.depth:
+            lines.append(f"  depth: {self.depth} ({TOPIC_COUNTS[self.depth]} topics)")
+        lines.append("  topics:")
+        lines += [f"    {n}. {t.title} ({t.slug}): {t.why}" for n, t in enumerate(self.topics, start=1)]
+        return "\n".join(lines)
+
     # -- persistence ---------------------------------------------------
 
     @classmethod
@@ -125,7 +152,10 @@ class Plan(_Record):
     def save(self, tree: Path) -> Path:
         path = plan_path(tree)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(self.model_dump(mode="json"), indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        data = self.model_dump(mode="json")
+        if self.depth is None:
+            del data["depth"]
+        path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         return path
 
 
