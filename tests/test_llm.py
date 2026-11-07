@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from protopilot.llm import ClaudeLLM
+from protopilot.llm import ClaudeLLM, _without_patterns
 
 
 class FakeMessages:
@@ -138,3 +138,34 @@ def test_offline_beats_every_other_signal():
 def test_unknown_backend_is_refused():
     with pytest.raises(LLMError, match="unknown backend"):
         build_llm(backend="gpt")
+
+
+# --- a schema keyword only one backend takes ----------------------------------
+
+PATTERNED = {
+    "type": "object",
+    "properties": {"a": {"type": "array", "items": {"type": "string", "pattern": "^x$"}}},
+}
+
+
+def test_the_api_backend_asks_in_words_for_what_the_sdk_says_it_cannot_enforce():
+    assert _without_patterns(PATTERNED)["properties"]["a"]["items"] == {
+        "type": "string",
+        "description": "Must match the regular expression ^x$",
+    }
+
+
+def test_a_schema_with_no_pattern_reaches_the_api_unchanged():
+    assert _without_patterns(SCHEMA) == SCHEMA
+
+
+def test_a_field_named_pattern_is_a_field_and_not_a_keyword():
+    named = {"type": "object", "properties": {"pattern": {"type": "string"}}}
+    assert _without_patterns(named)["properties"] != {}
+
+
+def test_the_cli_backend_keeps_the_pattern_because_it_enforces_it():
+    runner = FakeRunner([(["claude"], (0, envelope(), ""))])
+    ClaudeCodeLLM(runner=runner).structured(system="s", user="u", schema=PATTERNED, label="x")
+    argv = runner.calls[0]
+    assert json.loads(argv[argv.index("--json-schema") + 1]) == PATTERNED

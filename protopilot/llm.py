@@ -54,6 +54,23 @@ class OfflineLLM:
         raise NotImplementedError(f"pass {label!r} has no offline baseline")
 
 
+def _without_patterns(schema: Any) -> Any:
+    """`schema` with each `pattern` moved into a description.
+
+    The SDK's own `transform_schema` treats `pattern` as a keyword the Messages API does
+    not take, and a schema it refuses would cost the whole pass. So this backend asks in
+    words, and the caller's own check is what holds. The CLI backend enforces it.
+    """
+    if isinstance(schema, list):
+        return [_without_patterns(item) for item in schema]
+    if not isinstance(schema, dict):
+        return schema
+    kept = {key: _without_patterns(value) for key, value in schema.items()}
+    if isinstance(schema.get("pattern"), str):
+        kept["description"] = f"Must match the regular expression {kept.pop('pattern')}"
+    return kept
+
+
 class ClaudeLLM:
     offline = False
 
@@ -120,7 +137,7 @@ class ClaudeLLM:
             thinking={"type": "adaptive"},
             output_config={
                 "effort": self.effort,
-                "format": {"type": "json_schema", "schema": schema},
+                "format": {"type": "json_schema", "schema": _without_patterns(schema)},
             },
             # Server-side fallback: a safety refusal on one pass would
             # otherwise abort a generation that is most of the way done.
