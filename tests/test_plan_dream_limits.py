@@ -650,7 +650,7 @@ def judged(plan: Plan, **fields: list[str]) -> verify.PlanVerdict:
 
 @pytest.mark.parametrize("index", [0, 1], ids=["proposed", "set-aside"])
 @pytest.mark.parametrize("where", ["risks", "unknowns", "decisions"])
-def test_a_dream_still_on_offer_is_caught_in_each_place_a_topic_speaks(tmp_path, index, where):
+def test_a_dream_still_on_offer_is_caught_in_each_place_a_topic_speaks(tmp_path, index: int, where: str):
     plan = Plan.load(model_plan(tmp_path / "tree"))
     result = judged(plan, **{where: [f"Worth asking: {plan.dreams[index].what_if}."]})
     assert result.stage == "dreams_apart"
