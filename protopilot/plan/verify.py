@@ -83,6 +83,11 @@ class PlanVerdict(VerifyResult):
     def failed(self) -> list[CheckResult]:
         return [check for check in self.checks if check.state == FAILED]
 
+    @property
+    def problems(self) -> int:
+        """How much is wrong, counted so two verdicts can be compared."""
+        return sum(len(check.problems) for check in self.failed)
+
     def report(self) -> str:
         return "\n\n".join(check.report() for check in self.failed)
 
@@ -134,6 +139,25 @@ def cycle_edges(plan: Plan) -> list[Edge]:
     return [edge for edge in links if edge.from_topic in _reachable(edge.to_topic, graph)]
 
 
+def loops(plan: Plan) -> list[list[Edge]]:
+    """Every simple `depends-on` loop, once each, as its links, so two sharing a topic stay two."""
+    links = {(edge.from_topic, edge.to_topic): edge for edge in plan.edges if edge.kind == "depends-on"}
+    found: list[list[Edge]] = []
+
+    def walk(start: str, path: list[str]) -> None:
+        for source, target in sorted(links):
+            if source != path[-1]:
+                continue
+            if target == start:
+                found.append([links[pair] for pair in zip(path, [*path[1:], start])])
+            elif target > start and target not in path:
+                walk(start, [*path, target])
+
+    for topic in sorted({source for source, _ in links}):
+        walk(topic, [topic])
+    return found
+
+
 def no_cycles(plan: Plan, pages: Pages) -> CheckResult:
     """`depends-on` has no cycles."""
     looped = cycle_edges(plan)
@@ -174,6 +198,7 @@ def sources_fetched(plan: Plan, pages: Pages) -> CheckResult:
 
 
 class StepFault(NamedTuple):
+    index: int
     topic: str
     problem: str
 
@@ -183,15 +208,17 @@ def step_faults(plan: Plan) -> list[StepFault]:
     needs = plan.needs()
     covered: set[str] = set()
     faults = []
-    for number, step in enumerate(plan.steps, start=1):
-        waiting = sorted(needs.get(step.topic, set()) - covered)
+    for index, step in enumerate(plan.steps):
+        number, waiting = index + 1, sorted(needs.get(step.topic, set()) - covered)
         if step.topic not in needs:
-            faults.append(StepFault(step.topic, f"step {number} names a topic that does not exist: {step.topic}"))
+            faults.append(
+                StepFault(index, step.topic, f"step {number} names a topic that does not exist: {step.topic}")
+            )
         elif step.topic in covered:
-            faults.append(StepFault(step.topic, f"step {number} ({step.topic}) repeats a topic"))
+            faults.append(StepFault(index, step.topic, f"step {number} ({step.topic}) repeats a topic"))
         elif waiting:
             needed = f"waits on {', '.join(waiting)}, which no earlier step covers"
-            faults.append(StepFault(step.topic, f"step {number} ({step.topic}) {needed}"))
+            faults.append(StepFault(index, step.topic, f"step {number} ({step.topic}) {needed}"))
         covered.add(step.topic)
     return faults
 

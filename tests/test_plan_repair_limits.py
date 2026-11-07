@@ -502,3 +502,138 @@ def test_the_page_is_drawn_from_the_repaired_plan_not_the_one_that_failed(tmp_pa
     tree = tmp_path / "tree"
     run(tree, repair_of(GOOD_EDGES, IN_ORDER), start=OUT_OF_ORDER)
     assert render.render(Plan.load(tree)) == render.read(tree)
+
+
+# -- the guard judges against the plan repair started from ----------------
+
+
+def test_two_attempts_cannot_reverse_a_real_dependency(tmp_path):
+    first = repair_of([*GOOD_EDGES, edge("members", "lending")], ["lending", "members"])
+    second = repair_of([GOOD_EDGES[1], edge("members", "lending")], ["lending", "members"])
+    tree = tmp_path / "tree"
+    run(tree, first, second, start=OUT_OF_ORDER)
+    assert any(e.from_topic == "lending" and e.to_topic == "members" for e in Plan.load(tree).edges)
+
+
+def test_two_attempts_cannot_drop_a_healthy_step(tmp_path):
+    healthy = {"steps": [step("members"), step("lending"), step("tools")]}
+    first = {"edges": [*LOOP, edge("members", "tools")], "steps": healthy["steps"]}
+    second = {
+        "edges": [edge("lending", "space"), edge("tools", "lending"), edge("members", "tools")],
+        "steps": [step("space"), step("lending"), step("tools")],
+    }
+    tree = tmp_path / "tree"
+    run(tree, first, second, connect={"edges": LOOP}, start=healthy)
+    assert "members" in [s.topic for s in Plan.load(tree).steps]
+
+
+# -- the cap on steps -----------------------------------------------------
+
+PREREQUISITE = [edge("space", "money"), edge("tools", "space")]
+FULL_LIST = ["members", "lending", "space", "tools", "safety"]
+
+
+def test_a_full_list_can_make_room_for_a_prerequisite(tmp_path):
+    five = {"steps": [step(s) for s in FULL_LIST]}
+    honest = repair_of(PREREQUISITE, ["members", "lending", "money", "space", "tools"])
+    assert run(tmp_path / "tree", honest, connect={"edges": PREREQUISITE}, start=five)[2].ok
+
+
+def test_the_tools_cut_does_not_count_as_the_model_dropping_a_step(tmp_path):
+    five = {"steps": [step(s) for s in FULL_LIST]}
+    all_six = repair_of(PREREQUISITE, ["members", "lending", "money", "space", "tools", "safety"])
+    assert run(tmp_path / "tree", all_six, connect={"edges": PREREQUISITE}, start=five)[2].ok
+
+
+def test_a_full_list_cannot_swap_a_healthy_step_for_one_nothing_needs():
+    after = plan_of([], ["members", "lending", "space", "tools", "money"])
+    assert repair.rejected(plan_of([], FULL_LIST), after) == "it dropped steps nothing was wrong with: safety"
+
+
+def test_a_list_with_room_cannot_lose_a_healthy_step_to_a_prerequisite():
+    entry = plan_of(PREREQUISITE, ["members", "lending", "space"])
+    after = plan_of(PREREQUISITE, ["members", "money", "space"])
+    assert repair.rejected(entry, after) == "it dropped steps nothing was wrong with: lending"
+
+
+# -- healthy steps stay word for word -------------------------------------
+
+
+def test_a_repair_cannot_rewrite_a_healthy_step(tmp_path):
+    kept = {"topic": "tools", "action": "Buy tools.", "why": "Later."}
+    bad = {"steps": [step("lending"), step("members"), kept]}
+    answer = {
+        "edges": GOOD_EDGES,
+        "steps": [step("members"), step("lending"), {**kept, "action": "Sell the building."}],
+    }
+    tree = tmp_path / "tree"
+    job, _, _ = run(tree, answer, start=bad)
+    assert Plan.load(tree).steps[-1].action == "Buy tools."
+    assert "it rewrote steps nothing was wrong with: tools" in runbook(tree)
+    assert "repair_rejected" in kinds(job)
+
+
+@pytest.mark.parametrize("field", ["action", "why"])
+def test_either_text_of_a_healthy_step_is_compared(field):
+    entry = plan_of(GOOD_EDGES, ["tools"])
+    after = entry.revised(steps=[entry.steps[0].model_copy(update={field: "Something else."})])
+    assert repair.rejected(entry, after) == "it rewrote steps nothing was wrong with: tools"
+
+
+def test_a_step_at_fault_may_be_reworded():
+    entry = plan_of(GOOD_EDGES, ["lending", "members"])
+    after = plan_of(GOOD_EDGES, ["members", "lending"])
+    moved = after.steps[1].model_copy(update={"action": "Lend one thing."})
+    assert repair.rejected(entry, after.revised(steps=[after.steps[0], moved])) == ""
+
+
+# -- one link per loop, loop by loop --------------------------------------
+
+
+def test_a_whole_loop_cannot_go_because_another_loop_kept_a_link(tmp_path):
+    tree = tmp_path / "tree"
+    run(tree, repair_of([edge("tools", "money")], ["members"]), connect={"edges": TWO_LOOPS})
+    kept = {(e.from_topic, e.to_topic) for e in Plan.load(tree).edges}
+    assert kept & {("lending", "space"), ("space", "lending")}
+
+
+def test_a_loop_sharing_a_topic_is_judged_on_its_own():
+    entry = plan_of(SHARED, ["members"])
+    after = plan_of(SHARED[2:], ["members"])
+    assert repair.rejected(entry, after) == "it removed every link on the loop, and one is enough"
+
+
+def test_the_healthy_first_occurrence_of_a_repeated_step_stays():
+    entry = plan_of(GOOD_EDGES, ["tools", "money", "tools"])
+    assert repair.rejected(entry, plan_of(GOOD_EDGES, ["money"])) == "it dropped steps nothing was wrong with: tools"
+
+
+# -- a repair may not leave more wrong than it found ----------------------
+
+
+def test_a_repair_that_makes_the_count_worse_is_rejected_and_the_plan_stays(tmp_path):
+    tree = tmp_path / "tree"
+    worse = repair_of([*GOOD_EDGES, *LOOP], ["lending", "members"])
+    job, _, result = run(tree, worse, start=OUT_OF_ORDER)
+    assert not result.ok and result.stage == "start_order"
+    assert "it left more wrong than it found" in runbook(tree)
+    assert len(Plan.load(tree).edges) == len(GOOD_EDGES)
+    assert kinds(job).count("repair_rejected") == 1
+
+
+def test_the_floor_is_never_worse_than_what_repair_started_with(tmp_path):
+    tree = tmp_path / "tree"
+    even = repair_of(GOOD_EDGES, ["lending", "members", "space"])
+    worse = repair_of([*GOOD_EDGES, *LOOP], ["lending", "members", "space"])
+    _, _, result = run(tree, even, worse, start=OUT_OF_ORDER)
+    assert sum(len(check.problems) for check in result.failed) == 1
+
+
+# -- what a repair is labelled with ---------------------------------------
+
+
+def test_a_repair_is_labelled_with_the_check_it_worked_on_not_the_first_red(tmp_path):
+    tree = tmp_path / "tree"
+    job, _, _ = reviewed(tree, unfixable_too, SLUGS, repair_of(GOOD_EDGES, IN_ORDER), start=OUT_OF_ORDER)
+    assert "1. attempt 1 (start_order): steps now members, lending" in runbook(tree)
+    assert [e["stage"] for e in job.events if e["kind"] == "repair_started"] == ["start_order"]

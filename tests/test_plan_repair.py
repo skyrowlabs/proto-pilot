@@ -129,14 +129,14 @@ def test_a_repair_with_an_unsafe_step_slug_writes_no_path_of_its_own(tmp_path):
 
 def test_a_repair_that_fixes_one_check_and_breaks_another_stays_red(tmp_path):
     tree = tmp_path / "tree"
-    broke = repair_of(GOOD_EDGES + LOOP, ["members"])
-    _, llm, result = run(tree, broke, start=OUT_OF_ORDER)
+    two_faults = {"steps": [step("lending"), step("members"), step("lending")]}
+    _, llm, result = run(tree, repair_of(GOOD_EDGES + LOOP, ["members"]), start=two_faults)
     assert not result.ok
     assert result.stage == "no_cycles"
     assert labels(llm).count("repair") == 2  # the second had no scripted answer
 
 
-def test_a_later_repair_can_mend_what_an_earlier_one_broke(tmp_path):
+def test_a_later_repair_can_land_after_one_that_broke_more_is_thrown_away(tmp_path):
     broke = repair_of(GOOD_EDGES + LOOP, ["members"])
     mended = repair_of(GOOD_EDGES + MENDED, ["members"])
     _, _, result = run(tmp_path / "tree", broke, mended, start=OUT_OF_ORDER)

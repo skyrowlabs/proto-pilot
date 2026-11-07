@@ -152,17 +152,18 @@ def _verified(job, plan: Plan, attempt: int, of: int) -> verify.PlanVerdict:
     return result
 
 
-def _repair_once(job, llm: LLM, checked: Checked, rejection: str) -> str | None:
+def _repair_once(job, llm: LLM, checked: Checked, entry: Plan, rejection: str) -> str | None:
     """One repair, folded into `checked`. Returns why it was thrown away, "" if it landed, None to stop."""
     plan, result, attempt = checked.plan, checked.verdict, checked.attempts
-    label = f"attempt {attempt} ({result.stage})"
-    if not repair.fixable(result):
+    fixable = repair.fixable(result)
+    if not fixable:
         out_of_reach = ", ".join(result.named(verify.FAILED))
         job.log(f"    repair cannot reach {out_of_reach}")
-        checked.tried.append(f"{label}: repair cannot reach {out_of_reach}, so none ran")
+        checked.tried.append(f"attempt {attempt} ({result.stage}): repair cannot reach {out_of_reach}, so none ran")
         return None
+    label = f"attempt {attempt} ({', '.join(check.name for check in fixable)})"
     job.log("  pass repair...")
-    job.event("repair_started", attempt=attempt, stage=result.stage)
+    job.event("repair_started", attempt=attempt, stage=fixable[0].name)
     try:
         after = run_pass(repair, plan, llm, repair.failure(result, rejection))
     except Exception as exc:  # noqa: BLE001 -- a failed repair is an outcome
@@ -177,7 +178,7 @@ def _repair_once(job, llm: LLM, checked: Checked, rejection: str) -> str | None:
         job.event("repair_empty", attempt=attempt, notes=notes)
         checked.tried.append(f"{label}: {notes}")
         return None
-    reason = repair.rejected(plan, after)
+    reason = repair.rejected(entry, after) or repair.worsened(result, after)
     if reason:
         job.log(f"    rejected: {reason}")
         job.event("repair_rejected", attempt=attempt, reason=reason)
@@ -195,7 +196,7 @@ def repaired(job, plan: Plan, llm: LLM) -> Checked:
     checked = Checked(plan, _verified(job, plan, 1, repair.ATTEMPTS), 1, [])
     rejection: str | None = ""
     while not checked.verdict.ok and checked.attempts <= repair.ATTEMPTS and rejection is not None:
-        rejection = _repair_once(job, llm, checked, rejection)
+        rejection = _repair_once(job, llm, checked, plan, rejection)
         if rejection is not None:
             checked.attempts += 1
             checked.verdict = _verified(job, checked.plan, checked.attempts, repair.ATTEMPTS)

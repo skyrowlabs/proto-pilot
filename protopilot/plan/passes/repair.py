@@ -7,15 +7,17 @@ that returns a topic the plan lacks is refused.
 
 `rejected` is the shrink guard: the plan analogue of a repair that cuts the smoke
 suite. A fault is mended, never deleted, so a repair may give up only what the
-failing check named. Everything else is proved by verifying the whole plan again.
+failing check named in the plan repair started from, however many attempts it
+takes. `worsened` keeps the floor from holding a plan worse than the one before.
+Everything else is proved by verifying the whole plan again.
 """
 
 from __future__ import annotations
 
 import json
 
-from protopilot.plan import verify
-from protopilot.plan.model import Edge, Plan
+from protopilot.plan import render, verify
+from protopilot.plan.model import Edge, Plan, Step
 from protopilot.plan.passes import BRIEF, connect, start, topics_block
 
 NAME = "repair"
@@ -32,9 +34,11 @@ fix what failed. Nothing else in the plan is within your reach.
 - To break a `depends-on` loop, remove or retype one link on it and keep the others.
 - To fix the steps, reorder them, or add the steps they are waiting on.
 - Keep every edge that is on no loop: a dependency is never removed to suit the steps.
-- Keep every step nothing is wrong with.
+- Keep every step nothing is wrong with, word for word. Only when the list is full may
+  one give way, and only to a step that a kept step depends on.
 
-A repair that breaks those last two rules is thrown away.
+A repair that breaks those last two rules, or leaves more wrong than it found, is
+thrown away.
 
 {start.ORDER_RULES}"""
 
@@ -79,19 +83,52 @@ def _key(edge: Edge) -> str:
     return f"{edge.from_topic} {edge.kind} {edge.to_topic}"
 
 
-def rejected(before: Plan, after: Plan) -> str:
-    """Why `after` may not land, or an empty string. A loop breaks with one link, never all of them."""
-    looped = {_key(edge) for edge in verify.cycle_edges(before)}
-    lost = {_key(edge) for edge in before.edges} - {_key(edge) for edge in after.edges}
+def _room(entry: Plan, after: Plan) -> int:
+    """The healthy steps the cap may displace: one per new step that a step in `after` waits on."""
+    if len(after.steps) < start.MAX_STEPS:
+        return 0
+    needs = entry.needs()
+    wanted = {need for step in after.steps for need in needs.get(step.topic, set())}
+    return len(wanted & ({step.topic for step in after.steps} - {step.topic for step in entry.steps}))
+
+
+def _healthy(plan: Plan) -> list[Step]:
+    """The steps no fault names, by position: a repeat's first occurrence is one of them."""
+    faulted = {fault.index for fault in verify.step_faults(plan)}
+    return [step for index, step in enumerate(plan.steps) if index not in faulted]
+
+
+def _steps_lost(entry: Plan, after: Plan) -> str:
+    gone = [step for step in _healthy(entry) if step not in after.steps]
+    kept = {step.topic for step in after.steps}
+    rewritten = sorted({step.topic for step in gone if step.topic in kept})
+    if rewritten:
+        return f"it rewrote steps nothing was wrong with: {', '.join(rewritten)}"
+    dropped = sorted({step.topic for step in gone})
+    if len(dropped) > _room(entry, after):
+        return f"it dropped steps nothing was wrong with: {', '.join(dropped)}"
+    return ""
+
+
+def rejected(entry: Plan, after: Plan) -> str:
+    """Why `after` may not land, judged against the plan repair began with. Empty if it may."""
+    looped = {_key(edge) for edge in verify.cycle_edges(entry)}
+    lost = {_key(edge) for edge in entry.edges} - {_key(edge) for edge in after.edges}
     if lost - looped:
         return f"it removed edges on no loop: {', '.join(sorted(lost - looped))}"
-    if len(looped) > 1 and looped <= lost:
-        return "it removed every link on the loop, and one is enough"
-    faulted = {fault.topic for fault in verify.step_faults(before)}
-    dropped = {step.topic for step in before.steps} - {step.topic for step in after.steps} - faulted
-    if dropped:
-        return f"it dropped steps nothing was wrong with: {', '.join(sorted(dropped))}"
-    return ""
+    for loop in verify.loops(entry):
+        links = {_key(edge) for edge in loop}
+        if len(links) > 1 and links <= lost:
+            return "it removed every link on the loop, and one is enough"
+    return _steps_lost(entry, after)
+
+
+def worsened(found: verify.PlanVerdict, after: Plan) -> str:
+    """Why `after` leaves more wrong than `found` said was wrong, or an empty string."""
+    left = verify.verdict(after, render.render(after)).problems
+    return (
+        f"it left more wrong than it found: {left} problems, up from {found.problems}" if left > found.problems else ""
+    )
 
 
 def changes(before: Plan, after: Plan) -> str:
