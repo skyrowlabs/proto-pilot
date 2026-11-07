@@ -248,6 +248,11 @@ def _dreams_page(plan: Plan) -> str:
     )
 
 
+def _source_order(source: Source) -> tuple[int, str, str]:
+    """By number, as dreams are: s10 comes after s9."""
+    return (len(source.id), *_whole_record(source))
+
+
 def _link_target(url: str) -> str:
     """A URL that cannot close or break the markdown link it sits in."""
     return url.replace(" ", "%20").replace("(", "%28").replace(")", "%29").replace("<", "%3C").replace(">", "%3E")
@@ -262,11 +267,9 @@ def _sources_page(plan: Plan) -> str:
     sources = [
         f"{s.id}: [{s.title}]({_link_target(s.url)})"
         + (f", cited by {', '.join(citing[s.id])}" if s.id in citing else "")
-        for s in sorted(plan.sources, key=_whole_record)
+        for s in sorted(plan.sources, key=_source_order)
     ]
     blocks = [_bullets(sources, empty="No sources.")]
-    if plan.sources and plan.researched:
-        blocks.insert(0, f"Every source here was fetched during this run, {THROUGH_A_SUMMARY}.")
     unfetched = [
         f"{titles.get(r.topic, r.topic)}: {url}"
         for r in sorted(plan.research, key=lambda r: r.topic)

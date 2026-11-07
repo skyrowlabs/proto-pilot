@@ -223,7 +223,13 @@ def test_a_plan_researched_throughout_trades_the_stamp_for_what_a_citation_prove
     assert not [name for name, text in researched.items() if "not researched" in text.lower()]
     assert researched["PLAN.md"] == stamped["PLAN.md"].replace(STAMP, render.RESEARCHED)
     assert "read through a model's summary of the page" in researched["topics/members.md"]
-    assert "Every source here was fetched during this run" in researched["sources.md"]
+    assert researched["sources.md"].count("read through a model's summary") == 1
+
+
+def test_sources_are_listed_by_number():
+    many = [Source(id=f"s{n}", title=f"T{n}", url=f"https://example.test/{n}") for n in (10, 2, 1)]
+    page = render.render(sample(sources=many))["sources.md"]
+    assert page.index("- s1:") < page.index("- s2:") < page.index("- s10:")
 
 
 def test_a_flag_alone_does_not_make_a_topic_researched():
