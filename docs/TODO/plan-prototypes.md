@@ -180,10 +180,10 @@ Decision 5 is confirmed.
 
 ## Phase 3 — The passes and the checkpoint
 
-- [ ] `scope`, `outline`, `connect`, `consider`, `start` under `protopilot/plan/passes/`,
+- [x] `scope`, `outline`, `connect`, `consider`, `start` under `protopilot/plan/passes/`,
       each with its offline twin
-- [ ] Outline review with add, drop and rename, in the CLI and via `--yes`
-- [ ] `--depth shallow|standard|deep`, setting topic count and research effort, with
+- [x] Outline review with add, drop and rename, in the CLI and via `--yes`
+- [x] `--depth shallow|standard|deep`, setting topic count and research effort, with
       the estimated call count printed at the checkpoint
 
 ## Phase 4 — Verifier and repair
