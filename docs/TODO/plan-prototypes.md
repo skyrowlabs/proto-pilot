@@ -290,7 +290,7 @@ All six are Jeston's rulings, 2026-11-06.
 
 ## Acceptance
 
-- [x] `./pp test unit` green, with no network and no key: 2445 passed 2026-11-07 as uid 1000 in a user and net namespace with only `lo` up, key unset, 1.1.1.1:443 unreachable
+- [x] `./pp test unit` green, with no network and no key: 2445 passed 2026-11-07 as uid 1000 in a user and net namespace with only `lo` up, key unset, and an outside address unreachable
 - [x] `proto plan "…" --offline --yes` writes the whole tree, twice, byte-identical
 - [ ] Each verifier check goes red on its planted failure, from a green baseline
 - [ ] A plan's `dreams.md` holds proposals and set-aside entries, each with a verdict,
