@@ -139,13 +139,12 @@ def _drawn(plan: Plan, tree: Path, runbook: str) -> list[str]:
 
 
 def _verified(job, plan: Plan, attempt: int, of: int) -> verify.PlanVerdict:
-    """One verification and its events, against the pages this plan draws."""
+    """One verification against the pages this plan draws. Green is `_hand_back`'s to say, once they land."""
     job.log(f"  verify (attempt {attempt})...")
     job.event("verify_started", attempt=attempt, of=of)
     result = verify.verdict(plan, render.render(plan))
     if result.ok:
-        job.log("    no check failed")
-        job.event("verify_passed", attempt=attempt, summary=result.summary, no_subject=result.named(verify.NO_SUBJECT))
+        job.log("    nothing failed yet; the written tree is checked next")
     else:
         job.log(f"    failed at {result.stage}: {result.summary}")
         job.event("verify_failed", attempt=attempt, stage=result.stage, summary=result.summary)
@@ -223,8 +222,15 @@ def _hand_back(job, tree: Path, names: list[str], checked: Checked, save: bool) 
         job.event("verify_failed", attempt=checked.attempts, stage=landed.stage, summary=landed.summary)
         job.event("exhausted", attempts=checked.attempts, stage=landed.stage)
         _drawn(plan, tree, runbook(landed))
-    _finish(job, tree, plan, landed, checked.attempts)
-    return landed
+    # Either verdict red is red: the drawn one wrote the runbook, so green here would sit on top of it.
+    final = checked.verdict if landed.ok else landed
+    if final.ok:
+        job.log("    no check failed")
+        job.event(
+            "verify_passed", attempt=checked.attempts, summary=final.summary, no_subject=final.named(verify.NO_SUBJECT)
+        )
+    _finish(job, tree, plan, final, checked.attempts)
+    return final
 
 
 def build(job, tree: Path, plan: Plan, llm: LLM) -> verify.PlanVerdict:
@@ -280,7 +286,10 @@ def run_plan(job, tree: Path, llm: LLM | None = None, depth: Depth | None = None
 def after_failure(tree: Path) -> str:
     """What a failed run left in `tree`, and what running the command again does."""
     if plan_path(tree).exists():
-        return f"{tree} holds the whole plan but maybe not every page. Rerun to draw it again, with no model call."
+        return (
+            f"{tree} holds the whole plan but maybe not every page. Any page there may be out of date. "
+            "Rerun to check it and draw it again, with no model call."
+        )
     if tree.exists():
         return f"{tree} exists and holds no plan, so a rerun would be refused. Remove it, or pick another --dir."
     return f"Nothing was written to {tree}. Rerunning starts over from scope, and any review edits are lost."

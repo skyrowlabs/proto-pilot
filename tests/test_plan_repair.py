@@ -325,7 +325,7 @@ def test_a_green_plan_prints_the_limit_and_exits_zero(tmp_path, monkeypatch):
     result = CliRunner().invoke(cli.main, ["plan", IDEA, "--yes", "--dir", str(tmp_path / "tree")])
     said = " ".join(result.output.split())
     assert result.exit_code == 0
-    assert "coherent and traceable, which is not the same as true" in said
+    assert "structure holds, which is not the same as true. Nothing in it traces to a source." in said
     assert "No subject, so these proved nothing: findings_traced, sources_fetched" in said
 
 

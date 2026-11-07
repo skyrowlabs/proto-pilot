@@ -5,7 +5,7 @@ returns and `render.read` reads back, so the same check judges what was drawn an
 what landed. A check ends in one of three states, and `NO_SUBJECT` is not a pass:
 it had nothing to look at, proved nothing, and the green line names it apart.
 
-Green proves structure, never truth: see `green_line`, and the spec for why.
+Green proves structure, never truth, and `green_line` claims only what held.
 """
 
 from __future__ import annotations
@@ -254,18 +254,20 @@ def _plain(text: str) -> str:
 
 
 def dreams_apart(plan: Plan, pages: Pages) -> CheckResult:
-    """No dream text appears in a topic file."""
+    """No dream text appears in a topic file. Text too short to compare is no subject."""
     topics = {name: _plain(page) for name, page in pages.items() if name.startswith(f"{render.TOPICS_DIR}/")}
     problems = []
+    compared = False
     for dream in plan.dreams:
         for field in LEAK_FIELDS:
             words = _plain(getattr(dream, field))
             if len(words) >= MIN_LEAK_CHARS:
+                compared = True
                 problems += [
                     f"{name} repeats the {field} of dream {dream.id}" for name, page in topics.items() if words in page
                 ]
     advice = "A dream must not read as a finding: take its words out of the topic."
-    return _judged("dreams_apart", plan.dreams, problems, advice, "The plan has no dreams to keep apart.")
+    return _judged("dreams_apart", compared, problems, advice, "The plan has no dream text long enough to compare.")
 
 
 CHECKS: tuple[Callable[[Plan, Pages], CheckResult], ...] = (
@@ -283,18 +285,30 @@ def _listed(names: Iterable[str]) -> str:
     return ", ".join(names)
 
 
+def _claim(held: list[str]) -> str:
+    """What green may say: only what checks with a subject held, then the limit."""
+    limit = "which is not the same as true."
+    if "findings_traced" in held and "sources_fetched" in held:
+        return f"this plan is coherent and traceable, {limit}"
+    labelled = " and every finding is cited or labelled an assumption" if "findings_traced" in held else ""
+    return f"this plan's structure holds{labelled}, {limit}"
+
+
 def green_line(results: Iterable[CheckResult]) -> str:
-    """The sentence a green run ends on, which claims only what these checks can show."""
+    """The sentence a green run ends on, built from what held so it claims nothing else."""
     results = list(results)
     held = [result.name for result in results if result.state == PASSED]
     empty = [result.name for result in results if result.state == NO_SUBJECT]
-    parts = [
-        "Green: this plan is coherent and traceable, which is not the same as true.",
-        f"Held: {_listed(held)}.",
-    ]
+    parts = [f"Green: {_claim(held)}"]
+    if "sources_fetched" not in held:
+        parts.append("Nothing in it traces to a source.")
+    parts.append(f"Held: {_listed(held)}.")
     if empty:
         parts.append(f"No subject, so these proved nothing: {_listed(empty)}.")
-    parts.append("A source retrieved this run proves a summary of it was read, not that a claim is in the original.")
+    if "sources_fetched" in held:
+        parts.append(
+            "A source retrieved this run proves a summary of it was read, not that a claim is in the original."
+        )
     return " ".join(parts)
 
 

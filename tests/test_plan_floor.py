@@ -16,8 +16,8 @@ from plan_script import GOOD, IDEA, edge, repair_of, script, step
 from protopilot import cli
 from protopilot.console import progress
 from protopilot.jobs import Job
-from protopilot.plan import pipeline, render, verify
-from protopilot.plan.model import Plan, plan_path
+from protopilot.plan import baseline, pipeline, render, verify
+from protopilot.plan.model import Dream, Plan, plan_path
 from protopilot.plan.passes import repair
 
 pytestmark = [pytest.mark.unit]
@@ -172,7 +172,7 @@ def test_model_text_in_a_runbook_cannot_hide_what_follows_it(tmp_path):
             return super().structured(system=system, user=user, schema=schema, label=label)
 
     pipeline.run_plan(job_for(), tree, Hostile(script(start=OUT_OF_ORDER)))
-    said_there = page(tree, "RUNBOOK.md")
+    said_there = page(tree, "RUNBOOK.md").removeprefix(render.RUNBOOK_MARK)
     assert "<!--" not in said_there and "&lt;!-- swallow the rest" in said_there
 
 
@@ -222,7 +222,7 @@ def test_a_mended_plan_prints_green_exits_zero_and_needs_no_backend(tmp_path, mo
     monkeypatch.setattr(cli, "build_llm", lambda **_: pytest.fail("a re-render built a backend"))
     result = proto_plan(tree)
     assert result.exit_code == 0, result.output
-    assert "Green: this plan is coherent and traceable" in said(result)
+    assert "Green: this plan's structure holds" in said(result)
     assert not (tree / "RUNBOOK.md").exists()
     assert render.NOT_VERIFIED not in page(tree) and "RUNBOOK" not in page(tree)
 
@@ -362,7 +362,7 @@ def test_a_phase_three_tree_with_a_real_fault_goes_red_and_gains_a_banner(tmp_pa
 def test_a_stale_runbook_and_banner_go_when_the_plan_is_green(tmp_path):
     tree = offline_tree(tmp_path / "tree")
     plan = Plan.load(tree)
-    render.write(plan, tree, "# Runbook\n\nstale\n")
+    render.write(plan, tree, verify.runbook(verify.verdict(plan, render.render(plan)), 1, []))
     assert render.NOT_VERIFIED in page(tree)
     _, result = rerun(tree)
     assert result.ok
@@ -544,7 +544,7 @@ def test_a_refused_page_on_the_real_command_names_the_next_step(tmp_path, no_bac
     as_directory("RUNBOOK.md")(tree)
     result = proto_plan(tree)
     assert result.exit_code == 1
-    assert "nothing was drawn" in said(result) and "Move it out of the way and rerun" in said(result)
+    assert "marked not verified" in said(result) and "Move it out of the way and rerun" in said(result)
     assert "Green" not in said(result)
 
 
@@ -616,3 +616,241 @@ def test_the_verdict_a_run_returns_is_the_one_it_finished_on(tmp_path):
     job, result = run(tmp_path / "tree", repair_of(GOOD_EDGES, ["members", "lending"]), start=OUT_OF_ORDER)
     assert result.ok is job.events[-1]["ok"] is True
     assert job.events[-1]["attempts"] == kinds(job).count("verify_started") == repair.ATTEMPTS - 1
+
+
+# -- a RUNBOOK.md the tool did not write ----------------------------------
+
+MY_NOTES = "# my own notes\n"
+
+
+def test_green_keeps_a_runbook_the_tool_did_not_write(tmp_path):
+    tree = offline_tree(tmp_path / "tree")
+    (tree / "RUNBOOK.md").write_text(MY_NOTES)
+    assert rerun(tree)[1].ok
+    assert page(tree, "RUNBOOK.md") == MY_NOTES
+
+
+def test_red_refuses_to_overwrite_a_runbook_the_tool_did_not_write(tmp_path):
+    tree = offline_tree(tmp_path / "tree")
+    (tree / "RUNBOOK.md").write_text(MY_NOTES)
+    edit_plan_json(tree, steps=[])
+    with pytest.raises(pipeline.PlanRefused, match="RUNBOOK.md"):
+        rerun(tree)
+    assert page(tree, "RUNBOOK.md") == MY_NOTES
+
+
+def test_a_runbook_the_tool_wrote_opens_with_its_mark(tmp_path):
+    tree = tmp_path / "tree"
+    run(tree, connect={"edges": LOOP})
+    assert page(tree, "RUNBOOK.md").startswith(render.RUNBOOK_MARK)
+
+
+# -- nothing leaves the tree ----------------------------------------------
+
+
+def test_a_topics_link_cannot_cost_a_file_outside_the_tree(tmp_path):
+    tree = offline_tree(tmp_path / "tree")
+    notes = tmp_path / "notes"
+    notes.mkdir()
+    (notes / "mine.md").write_text("mine\n")
+    shutil.rmtree(tree / "topics")
+    (tree / "topics").symlink_to(notes)
+    with pytest.raises(pipeline.PlanRefused, match="a page needs this name"):
+        rerun(tree)
+    assert sorted(p.name for p in notes.iterdir()) == ["mine.md"]
+
+
+@pytest.mark.parametrize("name", ["sources.md", "PLAN.md", "topics/scope.md"])
+def test_a_page_link_cannot_overwrite_a_file_outside_the_tree(tmp_path, name):
+    tree = offline_tree(tmp_path / "tree")
+    outside = tmp_path / "outside.txt"
+    outside.write_text("outside\n")
+    (tree / name).unlink()
+    (tree / name).symlink_to(outside)
+    with pytest.raises(pipeline.PlanRefused, match="a page needs this name"):
+        rerun(tree)
+    assert outside.read_text() == "outside\n"
+
+
+def test_a_red_plan_never_writes_through_a_link_either(tmp_path):
+    tree = offline_tree(tmp_path / "tree")
+    outside = tmp_path / "outside.txt"
+    outside.write_text("outside\n")
+    (tree / "RUNBOOK.md").symlink_to(outside)
+    edit_plan_json(tree, steps=[])
+    with pytest.raises(pipeline.PlanRefused, match="a page needs this name"):
+        rerun(tree)
+    assert outside.read_text() == "outside\n"
+
+
+@pytest.mark.parametrize("name", ["topics", "dreams.md", "topics/scope.md"])
+def test_a_dangling_link_is_refused_with_a_sentence(tmp_path, name):
+    tree = offline_tree(tmp_path / "tree")
+    path = tree / name
+    shutil.rmtree(path) if path.is_dir() else path.unlink()
+    path.symlink_to(tmp_path / "no" / "such" / "place")
+    with pytest.raises(pipeline.PlanRefused, match="a page needs this name"):
+        rerun(tree)
+    assert not (tmp_path / "no").exists()
+
+
+def test_a_stale_link_in_topics_is_left_alone_and_never_followed(tmp_path):
+    tree = offline_tree(tmp_path / "tree")
+    outside = tmp_path / "outside.md"
+    outside.write_text("outside\n")
+    (tree / "topics" / "extra.md").symlink_to(outside)
+    assert rerun(tree)[1].ok
+    assert (tree / "topics" / "extra.md").is_symlink() and outside.read_text() == "outside\n"
+
+
+# -- a red plan that cannot be fully drawn --------------------------------
+
+
+def blocked_red_tree(tmp_path) -> Path:
+    tree = offline_tree(tmp_path / "tree")
+    plan = Plan.load(tree)
+    plan.steps = list(reversed(plan.steps))
+    plan.save(tree)
+    (tree / "sources.md").unlink()
+    (tree / "sources.md").mkdir()
+    return tree
+
+
+def test_a_red_plan_blocked_from_one_page_marks_every_page_it_can_reach(tmp_path):
+    tree = blocked_red_tree(tmp_path)
+    with pytest.raises(pipeline.PlanRefused):
+        rerun(tree)
+    assert render.NOT_VERIFIED in page(tree)
+    assert render.NOT_VERIFIED_TOPIC in page(tree, "topics/scope.md")
+    assert (tree / "sources.md").is_dir()
+
+
+def test_a_red_plan_blocked_says_what_it_drew_and_what_stands_in_the_way(tmp_path):
+    tree = blocked_red_tree(tmp_path)
+    with pytest.raises(pipeline.PlanRefused) as refused:
+        rerun(tree)
+    said = str(refused.value)
+    assert f"a page needs this name: {tree / 'sources.md'}" in said
+    assert "marked not verified" in said and "nothing was drawn" not in said
+
+
+def test_a_green_plan_blocked_still_moves_nothing(tmp_path):
+    tree = offline_tree(tmp_path / "tree")
+    (tree / "sources.md").unlink()
+    (tree / "sources.md").mkdir()
+    before = snapshot(tree)
+    with pytest.raises(pipeline.PlanRefused, match="nothing was drawn"):
+        rerun(tree)
+    assert snapshot(tree) == before
+
+
+def test_a_red_write_that_dies_midway_has_already_marked_an_old_entry_page(tmp_path, monkeypatch):
+    tree = offline_tree(tmp_path / "tree")
+    edit_plan_json(tree, steps=[])
+    real = Path.write_text
+
+    def dies(self, text, *args, **kwargs):
+        if self.name == render.SOURCES_FILE:
+            raise OSError("disk full")
+        return real(self, text, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", dies)
+    with pytest.raises(OSError, match="disk full"):
+        rerun(tree)
+    assert render.NOT_VERIFIED in page(tree)
+
+
+def test_a_write_that_dies_warns_that_a_page_may_be_out_of_date(tmp_path):
+    tree = offline_tree(tmp_path / "tree")
+    assert "may be out of date" in pipeline.after_failure(tree)
+
+
+# -- red pages say so -----------------------------------------------------
+
+
+def test_every_topic_page_of_a_red_plan_says_it_is_not_verified(tmp_path):
+    tree = tmp_path / "tree"
+    run(tree, connect={"edges": LOOP})
+    topics = sorted((tree / "topics").glob("*.md"))
+    assert topics and all(render.NOT_VERIFIED_TOPIC in path.read_text(encoding="utf-8") for path in topics)
+    assert "(../RUNBOOK.md)" in render.NOT_VERIFIED_TOPIC
+
+
+def test_a_green_plan_carries_no_banner_on_any_page(tmp_path):
+    tree = offline_tree(tmp_path / "tree")
+    assert not [name for name, data in snapshot(tree).items() if b"Not verified" in data]
+
+
+# -- what green is allowed to say -----------------------------------------
+
+
+def line_of(result: verify.PlanVerdict) -> str:
+    return result.summary
+
+
+def test_a_model_run_with_nothing_traced_claims_only_the_structure(tmp_path):
+    assert line_of(run(tmp_path / "tree")[1]) == (
+        "Green: this plan's structure holds, which is not the same as true. Nothing in it traces to a source. "
+        "Held: topic_map, no_cycles, start_order. "
+        "No subject, so these proved nothing: findings_traced, sources_fetched, dreams_shaped, dreams_apart."
+    )
+
+
+def test_an_offline_run_adds_only_that_its_findings_are_labelled(tmp_path):
+    job = job_for()
+    assert line_of(pipeline.run_plan(job, tmp_path / "tree")) == (
+        "Green: this plan's structure holds and every finding is cited or labelled an assumption, "
+        "which is not the same as true. Nothing in it traces to a source. "
+        "Held: topic_map, no_cycles, findings_traced, start_order. "
+        "No subject, so these proved nothing: sources_fetched, dreams_shaped, dreams_apart."
+    )
+
+
+def test_coherent_and_traceable_is_said_only_once_findings_and_sources_held():
+    held = [
+        verify.CheckResult(name, verify.PASSED, "Held.")
+        for name in ("topic_map", "no_cycles", "findings_traced", "sources_fetched", "start_order")
+    ]
+    line = verify.green_line(held)
+    assert line.startswith("Green: this plan is coherent and traceable, which is not the same as true.")
+    assert "a summary of it was read, not that a claim is in the original" in line
+    assert "Nothing in it traces" not in line
+
+
+def test_a_dream_too_short_to_compare_leaves_dreams_apart_with_no_subject():
+    dream = Dream(id="d", title="Seeds", what_if="a seed shelf", lens="l", anchor="audience", takes="A shelf")
+    plan = baseline.build_plan("an idea").revised(dreams=[dream.model_copy(update={"verdict": "proposed"})])
+    assert verify.dreams_apart(plan, render.render(plan)).state == verify.NO_SUBJECT
+
+
+# -- red wins -------------------------------------------------------------
+
+
+def test_red_drawn_and_green_landed_is_red_and_never_green_over_a_runbook(tmp_path, monkeypatch):
+    tree = offline_tree(tmp_path / "tree")
+    real, calls = verify.verdict, []
+
+    def red_once(plan: Plan, pages: dict[str, str]) -> verify.PlanVerdict:
+        calls.append(1)
+        if len(calls) > 1:
+            return real(plan, pages)
+        forced = verify.CheckResult("dreams_apart", verify.FAILED, "forced.", ("forced",))
+        return verify.PlanVerdict(False, "dreams_apart", "forced.", checks=(forced,))
+
+    monkeypatch.setattr(verify, "verdict", red_once)
+    job, result = rerun(tree)
+    assert not result.ok and (tree / "RUNBOOK.md").is_file()
+    assert job.events[-1]["ok"] is False
+    assert not [line for line in job.lines if line.startswith("Green")]
+
+
+def test_no_passing_word_survives_a_run_that_landed_red(tmp_path, tampered):
+    job, result = run(tmp_path / "tree")
+    assert not result.ok
+    assert "verify_passed" not in kinds(job)
+    assert "no check failed" not in "\n".join(job.lines)
+
+
+def test_a_green_run_passes_verification_only_after_the_tree_landed(tmp_path):
+    job, _ = run(tmp_path / "tree")
+    assert kinds(job).index("pass_done", kinds(job).index("verify_started")) < kinds(job).index("verify_passed")

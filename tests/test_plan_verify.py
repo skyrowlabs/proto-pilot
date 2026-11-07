@@ -234,7 +234,7 @@ def test_a_plan_with_no_topics_has_nothing_mapped_and_is_still_red():
 
 
 def test_the_green_line_states_the_limit_in_words():
-    line = judged(baseline.build_plan(IDEA)).summary
+    line = judged(full()).summary
     assert "coherent and traceable" in line and "not the same as true" in line
     assert "a summary of it was read, not that a claim is in the original" in line
 

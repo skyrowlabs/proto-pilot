@@ -79,14 +79,14 @@ def test_a_fresh_run_emits_the_whole_sequence_in_order(tmp_path):
             for kind, extra in (("pass_started", {}), ("pass_done", {"files": []}))
         ),
         {"kind": "verify_started", "attempt": 1, "of": 3},
+        {"kind": "pass_started", "name": "render", "index": 6, "of": 6},
+        {"kind": "pass_done", "name": "render", "index": 6, "of": 6, "files": [PLAN_JSON, *PAGES]},
         {
             "kind": "verify_passed",
             "attempt": 1,
             "summary": verify.verdict(plan, render.render(plan)).summary,
             "no_subject": ["sources_fetched", "dreams_shaped", "dreams_apart"],
         },
-        {"kind": "pass_started", "name": "render", "index": 6, "of": 6},
-        {"kind": "pass_done", "name": "render", "index": 6, "of": 6, "files": [PLAN_JSON, *PAGES]},
         {"kind": "finished", "ok": True, "attempts": 1, "project_dir": str(tree), "run_hint": ""},
     ]
 
