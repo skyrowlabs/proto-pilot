@@ -537,7 +537,7 @@ DREAM_ROUND = "round"
 
 
 class _DreamCommand(click.Group):
-    """`proto dream [DIR]`, whose verbs share its name: a first word that is a verb is one.
+    """`proto dream [DIR]` and its verbs share a position, so a first word that is a verb is one.
 
     Anything else is a round, so a directory called `promote` is written `./promote`.
     """

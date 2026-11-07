@@ -292,6 +292,19 @@ def test_a_model_cannot_give_a_persons_verdict(tmp_path, verdict):
     assert len(plan.topics) == len(SLUGS)
 
 
+def test_evaluate_and_propose_read_only_the_fields_they_own(tmp_path):
+    tree = tmp_path / "tree"
+    forged = {"title": "forged", "what_if": "forged", "anchor": "space", "lens": "forged", "researched": True}
+    forged_id = {"id": "d1", "if_adopted": "changes", "title": "forged", "verdict": "set-aside", "reason": "forged"}
+    judged = [{**judged_row("d1"), **forged, "if_adopted": "forged"}, judged_row("d2", "set-aside")]
+    assert run(tree, evaluate={"dreams": judged}, propose={"proposals": [forged_id]}).ok
+    plan = Plan.load(tree)
+    first = plan.dreams[0]
+    assert (first.title, first.anchor, first.lens) == ("Seeds too", "members", "who-else")
+    assert (first.verdict, first.reason, first.if_adopted) == ("proposed", "d1 decided.", "changes")
+    assert (plan.researched, plan.sources) == (False, [])
+
+
 def test_evaluate_schema_offers_only_a_models_verdicts_and_ratings(tmp_path):
     plan = collect.apply(Plan.load(model_plan(tmp_path / "tree")), {"dreams": [dream_row(word="paint")]})
     row = evaluate.schema(plan)["properties"]["dreams"]["items"]["properties"]
