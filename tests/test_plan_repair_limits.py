@@ -73,7 +73,7 @@ def reviewed(
     job = job_for()
     llm = FakeLLM([GOOD["scope"], GOOD["outline"], passes["connect"], passes["consider"], passes["start"], *after])
     draft = edit(pipeline.outlined(job, llm, pipeline.scoped(job, llm)))
-    return job, llm, pipeline.build(job, tree, draft, llm)
+    return job, llm, pipeline.build(job, tree, draft, llm, dream=False)
 
 
 def adding_insurance(plan: Plan) -> Plan:

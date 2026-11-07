@@ -468,6 +468,7 @@ def _review_outline(plan):
     help="api bills API credit; claude-code bills a Claude subscription.",
 )
 @click.option("--yes", "-y", is_flag=True, help="Skip scope's questions and the outline review.")
+@click.option("--no-dream", is_flag=True, help="Skip dreaming; `proto dream` can start the pool later.")
 def plan_command(
     idea: str,
     directory: str | None,
@@ -476,8 +477,9 @@ def plan_command(
     offline: bool,
     backend: str | None,
     yes: bool,
+    no_dream: bool,
 ) -> None:
-    """Turn IDEA into an organised set of text plans. Research does not run yet."""
+    """Turn IDEA into an organised set of text plans, and dream a little. Research does not run yet."""
     from protopilot.jobs import STORE
     from protopilot.plan import baseline, pipeline
 
@@ -516,14 +518,15 @@ def plan_command(
         )
 
     job = STORE.create(idea, direction)
-    draft = _plan_step(job, target, lambda j: pipeline.scoped(j, llm, cast("Depth | None", depth)))
+    dream = not no_dream
+    draft = _plan_step(job, target, lambda j: pipeline.scoped(j, llm, cast("Depth | None", depth), dream))
     if not yes:
         draft = _ask_questions(draft)
-    draft = _plan_step(job, target, lambda j: pipeline.outlined(j, llm, draft))
+    draft = _plan_step(job, target, lambda j: pipeline.outlined(j, llm, draft, dream))
     _echo(f"\n  -> {target}\n")
     if not yes:
         draft = _review_outline(draft)
-    result = _plan_step(job, target, lambda j: pipeline.build(j, target, draft, llm))
+    result = _plan_step(job, target, lambda j: pipeline.build(j, target, draft, llm, dream))
     if not result.ok:
         sys.exit(1)  # the tree is handed back, as `proto new`'s floor hands one back
 

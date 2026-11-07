@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 from fakes import FakeLLM
-from plan_script import GOOD, IDEA, PASS_NAMES, SLUGS, consider_of, edge, outline_of, script, step
+from plan_script import GOOD, IDEA, PASS_NAMES, PLAN_PASS_NAMES, SLUGS, consider_of, edge, outline_of, script, step
 
 from protopilot import cli
 from protopilot import llm as llm_module
@@ -416,7 +416,7 @@ def test_a_review_may_leave_depth_and_topic_count_apart_and_records_the_depth_as
 def test_the_estimate_is_on_screen_before_the_review_asks(tmp_path, at_a_terminal, model):
     model()
     result = invoke(IDEA, "--dir", str(tmp_path / "tree"), stdin="\n")
-    assert result.output.index("3 still to come") < result.output.index(cli.PLAN_REVIEW_PROMPT)
+    assert result.output.index("6 still to come") < result.output.index(cli.PLAN_REVIEW_PROMPT)
 
 
 def test_each_line_of_a_run_is_printed_once(tmp_path, model):
@@ -438,7 +438,7 @@ BROKEN = {
 }
 
 
-@pytest.mark.parametrize("name", PASS_NAMES)
+@pytest.mark.parametrize("name", PLAN_PASS_NAMES)
 def test_a_pass_that_fails_leaves_no_tree_and_a_rerun_starts_over(tmp_path, model, name):
     tree = tmp_path / "tree"
     model(**{name: BROKEN[name]})

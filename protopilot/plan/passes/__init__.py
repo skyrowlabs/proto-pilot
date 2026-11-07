@@ -8,6 +8,9 @@ Each module exports:
     offline(plan)      -> dict in that shape, sliced from `baseline.build_plan`
     apply(plan, data)  -> a new Plan
 
+A pass that takes options, as `collect` takes its lenses, takes them by keyword in
+all four.
+
 `apply` reads only the fields it names, so no pass can reach `researched`,
 `sources` or a finding. Whatever it refuses reaches the job as `PlanPassError`.
 """
@@ -19,7 +22,7 @@ from types import ModuleType
 
 from protopilot.llm import LLM
 from protopilot.plan.baseline import clean
-from protopilot.plan.model import Plan, Topic
+from protopilot.plan.model import Dream, Plan, Topic
 
 BRIEF = """\
 You are one step in planning an idea, before any research has been done. You have
@@ -75,15 +78,22 @@ def topics_block(topics: list[Topic], *fields: str) -> str:
     return "## The topics\n\n```json\n" + json.dumps(rows, indent=2, ensure_ascii=False) + "\n```"
 
 
-def run_pass(module: ModuleType, plan: Plan, llm: LLM, *context: str) -> Plan:
+def dreams_block(heading: str, dreams: list[Dream], *fields: str) -> str:
+    """Dreams as JSON, with `fields` beyond the id, title and what-if."""
+    keys = ("id", "title", "what_if", *fields)
+    rows = [{key: getattr(dream, key) for key in keys} for dream in dreams]
+    return f"## {heading}\n\n```json\n" + json.dumps(rows, indent=2, ensure_ascii=False) + "\n```"
+
+
+def run_pass(module: ModuleType, plan: Plan, llm: LLM, *context: str, **options: object) -> Plan:
     """Produce a pass's output and fold it into a new plan, or raise. `context` goes to `build`."""
     if llm.offline:
-        data = module.offline(plan)
+        data = module.offline(plan, **options)
     else:
-        system, user = module.build(plan, *context)
-        data = llm.structured(system=system, user=user, schema=module.schema(plan), label=module.NAME)
+        system, user = module.build(plan, *context, **options)
+        data = llm.structured(system=system, user=user, schema=module.schema(plan, **options), label=module.NAME)
     try:
-        return module.apply(plan, data)
+        return module.apply(plan, data, **options)
     except (AttributeError, KeyError, TypeError, ValueError) as exc:
         detail = f"missing field {exc}" if isinstance(exc, KeyError) else exc
         raise PlanPassError(f"pass {module.NAME!r} returned output that cannot be used: {detail}") from exc

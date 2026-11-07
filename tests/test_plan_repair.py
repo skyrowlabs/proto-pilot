@@ -105,7 +105,8 @@ def test_a_repair_cannot_reach_anything_but_edges_and_steps(tmp_path):
     _, _, result = run(tree, forged, start=OUT_OF_ORDER)
     plan = Plan.load(tree)
     assert result.ok
-    assert (plan.researched, plan.sources, plan.dreams) == (False, [], [])
+    assert (plan.researched, plan.sources) == (False, [])
+    assert [dream.id for dream in plan.dreams] == ["d1", "d2"]
     assert [t.findings for t in plan.topics] == [[] for _ in plan.topics]
     assert render.NOT_RESEARCHED in (tree / "PLAN.md").read_text(encoding="utf-8")
 
@@ -258,7 +259,7 @@ UNEVALUATED = Dream(id="d1", title="Seeds", what_if="it lent seeds", lens="l", a
 def test_a_failure_repair_cannot_reach_makes_no_call_and_goes_to_the_floor(tmp_path, plan, stage):
     tree, job, llm = tmp_path / "tree", job_for(), FakeLLM([])
     llm.offline = True  # the twin's passes rebuild the plan's edges and steps, which is all this needs
-    result = pipeline.build(job, tree, plan, llm)
+    result = pipeline.build(job, tree, plan, llm, dream=False)
     assert not result.ok and result.stage == stage
     assert llm.calls == []
     assert "repair_started" not in kinds(job)

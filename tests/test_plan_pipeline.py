@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
+from plan_script import PASS_NAMES
 
 from protopilot import cli
 from protopilot.console import progress
@@ -67,7 +68,7 @@ class RenderBlocked(Job):
 
 def test_a_fresh_run_emits_the_whole_sequence_in_order(tmp_path):
     job, tree = job_for(), tmp_path / "tree"
-    pipeline.run_plan(job, tree)
+    pipeline.run_plan(job, tree, dream=False)
     passes = [(n, i) for i, n in enumerate(["scope", "outline", "connect", "consider", "start"], start=1)]
     sequence = [e for e in events(job) if e["kind"] != "outline"]
     plan = Plan.load(tree)
@@ -119,9 +120,7 @@ def test_the_console_fold_reads_a_finished_run(tmp_path):
     job, tree = job_for(), tmp_path / "tree"
     pipeline.run_plan(job, tree)
     folded = progress.fold(job.events)
-    assert [(p.name, p.state) for p in folded.passes] == [
-        (name, progress.DONE) for name in ("scope", "outline", "connect", "consider", "start", "render")
-    ]
+    assert [(p.name, p.state) for p in folded.passes] == [(name, progress.DONE) for name in (*PASS_NAMES, "render")]
     assert folded.passes[-1].files == [PLAN_JSON, *PAGES]
     assert (folded.finished, folded.ok, folded.gave_up) == (True, True, False)
     assert folded.project_dir == str(tree)

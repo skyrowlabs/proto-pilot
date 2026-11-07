@@ -386,7 +386,8 @@ INFORMS_ONLY = [edge("money", "space", "informs")]
 
 
 def no_subject_run(tree: Path) -> tuple[Job, verify.PlanVerdict]:
-    return run(tree, connect={"edges": INFORMS_ONLY})
+    job = job_for()
+    return job, pipeline.run_plan(job, tree, FakeLLM(script(connect={"edges": INFORMS_ONLY})), dream=False)
 
 
 def test_an_empty_check_is_absent_from_held_in_the_green_line(tmp_path):
@@ -789,16 +790,26 @@ def line_of(result: verify.PlanVerdict) -> str:
 
 
 def test_a_model_run_with_nothing_traced_claims_only_the_structure(tmp_path):
-    assert line_of(run(tmp_path / "tree")[1]) == (
+    job = job_for()
+    assert line_of(pipeline.run_plan(job, tmp_path / "tree", FakeLLM(script()), dream=False)) == (
         "Green: this plan's structure holds, which is not the same as true. Nothing in it traces to a source. "
         "Held: topic_map, no_cycles, start_order. "
         "No subject, so these proved nothing: findings_traced, sources_fetched, dreams_shaped, dreams_apart."
     )
 
 
+def test_held_dream_checks_say_that_dreams_are_not_findings(tmp_path):
+    assert line_of(run(tmp_path / "tree")[1]) == (
+        "Green: this plan's structure holds, which is not the same as true. Nothing in it traces to a source. "
+        "Held: topic_map, no_cycles, start_order, dreams_shaped, dreams_apart. "
+        "No subject, so these proved nothing: findings_traced, sources_fetched. "
+        "Dreams are guesses, not findings: their checks read their shape and that they stay apart."
+    )
+
+
 def test_an_offline_run_adds_only_that_its_findings_are_labelled(tmp_path):
     job = job_for()
-    assert line_of(pipeline.run_plan(job, tmp_path / "tree")) == (
+    assert line_of(pipeline.run_plan(job, tmp_path / "tree", dream=False)) == (
         "Green: this plan's structure holds and every finding is cited or labelled an assumption, "
         "which is not the same as true. Nothing in it traces to a source. "
         "Held: topic_map, no_cycles, findings_traced, start_order. "

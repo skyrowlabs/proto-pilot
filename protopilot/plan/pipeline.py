@@ -16,6 +16,9 @@ only ever edits data. `_hand_back` writes, then reads the tree and checks again.
 plan still red is handed back with a RUNBOOK, `finished` says `ok=False`, and the
 CLI exits 1, as `proto new`'s floor does. A failed pass is a different thing: a
 pass that returns nothing a plan can hold leaves no tree at all.
+
+Dreaming is the exception, because dreams are extras. A plan keeps going when its
+dreaming fails, and `dreams.md` says so.
 """
 
 from __future__ import annotations
@@ -25,18 +28,38 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from protopilot.llm import LLM, OfflineLLM
-from protopilot.plan import baseline, render, verify
+from protopilot.plan import baseline, dreaming, render, verify
+from protopilot.plan.lenses import LENSES, Lens
 from protopilot.plan.model import DEFAULT_DEPTH, Depth, Plan, plan_path
-from protopilot.plan.passes import connect, consider, outline, repair, run_pass, scope, start
+from protopilot.plan.passes import (
+    collect,
+    connect,
+    consider,
+    evaluate,
+    outline,
+    propose,
+    repair,
+    run_pass,
+    scope,
+    start,
+)
 
 #: Every model call a run makes, in order; the review sits after `BEFORE_REVIEW`.
-PASSES = (scope, outline, connect, consider, start)
+PLAN_PASSES = (scope, outline, connect, consider, start)
+DREAM_PASSES = (collect, evaluate, propose)
+PASSES = (*PLAN_PASSES, *DREAM_PASSES)
 BEFORE_REVIEW = (scope, outline)
 RENDER = "render"
+#: A model's error can be a page of text, and it lands in `dreams.md`.
+MOST_FAILURE_CHARS = 300
 
 
 class PlanRefused(Exception):
     """The target cannot take a plan; the message says why, for a person."""
+
+
+class DreamFailed(Exception):
+    """A dream pass stopped; the message says which, and why, in one line."""
 
 
 @dataclass
@@ -89,37 +112,42 @@ def _pass(job, name: str, names: list[str], work: Callable[[], tuple[object, lis
     return result
 
 
-def _names() -> list[str]:
-    return [*(module.NAME for module in PASSES), RENDER]
+def _passes(dream: bool) -> tuple:
+    return PASSES if dream else PLAN_PASSES
 
 
-def _model_pass(job, module, plan: Plan, llm: LLM) -> Plan:
-    return _pass(job, module.NAME, _names(), lambda: (run_pass(module, plan, llm), []))
+def _names(dream: bool = True) -> list[str]:
+    return [*(module.NAME for module in _passes(dream)), RENDER]
 
 
-def call_estimate(llm: LLM) -> str:
-    """The model calls this run makes, counted from `PASSES`, for the checkpoint."""
+def _model_pass(job, module, plan: Plan, llm: LLM, names: list[str]) -> Plan:
+    return _pass(job, module.NAME, names, lambda: (run_pass(module, plan, llm), []))
+
+
+def call_estimate(llm: LLM, dream: bool = True) -> str:
+    """The model calls this run makes, counted from the passes it runs, for the checkpoint."""
     excluded = "Research does not run in this build, so these numbers exclude it."
     if llm.offline:
         return f"Estimated model calls: 0, because this run is offline. {excluded}"
-    ahead = [module.NAME for module in PASSES if module not in BEFORE_REVIEW]
+    passes = _passes(dream)
+    ahead = [module.NAME for module in passes if module not in BEFORE_REVIEW]
     repairs = f"plus 0 to {repair.ATTEMPTS} repair calls, only if verification finds something repair can fix"
     still = f"{len(ahead)} still to come ({', '.join(ahead)})"
-    return f"Estimated model calls: {len(PASSES)} in all, {still}, {repairs}. {excluded}"
+    return f"Estimated model calls: {len(passes)} in all, {still}, {repairs}. {excluded}"
 
 
-def scoped(job, llm: LLM, depth: Depth | None = None) -> Plan:
+def scoped(job, llm: LLM, depth: Depth | None = None, dream: bool = True) -> Plan:
     """The plan's scope, with any questions still open. Writes no files."""
-    job.event("plan", passes=_names())
+    job.event("plan", passes=_names(dream))
     plan = scope.seed(job.idea, job.direction, None if llm.offline else depth or DEFAULT_DEPTH)
-    return _model_pass(job, scope, plan, llm)
+    return _model_pass(job, scope, plan, llm, _names(dream))
 
 
-def outlined(job, llm: LLM, plan: Plan) -> Plan:
+def outlined(job, llm: LLM, plan: Plan, dream: bool = True) -> Plan:
     """The topics, ready to review. Writes no files; the summary is the checkpoint's."""
-    plan = _model_pass(job, outline, plan, llm)
+    plan = _model_pass(job, outline, plan, llm, _names(dream))
     plan = outline.with_assumptions(plan) if llm.offline else plan
-    estimate = call_estimate(llm)
+    estimate = call_estimate(llm, dream)
     job.log(plan.summary())
     job.log(estimate)
     job.event("outline", topics=[t.slug for t in plan.topics], depth=plan.depth, estimate=estimate)
@@ -236,19 +264,66 @@ def _hand_back(job, tree: Path, names: list[str], checked: Checked, save: bool) 
     return final
 
 
-def build(job, tree: Path, plan: Plan, llm: LLM) -> verify.PlanVerdict:
+def _dream_pass(job, module, plan: Plan, llm: LLM, names: list[str], **options: object) -> Plan:
+    """One dream pass; `DreamFailed` is the only way it stops, however it went wrong."""
+    try:
+        return _pass(job, module.NAME, names, lambda: (run_pass(module, plan, llm, **options), []))
+    except Exception as exc:  # noqa: BLE001 -- a failed dream is an outcome
+        said = baseline.clean(str(exc))[:MOST_FAILURE_CHARS]
+        raise DreamFailed(f"the {module.NAME} pass stopped: {said}.") from exc
+
+
+def _skipped(job, module, plan: Plan, names: list[str]) -> Plan:
+    """A pass with nothing to read costs no call, and still reaches the end of the list."""
+    job.log(f"    {module.NAME} has nothing to read, so no call was made")
+    return _pass(job, module.NAME, names, lambda: (plan, []))
+
+
+def _dreamed(job, plan: Plan, llm: LLM, names: list[str], lenses: tuple[Lens, ...], per_lens: int) -> Plan:
+    """One round, whole or not at all: new dreams join `plan`'s pool, or `DreamFailed` is raised."""
+    collected = _dream_pass(job, collect, plan, llm, names, lenses=lenses, per_lens=per_lens)
+    pool, notes = dreaming.admit(collected, plan, lenses)
+    for module, waiting in ((evaluate, evaluate.fresh), (propose, propose.shortlist)):
+        pool = _dream_pass(job, module, pool, llm, names) if waiting(pool) else _skipped(job, module, pool, names)
+    pool, more = dreaming.settle(pool, plan)
+    for note in [*notes, *more]:
+        job.log(f"    {note}")
+    added = len(pool.dreams) - len(plan.dreams)
+    job.log(f"    {added} new dream(s) in a pool of {len(pool.dreams)}")
+    job.event("dreamed", added=added, pool=len(pool.dreams))
+    return pool
+
+
+def _dreamed_or_noted(job, plan: Plan, llm: LLM, names: list[str]) -> Plan:
+    """A plan's own dreaming: whatever goes wrong here is written down, and the plan goes on."""
+    try:
+        dreamt = _dreamed(job, plan, llm, names, LENSES, dreaming.PLAN_PER_LENS)
+        if dreamt.dreams:
+            return dreamt
+        reason = "no dream came through it whole."
+    except DreamFailed as exc:
+        reason = str(exc)
+    job.log(f"    dreaming failed: {reason}")
+    job.event("dream_failed", error=reason)
+    return plan.revised(dream_failure=reason)
+
+
+def build(job, tree: Path, plan: Plan, llm: LLM, dream: bool = True) -> verify.PlanVerdict:
     """Everything after the review, whether a person approved it or nobody was asked."""
     tree = Path(tree)
     _refuse_if_taken(job, tree)
     job.project_dir = str(tree)
+    names = _names(dream)
 
     for module in (connect, consider, start):
-        plan = _model_pass(job, module, plan, llm)
+        plan = _model_pass(job, module, plan, llm, names)
+    if dream:
+        plan = _dreamed_or_noted(job, plan, llm, names)
     checked = repaired(job, plan, llm)
     # Again, because those passes take minutes. What is left is the instant between
     # here and the save's rename, in which another run's plan would still be replaced.
     _refuse_if_taken(job, tree)
-    return _hand_back(job, tree, _names(), checked, save=True)
+    return _hand_back(job, tree, names, checked, save=True)
 
 
 def _finish(job, tree: Path, plan: Plan, result: verify.PlanVerdict, attempts: int) -> None:
@@ -256,6 +331,9 @@ def _finish(job, tree: Path, plan: Plan, result: verify.PlanVerdict, attempts: i
         job.log("Not researched: nothing here was checked against a source.")
     if result.ok:
         job.log(result.summary)
+    if plan.dream_failure:
+        job.log(f"Dreaming failed, and this plan does not depend on it: {plan.dream_failure} {render.RETRY}")
+    if result.ok:
         job.log(f"\nPlan at {tree}. Start with {render.PLAN_FILE}.")
     else:
         job.log(f"Not verified: red at {result.stage} after {attempts} check(s).")
@@ -277,13 +355,15 @@ def rerender(job, tree: Path) -> verify.PlanVerdict:
     return _hand_back(job, tree, [RENDER], Checked(plan, result, 1, tried), save=False)
 
 
-def run_plan(job, tree: Path, llm: LLM | None = None, depth: Depth | None = None) -> verify.PlanVerdict:
+def run_plan(
+    job, tree: Path, llm: LLM | None = None, depth: Depth | None = None, dream: bool = True
+) -> verify.PlanVerdict:
     """Every half with nobody asked, or a re-render of the plan already in `tree`."""
     tree = Path(tree)
     if existing_plan(tree, job.idea, job.direction) is not None:
         return rerender(job, tree)
     llm = llm or OfflineLLM()
-    return build(job, tree, outlined(job, llm, scoped(job, llm, depth)), llm)
+    return build(job, tree, outlined(job, llm, scoped(job, llm, depth, dream), dream), llm, dream)
 
 
 def after_failure(tree: Path) -> str:

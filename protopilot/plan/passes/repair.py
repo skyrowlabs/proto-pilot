@@ -2,8 +2,9 @@
 
 `apply` is `connect.apply` then `start.apply`, so repair owns what they own and
 reaches no finding, source, dream or `researched`. A check on those goes to the
-floor unrepaired, which is why `FIXES` is short. Slugs stay validated, and a repair
-that returns a topic the plan lacks is refused.
+floor unrepaired, which is why `FIXES` is short. A dream fault never gets this far
+from a run: `dreaming` removes the dream instead, because a dream is not worth a
+repair. Slugs stay validated, and a repair that returns a topic the plan lacks is refused.
 
 `rejected` is the shrink guard: the plan analogue of a repair that cuts the smoke
 suite. A fault is mended, never deleted, so a repair may give up only what the

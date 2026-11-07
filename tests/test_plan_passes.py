@@ -11,6 +11,8 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 from fakes import FakeLLM
+from plan_script import PASS_NAMES
+from plan_script import script as whole_script
 
 from protopilot import cli
 from protopilot.jobs import Job
@@ -53,9 +55,9 @@ def fail_at(tree: Path, **overrides: dict) -> str:
 
 
 def test_a_model_run_calls_each_pass_once_in_order(tmp_path):
-    llm = FakeLLM(script())
+    llm = FakeLLM(whole_script())
     pipeline.run_plan(job_for(), tmp_path / "tree", llm)
-    assert [call["label"] for call in llm.calls] == ["scope", "outline", "connect", "consider", "start"]
+    assert [call["label"] for call in llm.calls] == PASS_NAMES
     assert llm.responses == []
 
 
@@ -80,7 +82,7 @@ def test_a_model_cannot_claim_research_by_returning_it(tmp_path):
 
 
 def test_the_offline_passes_rebuild_the_baseline_exactly(tmp_path):
-    pipeline.run_plan(job_for(), tmp_path / "tree")
+    pipeline.run_plan(job_for(), tmp_path / "tree", dream=False)
     assert Plan.load(tmp_path / "tree") == baseline.build_plan(IDEA)
     assert "depth" not in json.loads(plan_path(tmp_path / "tree").read_text(encoding="utf-8"))
 
@@ -139,7 +141,7 @@ def test_a_consider_row_for_a_ghost_or_missing_topic_is_refused(tmp_path):
 def test_start_is_shown_every_topic_and_what_each_depends_on(tmp_path):
     llm = FakeLLM(script())
     pipeline.run_plan(job_for(), tmp_path / "tree", llm)
-    shown = llm.calls[-1]["user"]
+    shown = next(call for call in llm.calls if call["label"] == "start")["user"]
     assert '"slug": "lending"' in shown and "- lending depends on: members" in shown
 
 
@@ -200,7 +202,7 @@ def test_a_render_that_dies_leaves_no_entry_page_on_a_fresh_tree(tmp_path, monke
 
 def test_the_estimate_counts_what_runs_and_says_research_is_excluded():
     said = pipeline.call_estimate(FakeLLM([]))
-    assert "5 in all" in said and "3 still to come (connect, consider, start)" in said
+    assert "8 in all" in said and "6 still to come (connect, consider, start, collect, evaluate, propose)" in said
     assert "plus 0 to 3 repair calls" in said
     assert "exclude" in said and "Research" in said
 
@@ -295,7 +297,7 @@ def test_yes_runs_the_model_with_no_prompt(tmp_path, monkeypatch):
     tree = tmp_path / "tree"
     result = invoke(IDEA, "--yes", "--depth", "standard", "--dir", str(tree))
     assert result.exit_code == 0, result.output
-    assert "5 in all" in result.output and "exclude it" in result.output
+    assert "8 in all" in result.output and "exclude it" in result.output
     plan = Plan.load(tree)
     assert (plan.depth, plan.questions) == ("standard", ["Who runs it?"])
 

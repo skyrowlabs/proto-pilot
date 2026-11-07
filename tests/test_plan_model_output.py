@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 from fakes import FakeLLM
-from plan_script import GOOD, IDEA, PASS_NAMES, SLUGS, consider_of, edge, outline_of, script, step
+from plan_script import GOOD, IDEA, PASS_NAMES, PLAN_PASS_NAMES, SLUGS, consider_of, edge, outline_of, script, step
 
 from protopilot.console import progress
 from protopilot.jobs import Job
@@ -81,8 +81,9 @@ def test_nothing_a_pass_returns_beyond_its_fields_reaches_the_plan(tmp_path, nam
 
 def test_a_forged_plan_stays_stamped_and_sourceless(tmp_path):
     tree = tmp_path / "tree"
-    plan = run(tree, **{name: forged_everywhere(name) for name in PASS_NAMES})
-    assert (plan.researched, plan.sources, plan.dreams, plan.depth) == (False, [], [], "standard")
+    plan = run(tree, **{name: forged_everywhere(name) for name in PLAN_PASS_NAMES})
+    assert (plan.researched, plan.sources, plan.depth) == (False, [], "standard")
+    assert "d" not in [dream.id for dream in plan.dreams]
     assert [t.findings for t in plan.topics] == [[]] * len(SLUGS)
     assert (plan.idea, plan.title, plan.slug) == (IDEA, baseline.build_plan(IDEA).title, baseline.slug_for(IDEA))
     assert "No sources." in (tree / "sources.md").read_text(encoding="utf-8")
@@ -201,7 +202,7 @@ def test_a_scope_missing_a_field_is_refused_and_named(tmp_path, field):
     assert f"missing field '{field}'" in refused(tmp_path / "tree", scope=bad)
 
 
-@pytest.mark.parametrize("name", PASS_NAMES)
+@pytest.mark.parametrize("name", PLAN_PASS_NAMES)
 @pytest.mark.parametrize("nonsense", [None, [], "text", 5], ids=repr)
 def test_a_response_of_the_wrong_shape_is_refused_by_its_pass(tmp_path, name, nonsense):
     assert f"pass {name!r}" in refused(tmp_path / "tree", **{name: nonsense})
@@ -400,7 +401,7 @@ def test_the_outline_event_survives_json_and_the_console_fold(tmp_path):
     job = job_for()
     pipeline.run_plan(job, tmp_path / "tree", FakeLLM(script()))
     assert json.loads(json.dumps(job.snapshot()))["events"] == job.events
-    assert [p.state for p in progress.fold(job.events).passes] == [progress.DONE] * 6
+    assert [p.state for p in progress.fold(job.events).passes] == [progress.DONE] * (len(PASS_NAMES) + 1)
 
 
 def test_a_run_that_stops_at_the_outline_emits_no_outline_event(tmp_path):
@@ -426,7 +427,7 @@ class DiesAt(FakeLLM):
         return super().structured(system=system, user=user, schema=schema, label=label)
 
 
-@pytest.mark.parametrize("name", PASS_NAMES)
+@pytest.mark.parametrize("name", PLAN_PASS_NAMES)
 def test_a_backend_failure_at_any_pass_is_a_failed_pass_and_no_tree(tmp_path, name):
     job, tree = job_for(), tmp_path / "tree"
     with pytest.raises(LLMError, match="out of credit"):
@@ -663,8 +664,8 @@ class HoldsToItsSchema(FakeLLM):
 def test_a_chain_graph_gets_more_than_one_step(tmp_path):
     chain = {"edges": [edge(a, b) for a, b in zip(SLUGS[1:], SLUGS)]}
     order = SLUGS[:4]
-    llm = HoldsToItsSchema(script(connect=chain, start={"steps": [step(t) for t in order]}))
-    pipeline.run_plan(job_for(), tmp_path / "tree", llm)
+    llm = HoldsToItsSchema(script(connect=chain, start={"steps": [step(t) for t in order]})[:5])
+    pipeline.run_plan(job_for(), tmp_path / "tree", llm, dream=False)
     assert [s.topic for s in Plan.load(tmp_path / "tree").steps] == order
     shown = llm.calls[-1]["user"]
     assert "- lending depends on: members" in shown and "- members depends on: nothing" in shown
