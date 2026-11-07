@@ -335,7 +335,8 @@ HTML opener in plan text.
   only research in progress is neither. `proto ls` lists a plan with no port or state,
   `proto rm` deletes it with no Docker call, and `up`, `down`, `test`, `add`, `reset`,
   `logs`, `spec` and `export` refuse it in a sentence that says what to do instead.
-  `proto serve` lists it read-only. `proto console` lists no saved trees at all, so a
+  `proto serve` lists it read-only, and asks the tree too. A slug another path holds
+  is recorded with `_2`, `_3`, because the web finds an entry by slug. `proto console` lists no saved trees at all, so a
   plan does not appear there.
 
 ## Critical Patterns

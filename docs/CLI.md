@@ -160,6 +160,7 @@ the next time `proto plan` redraws it.
 What a folder is comes from its own files, never from the list: a `spec.json` there
 makes it an app, and a `plan.json` a plan. A folder holding neither, including one
 whose research stopped before `plan.json` was written, is refused by `proto rm`.
+An app and a plan made from one idea share a slug, so the second one listed gets `_2`.
 
 ## `proto dream`
 

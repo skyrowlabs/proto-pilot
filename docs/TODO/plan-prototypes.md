@@ -263,6 +263,10 @@ target showed cost more than the seam looks.
   made earlier, and a listed one keeps its date. An entry with no `kind` is an app.
 - **What a tree is comes from its files**, never the index: `spec.json` is an app,
   `plan.json` a plan, anything else is refused by `rm`, research in progress included.
+- **Slugs are unique across the registry**: a slug another path holds gets `_2`, `_3`, so
+  an app and a plan from one idea are both reachable on the web, which finds by slug.
+- **The web asks the tree, not the entry**, as the CLI does, so a stale entry reaches no
+  Docker call and no delete.
 - **`spec` and `export` refuse a plan too**, with the same sentence, since both read a `Spec`.
 - **`proto console` lists no saved trees**, app or plan, and its actions reach only the run
   it just made, so a plan does not appear there. `proto serve`, which does list them,
@@ -286,7 +290,7 @@ All six are Jeston's rulings, 2026-11-06.
 
 ## Acceptance
 
-- [ ] `./pp test unit` green, with no network and no key
+- [x] `./pp test unit` green, with no network and no key: 2445 passed 2026-11-07 as uid 1000 in a user and net namespace with only `lo` up, key unset, 1.1.1.1:443 unreachable
 - [x] `proto plan "…" --offline --yes` writes the whole tree, twice, byte-identical
 - [ ] Each verifier check goes red on its planted failure, from a green baseline
 - [ ] A plan's `dreams.md` holds proposals and set-aside entries, each with a verdict,
