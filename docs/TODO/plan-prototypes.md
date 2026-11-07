@@ -244,17 +244,29 @@ findings were labelled assumptions. A re-render from disk stayed green.
 These are the sentences that turn out to be *true only of apps*, which the second
 target showed cost more than the seam looks.
 
-- [ ] `registry.Entry` gains a `kind`; `proto ls` shows it; `port` means nothing for a plan
-- [ ] `registry.delete` refuses any tree without `spec.json`, so `proto rm` would refuse
+- [x] `registry.Entry` gains a `kind`; `proto ls` shows it; `port` means nothing for a plan
+- [x] `registry.delete` refuses any tree without `spec.json`, so `proto rm` would refuse
       a plan, and it runs `docker compose down -v` first. It needs both changed
-- [ ] `proto up`, `down`, `test`, `add`, `reset`, `logs` refuse a plan tree with a sentence
+- [x] `proto up`, `down`, `test`, `add`, `reset`, `logs` refuse a plan tree with a sentence
       that says what to do instead
-- [ ] `proto console`: decide whether a plan appears, and read-only is enough at first
-- [ ] Update `README.md` (*a prototype you can run* is no longer the whole claim),
+- [x] `proto console`: decide whether a plan appears, and read-only is enough at first
+- [x] Update `README.md` (*a prototype you can run* is no longer the whole claim),
       `docs/CLI.md` and `docs/ARCHITECTURE.md`
 - [ ] `proto new --from-plan <dir> --topic <topic>`, building a running prototype of one
       topic (~deferred)
 - [ ] Hand the plan to the Improvement Loop for repeat research rounds (~deferred)
+
+**Built 2026-11-07.** Choices this phase made:
+
+- **`proto plan` registers its tree** as kind `plan`, with no port, once `plan.json`
+  lands, green or red, so `ls`, `rm` and `prune` reach it. A re-render registers a plan
+  made earlier, and a listed one keeps its date. An entry with no `kind` is an app.
+- **What a tree is comes from its files**, never the index: `spec.json` is an app,
+  `plan.json` a plan, anything else is refused by `rm`, research in progress included.
+- **`spec` and `export` refuse a plan too**, with the same sentence, since both read a `Spec`.
+- **`proto console` lists no saved trees**, app or plan, and its actions reach only the run
+  it just made, so a plan does not appear there. `proto serve`, which does list them,
+  shows a plan read-only.
 
 ## Open decisions
 
@@ -275,15 +287,15 @@ All six are Jeston's rulings, 2026-11-06.
 ## Acceptance
 
 - [ ] `./pp test unit` green, with no network and no key
-- [ ] `proto plan "…" --offline --yes` writes the whole tree, twice, byte-identical
+- [x] `proto plan "…" --offline --yes` writes the whole tree, twice, byte-identical
 - [ ] Each verifier check goes red on its planted failure, from a green baseline
 - [ ] A plan's `dreams.md` holds proposals and set-aside entries, each with a verdict,
       and no dream text appears under `topics/`
-- [ ] `proto dream` run twice grows one pool, without duplicates
+- [x] `proto dream` run twice grows one pool, without duplicates
 - [ ] `proto dream promote <id>` produces a verified topic, and no other path does
-- [ ] `proto up` on a plan tree refuses and exits non-zero; `proto rm` removes it and
+- [x] `proto up` on a plan tree refuses and exits non-zero; `proto rm` removes it and
       never calls Docker
-- [ ] `proto new` output is unchanged: the golden manifests do not move
+- [x] `proto new` output is unchanged: the golden manifests do not move
 - [ ] One real idea run end to end with research, read by a person, who can name a
       topic they would not have thought of and a first step they would act on (~operator)
 
