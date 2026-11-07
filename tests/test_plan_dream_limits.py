@@ -16,28 +16,45 @@ from plan_script import (
     DREAM_PASS_NAMES,
     GOOD,
     IDEA,
+    NO_REPAIR,
     SLUGS,
     consider_of,
     dream_row,
     edge,
     judged_row,
+    outline_of,
     proposal_row,
     repair_of,
     script,
+    step,
 )
 
 from protopilot import cli
 from protopilot.console.progress import DONE, FAILED, fold
 from protopilot.jobs import Job
-from protopilot.llm import LLMError
-from protopilot.plan import dreaming, pipeline, render, verify
-from protopilot.plan.model import DREAM_WORD_CAP, MAX_SLUG_LENGTH, Plan, plan_path
-from protopilot.plan.passes import outline, propose
+from protopilot.llm import LLMError, _without_patterns
+from protopilot.plan import dreaming, passes, pipeline, render, verify
+from protopilot.plan.model import (
+    DREAM_FIELD_WORDS,
+    DREAM_WORD_CAP,
+    MAX_SLUG_LENGTH,
+    MAX_TOPICS,
+    Plan,
+    dream_words,
+    plan_path,
+)
+from protopilot.plan.passes import collect, evaluate, outline, propose, repair
 from protopilot.spec import SLUG_RE
 
 pytestmark = [pytest.mark.unit]
 
 BREAD = GOOD["collect"]["dreams"][1]
+PLAN_WITH_A_DREAM = {
+    "slug": "p",
+    "title": "t",
+    "idea": "i",
+    "dreams": [{"id": "d1", "title": "t", "what_if": "w", "lens": "l", "anchor": "a", "takes": "x"}],
+}
 #: Over the cap in `takes`, whichever other fields it carries.
 RAMBLING = {**dream_row(word="rambling"), "takes": " ".join(["word"] * (DREAM_WORD_CAP + 1))}
 
@@ -117,9 +134,16 @@ class DiesAt(FakeLLM):
 
 
 def test_a_script_that_stops_short_at_a_dream_pass_is_on_record(tmp_path):
-    pipeline.run_plan(job_for(), tmp_path / "tree", FakeLLM(script()[:5]))
+    with pytest.raises(AssertionError, match="ran out of responses"):
+        pipeline.run_plan(job_for(), tmp_path / "tree", FakeLLM(script()[:5]))
     assert FakeLLM.ran_dry == ["collect"]
-    assert "ran out of responses" in Plan.load(tmp_path / "tree").dream_failure
+    FakeLLM.ran_dry.clear()
+
+
+def test_a_script_that_stops_short_at_repair_is_on_record(tmp_path):
+    with pytest.raises(AssertionError, match="ran out of responses"):
+        pipeline.run_plan(job_for(), tmp_path / "tree", FakeLLM(script(start={"steps": [step("lending")]})))
+    assert FakeLLM.ran_dry == ["repair"]
     FakeLLM.ran_dry.clear()
 
 
@@ -568,15 +592,15 @@ def test_the_console_reads_a_failed_dream_as_a_finished_plan(tmp_path):
 # -- the cap --------------------------------------------------------------
 
 
-def over_by(extra: int) -> dict:
-    """A dream of exactly the cap in words, plus `extra`, split as the fields allow."""
-    takes = " ".join(["w"] * (DREAM_WORD_CAP - 5 + extra))
-    return {**dream_row(), "title": "one two", "what_if": "a b c", "takes": takes}
+def over_by(extra: int, word: str = "a") -> dict:
+    """A dream of exactly the cap in words, plus `extra`, each field at its budget."""
+    fields = {name: " ".join([word] * most) for name, most in DREAM_FIELD_WORDS.items()}
+    return {**dream_row(), **fields, "takes": " ".join(["w"] * (DREAM_FIELD_WORDS["takes"] + extra))}
 
 
 def test_a_dream_at_the_cap_enters_and_one_word_past_it_is_left_out_with_its_count(tmp_path):
     job, tree = job_for(), tmp_path / "tree"
-    rows = [over_by(0), {**over_by(1), "title": "other two", "what_if": "x y z", "lens": "the-opposite"}]
+    rows = [over_by(0), {**over_by(1, "b"), "lens": "the-opposite"}]
     llm = FakeLLM(script(collect={"dreams": rows}, evaluate={"dreams": [judged_row("d1")]}))
     assert pipeline.run_plan(job, tree, llm).ok
     assert [dream.id for dream in Plan.load(tree).dreams] == ["d1"]
@@ -864,3 +888,386 @@ def test_dreaming_offline_changes_only_the_dreams_page_and_plan_jsons_dreams(tmp
     assert invoke("plan", IDEA, "--offline", "--yes", "--no-dream", "--dir", str(without)).exit_code == 0
     assert changed(snapshot(without), snapshot(with_dreams)) == {"dreams.md", ".protopilot/plan.json"}
     assert Plan.load(with_dreams).revised(dreams=[]) == Plan.load(without)
+
+
+# -- the defects a review found: each named for its finding ----------------
+
+
+def test_H1_a_bad_rating_from_evaluate_must_not_cost_the_plan(tmp_path):
+    """One out-of-range rating destroys a whole `proto plan` run, after every paid pass."""
+    tree = tmp_path / "tree"
+    bad = {**judged_row("d1"), "pull": "huge"}
+    result = pipeline.run_plan(job_for(), tree, FakeLLM(script(evaluate={"dreams": [bad, judged_row("d2")]})))
+    assert result.ok and (tree / "PLAN.md").is_file()
+
+
+def test_H2_a_lone_surrogate_in_a_dream_must_not_cost_the_plan(tmp_path):
+    """`"\\ud800"` is valid JSON, and json.loads yields a lone surrogate."""
+    tree = tmp_path / "tree"
+    row = {**dream_row(), "title": "Seeds \ud800 too"}
+    result = pipeline.run_plan(job_for(), tree, FakeLLM(script(collect={"dreams": [row]})))
+    assert result.ok and (tree / "PLAN.md").is_file()
+
+
+@pytest.mark.parametrize("blocker", ["symlink", "directory", "read-only"])
+def test_H3_a_dream_verb_that_cannot_draw_must_leave_the_tree_as_it_was(tmp_path, blocker):
+    """`_land` promises "Red, or raced, leaves the tree as it was"; a blocked page does not."""
+    tree = model_plan(tmp_path / "tree")
+    page = tree / "dreams.md"
+    if blocker == "symlink":
+        (tmp_path / "mine.md").write_text("mine", encoding="utf-8")
+        page.unlink()
+        page.symlink_to(tmp_path / "mine.md")
+    elif blocker == "directory":
+        page.unlink()
+        page.mkdir()
+    else:
+        os.chmod(page, 0o444)
+    before = snapshot(tree)
+    with pytest.raises((pipeline.PlanRefused, OSError)):
+        pipeline.drop(job_for(), tree, "d1", "No shelf.")
+    assert snapshot(tree) == before
+
+
+def test_H4_repair_during_a_promotion_must_not_remove_a_settled_edge(tmp_path):
+    """promote.py: "what the plan had settled stays settled". Repair can delete a settled link."""
+    tree = model_plan(tmp_path / "tree")
+    before = Plan.load(tree)
+    links = [edge("members", "seeds_too"), edge("seeds_too", "lending")]
+    gives_up_the_settled_link = repair_of([edge("money", "space", "informs"), *links], ["lending"])
+    try:
+        pipeline.promote(job_for(), tree, "d1", FakeLLM([answer(*links), gives_up_the_settled_link, NO_REPAIR]))
+    except pipeline.PlanRefused:
+        pass  # refusing is a correct answer
+    assert all(held in Plan.load(tree).edges for held in before.edges)
+
+
+def test_M1_repair_during_a_promotion_must_not_add_links_between_settled_topics(tmp_path):
+    """`repair.rejected` looks only at edges lost, so a repair can add anything."""
+    tree = model_plan(tmp_path / "tree")
+    loop = [edge("seeds_too", "members"), edge("members", "seeds_too")]
+    extra = edge("tools", "money", "conflicts-with")
+    mended = repair_of([*GOOD["connect"]["edges"], edge("seeds_too", "members"), extra], ["members"])
+    try:
+        pipeline.promote(job_for(), tree, "d1", FakeLLM([answer(*loop), mended, NO_REPAIR]))
+    except pipeline.PlanRefused:
+        pass
+    assert ("tools", "money") not in {(e.from_topic, e.to_topic) for e in Plan.load(tree).edges}
+
+
+def test_M2_a_programmer_error_in_a_dream_pass_must_not_read_as_dreaming_failed(tmp_path, monkeypatch):
+    """Should a bug be hidden? No."""
+
+    def broken(*_args, **_kwargs):
+        raise NameError("name 'parts' is not defined")
+
+    monkeypatch.setattr(collect, "build", broken)
+    monkeypatch.setattr(cli, "build_llm", lambda **_: FakeLLM(script()))
+    result = CliRunner().invoke(cli.main, ["plan", IDEA, "--yes", "--dir", str(tmp_path / "tree")])
+    assert result.exit_code != 0
+
+
+def test_M3_a_plan_json_corrupted_during_a_promotion_is_a_lost_race_with_a_true_message(tmp_path):
+    """`_land`'s race check calls `Plan.load` unguarded."""
+    tree = model_plan(tmp_path / "tree")
+    llm = During([answer()], "promote", lambda: plan_path(tree).write_text("{", encoding="utf-8"))
+    with pytest.raises(pipeline.PlanRefused, match="changed while this ran"):
+        pipeline.promote(job_for(), tree, "d1", llm)
+
+
+def test_M4_a_round_that_adds_nothing_must_not_erase_the_note_or_claim_dreaming_never_ran(tmp_path):
+    """`dream_round` clears `dream_failure` whatever the round produced."""
+    tree = tmp_path / "tree"
+    assert pipeline.run_plan(job_for(), tree, FakeLLM(script(collect={"nonsense": 1}))).ok
+    rambling = {**dream_row(), "takes": " ".join(["word"] * (DREAM_WORD_CAP + 1))}
+    assert pipeline.dream_round(job_for(), tree, FakeLLM([{"dreams": [rambling]}])).ok
+    assert "dreaming has not run" not in (tree / "dreams.md").read_text(encoding="utf-8")
+
+
+def test_M5_the_word_cap_must_not_be_beaten_by_joining_words_with_what_it_does_not_break_on(tmp_path):
+    """model.py records that a model joined 28 words with hyphens; other joiners still work."""
+    words = [f"w{n}" for n in range(60)]
+    for joined in (",".join(words), ".".join(words), "‑".join(words), "−".join(words), "​".join(words)):
+        assert dream_words(joined) > DREAM_WORD_CAP, repr(joined[:12])
+    assert dream_words("🚲 " * 100) > DREAM_WORD_CAP
+
+
+def test_M6_a_field_over_its_own_budget_must_be_left_out(tmp_path):
+    """The per-field budget is enforced nowhere the API backend can reach."""
+    tree = tmp_path / "tree"
+    title = " ".join(["word"] * 30)
+    assert pipeline.run_plan(
+        job_for(), tree, FakeLLM(script(collect={"dreams": [{**dream_row(), "title": title}, BREAD]}))
+    )
+    assert all(dream_words(d.title) <= DREAM_FIELD_WORDS["title"] for d in Plan.load(tree).dreams)
+
+
+def test_L1_one_blank_field_must_cost_one_dream_not_the_round(tmp_path):
+    """collect.py says "one bad dream costs only itself", but a blank field costs the round."""
+    tree = tmp_path / "tree"
+    rows = [dream_row(), {**BREAD, "what_if": "What if"}]
+    answers = script(collect={"dreams": rows}, evaluate={"dreams": [judged_row("d1")]})
+    assert pipeline.run_plan(job_for(), tree, FakeLLM(answers)).ok
+    assert [dream.id for dream in Plan.load(tree).dreams] == ["d1"]
+
+
+@pytest.mark.parametrize("rating", ["not judged", None])
+def test_L2_a_model_must_not_give_a_rating_only_the_twin_may(tmp_path, rating):
+    """`MODEL_RATINGS` excludes "not judged" but `_judged` never reads it."""
+    tree = tmp_path / "tree"
+    bad = {**judged_row("d1"), "pull": rating}
+    assert pipeline.run_plan(job_for(), tree, FakeLLM(script(evaluate={"dreams": [bad, judged_row("d2")]})))
+    assert all(dream.pull in ("low", "medium", "high") for dream in Plan.load(tree).dreams)
+
+
+def test_L3_the_schema_must_agree_with_dream_words_about_han(tmp_path):
+    """`word_pattern`'s docstring says "as `dream_words` counts them". It does not for Han or kana."""
+    assert dream_words("夢" * 100) == 50
+    assert re.fullmatch(collect.word_pattern(DREAM_FIELD_WORDS["title"]), "夢" * 100) is None
+
+
+def test_L4_the_green_lines_dream_sentence_must_claim_only_what_held(tmp_path):
+    """With every dream settled, `dreams_apart` is NO_SUBJECT, yet the line says they stay apart."""
+    tree = model_plan(tmp_path / "tree")
+    assert pipeline.promote(job_for(), tree, "d1", FakeLLM([answer()])).ok
+    result = pipeline.promote(job_for(), tree, "d2", FakeLLM([answer()]))
+    assert "dreams_apart" in result.named(verify.NO_SUBJECT)
+    assert "stay apart" not in result.summary
+
+
+@pytest.mark.parametrize("said", ["out of credit.", ""])
+def test_L5_a_failure_sentence_must_read_as_one_sentence(tmp_path, said):
+    """`f"...stopped: {said}."` doubles a period and leaves "stopped: ." on an empty error."""
+
+    class Dies(FakeLLM):
+        def structured(self, *, system, user, schema, label):
+            if label == "collect":
+                raise LLMError(said)
+            return super().structured(system=system, user=user, schema=schema, label=label)
+
+    tree = tmp_path / "tree"
+    assert pipeline.run_plan(job_for(), tree, Dies(script())).ok
+    failure = Plan.load(tree).dream_failure
+    assert not failure.endswith("..") and not failure.endswith(": .")
+
+
+def test_L6_a_dream_merged_into_one_that_did_not_survive_must_not_vanish(tmp_path):
+    """`evaluate.apply` merges d1 into d2, then `settle` removes d2, so neither lands."""
+    tree = tmp_path / "tree"
+    answers = script(evaluate={"dreams": [judged_row("d1", duplicate_of="d2")]})
+    assert pipeline.run_plan(job_for(), tree, FakeLLM(answers)).ok
+    assert [dream.id for dream in Plan.load(tree).dreams] == ["d1"]
+
+
+def test_L7_after_failure_must_not_promise_a_free_rerun_of_a_dream_verb(tmp_path):
+    """`_plan_step` appends `after_failure`, written for `proto plan`, to dream verbs."""
+    tree = model_plan(tmp_path / "tree")
+    os.chmod(tree / "sources.md", 0o444)
+    result = CliRunner().invoke(cli.main, ["dream", "drop", "d1", "--why", "No.", "--dir", str(tree)])
+    assert result.exit_code == 1
+    assert "no model call" not in " ".join(result.output.split())
+
+
+def test_L8_llm_a_moved_pattern_must_not_overwrite_a_description(tmp_path):
+    """py recomputes that for `proto new`)."""
+    moved = _without_patterns({"type": "string", "description": "A slug.", "pattern": "^a$"})
+    assert "A slug." in moved["description"] and "^a$" in moved["description"]
+    assert _without_patterns({"const": {"pattern": "b"}}) == {"const": {"pattern": "b"}}
+
+
+def test_R1_a_promotion_may_pass_the_outlines_eight_topics(tmp_path):
+    """A person chose it, and four to eight is the outline's rule, not the plan's."""
+    tree = tmp_path / "tree"
+    names = list("abcdefgh")
+    llm = FakeLLM(
+        script(
+            outline=outline_of(names),
+            connect={"edges": []},
+            consider=consider_of(names),
+            start={"steps": [step("a")]},
+            collect={"dreams": [dream_row(anchor="a")]},
+            evaluate={"dreams": [judged_row("d1")]},
+        )
+    )
+    job = job_for()
+    assert pipeline.build(job, tree, pipeline.outlined(job, llm, pipeline.scoped(job, llm, "deep")), llm).ok
+    assert pipeline.promote(job_for(), tree, "d1", FakeLLM([answer()])).ok
+    assert len(Plan.load(tree).topics) == MAX_TOPICS + 1
+
+
+@pytest.mark.parametrize(
+    ("first", "label"),
+    [("d1", "Dropped before: Too dear"), ("d2", "Set aside before: d2 decided.")],
+    ids=["dropped", "set-aside"],
+)
+def test_R2_a_promoted_dream_labels_its_earlier_reason_as_earlier(tmp_path, first, label):
+    """A dropped or set-aside dream's reason argued against it, so it must not read as why it was promoted."""
+    tree = model_plan(tmp_path / "tree")
+    assert pipeline.drop(job_for(), tree, "d1", "Too dear for a volunteer group").ok
+    assert pipeline.promote(job_for(), tree, first, FakeLLM([answer()])).ok
+    text = (tree / "dreams.md").read_text(encoding="utf-8")
+    assert "- Verdict: promoted\n" in text and label in text
+
+
+def test_R3_only_why_is_exempt_on_a_dropped_dream(tmp_path):
+    """What a person rejected must not read as a risk; only the person's own reason may repeat a topic."""
+    tree = model_plan(tmp_path / "tree")
+    assert pipeline.drop(job_for(), tree, "d2", "No shelf.").ok
+    before = snapshot(tree)
+    with pytest.raises(pipeline.PlanRefused, match="dreams_apart"):
+        pipeline.promote(job_for(), tree, "d1", FakeLLM([answer(risks=["the library lent bread as well as saws"])]))
+    assert snapshot(tree) == before
+
+
+def test_R4_an_ordinary_phrase_in_a_dreams_takes_must_not_block_a_promotion(tmp_path):
+    """The fuzzy rule is sound; the false reds come from MIN_LEAK_CHARS on `takes`."""
+    row = {**dream_row(), "takes": "A part-time coordinator."}
+    tree = model_plan(tmp_path / "tree", collect={"dreams": [row, BREAD]})
+    risk = "Everything leans on a part time coordinator who may leave."
+    assert pipeline.promote(job_for(), tree, "d2", FakeLLM([answer(risks=[risk])])).ok
+
+
+# -- what the fixes above must also hold ----------------------------------
+
+
+def test_a_blocked_page_is_refused_before_any_model_call(tmp_path):
+    tree = model_plan(tmp_path / "tree")
+    os.chmod(tree / "sources.md", 0o444)
+    llm = FakeLLM([])
+    with pytest.raises(pipeline.PlanRefused, match="Nothing was changed, because a page needs this name"):
+        pipeline.dream_round(job_for(), tree, llm)
+    assert llm.calls == []
+
+
+def test_a_write_that_dies_after_the_save_puts_the_tree_back(tmp_path, monkeypatch):
+    tree, real = model_plan(tmp_path / "tree"), Path.write_text
+    before = snapshot(tree)
+    armed = [True]
+
+    def dies(self, text, *args, **kwargs):
+        if self.name == "sources.md" and armed.pop() if armed else False:
+            raise OSError("disk full")
+        return real(self, text, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", dies)
+    with pytest.raises(pipeline.PlanRefused, match="the tree is back as it was: disk full"):
+        pipeline.drop(job_for(), tree, "d1", "No.")
+    assert snapshot(tree) == before
+
+
+def test_a_write_that_cannot_be_put_back_says_so(tmp_path, monkeypatch):
+    tree, real = model_plan(tmp_path / "tree"), Path.write_text
+
+    def dies(self, text, *args, **kwargs):
+        if self.name == "sources.md":
+            raise OSError("disk full")
+        return real(self, text, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", dies)
+    with pytest.raises(pipeline.PlanRefused, match="may disagree, and a rerun may repeat it"):
+        pipeline.drop(job_for(), tree, "d1", "No.")
+
+
+def test_a_bug_in_a_dream_verb_says_nothing_of_a_free_rerun(tmp_path, monkeypatch):
+    tree = model_plan(tmp_path / "tree")
+
+    def broken(*_args, **_kwargs):
+        raise NameError("a bug")
+
+    monkeypatch.setattr(dreaming, "dropped", broken)
+    result = invoke("dream", "drop", "d1", "--why", "No.", "--dir", str(tree))
+    assert result.exit_code == 1 and "NameError: a bug" in result.output
+    assert "before rerunning" in said(result) and "no model call" not in said(result)
+
+
+def test_a_bug_in_a_repair_surfaces_rather_than_reading_as_a_failed_repair(tmp_path, monkeypatch):
+    def broken(*_args, **_kwargs):
+        raise NameError("a bug")
+
+    monkeypatch.setattr(repair, "failure", broken)
+    with pytest.raises(NameError):
+        pipeline.run_plan(job_for(), tmp_path / "tree", FakeLLM(script(start={"steps": [step("lending")]})))
+
+
+def test_a_bug_in_apply_is_not_labelled_as_a_models_output(tmp_path, monkeypatch):
+    def broken(_plan, _data):
+        raise KeyError("a bug")
+
+    monkeypatch.setattr(propose, "apply", broken)
+    with pytest.raises(KeyError):
+        pipeline.run_plan(job_for(), tmp_path / "tree", FakeLLM(script()))
+
+
+@pytest.mark.parametrize(
+    ("value", "said_"),
+    [([], "an object was wanted"), ({"dreams": "x"}, "must be a list"), ({"dreams": [{"id": 1}]}, "missing field")],
+    ids=["not-an-object", "not-a-list", "row-short"],
+)
+def test_a_response_of_the_wrong_shape_is_named_as_that(value, said_):
+    assert said_ in passes.misshapen(evaluate.schema(Plan.model_validate(PLAN_WITH_A_DREAM)), value)
+
+
+def test_a_repair_during_a_promotion_is_told_what_is_settled(tmp_path):
+    tree = model_plan(tmp_path / "tree")
+    llm = FakeLLM([answer(edge("members", "seeds_too")), NO_REPAIR])
+    with pytest.raises(pipeline.PlanRefused):
+        pipeline.promote(job_for(), tree, "d1", llm)
+    assert repair.SETTLED_RULE in llm.calls[-1]["user"]
+
+
+def test_a_repair_may_mend_a_promotion_at_a_new_link_and_keep_every_settled_step(tmp_path):
+    tree = model_plan(tmp_path / "tree")
+    links = [edge("members", "seeds_too"), edge("seeds_too", "lending")]
+    mended = repair_of([*GOOD["connect"]["edges"], links[1]], ["members"])
+    assert pipeline.promote(job_for(), tree, "d1", FakeLLM([answer(*links), mended])).ok
+    assert edge("members", "seeds_too") not in [e.model_dump() for e in Plan.load(tree).edges]
+
+
+def test_a_repair_that_drops_a_settled_step_is_thrown_away(tmp_path):
+    tree = model_plan(tmp_path / "tree")
+    before = snapshot(tree)
+    gone = repair_of([*GOOD["connect"]["edges"], edge("members", "seeds_too")], ["seeds_too"])
+    with pytest.raises(pipeline.PlanRefused, match="changed settled steps"):
+        pipeline.promote(job_for(), tree, "d1", FakeLLM([answer(edge("members", "seeds_too")), gone, NO_REPAIR]))
+    assert snapshot(tree) == before
+
+
+def test_an_empty_round_after_no_dream_says_a_round_ran(tmp_path):
+    tree = tmp_path / "tree"
+    assert pipeline.run_plan(job_for(), tree, FakeLLM(script()[:5]), dream=False).ok
+    assert pipeline.dream_round(job_for(), tree, FakeLLM([{"dreams": [RAMBLING]}])).ok
+    assert "a round ran" in page(tree) and "dreaming has not run" not in page(tree)
+
+
+def test_an_empty_round_keeps_the_note_it_found(tmp_path):
+    tree = tmp_path / "tree"
+    assert pipeline.run_plan(job_for(), tree, FakeLLM(script(collect={"nonsense": 1}))).ok
+    said_before = Plan.load(tree).dream_failure
+    assert pipeline.dream_round(job_for(), tree, FakeLLM([{"dreams": [RAMBLING]}])).ok
+    assert Plan.load(tree).dream_failure == said_before
+
+
+@pytest.mark.parametrize(
+    ("text", "words"),
+    [("don't stop", 2), ("3.5 tools", 3), ("a" * 25, 2), ("\U0001f6b2\U0001f6b2", 2), ("a, b; c: d", 4)],
+    ids=["apostrophe", "decimal", "long-run", "emoji", "punctuation"],
+)
+def test_the_exact_count_of_words(text, words):
+    assert dream_words(text) == words
+
+
+def test_an_ordinary_sentence_with_punctuation_fits_the_pattern():
+    sentence = "the town's depot, with repair bays: open daily."
+    assert re.fullmatch(collect.word_pattern(DREAM_FIELD_WORDS["what_if"]), sentence)
+
+
+def test_the_pattern_refuses_every_joiner_the_count_refuses():
+    for join in (",", ".", "\u2011", "\u2212", "\u200b", "\u00b7"):
+        assert not re.fullmatch(collect.word_pattern(5), join.join(["w"] * 30)), repr(join)
+
+
+def test_a_lone_surrogate_in_what_evaluate_says_costs_the_round_and_not_the_plan(tmp_path):
+    tree = tmp_path / "tree"
+    bad = {**judged_row("d1"), "reason": "bad \ud800 reason"}
+    assert pipeline.run_plan(job_for(), tree, FakeLLM(script(evaluate={"dreams": [bad, judged_row("d2")]}))).ok
+    assert Plan.load(tree).dream_failure

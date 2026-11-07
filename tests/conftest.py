@@ -235,5 +235,5 @@ def _no_dream_pass_ran_out_of_script():
 
     FakeLLM.ran_dry.clear()
     yield
-    hidden = [label for label in FakeLLM.ran_dry if label in DREAM_PASS_NAMES]
-    assert not hidden, f"FakeLLM ran out at {hidden}: the script is short, and dreaming swallowed the failure"
+    hidden = [label for label in FakeLLM.ran_dry if label in (*DREAM_PASS_NAMES, "repair")]
+    assert not hidden, f"FakeLLM ran out at {hidden}: the script is short, and something swallowed the failure"

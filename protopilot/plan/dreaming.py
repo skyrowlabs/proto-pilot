@@ -10,12 +10,15 @@ from __future__ import annotations
 
 from protopilot.plan import baseline, render, verify
 from protopilot.plan.lenses import Lens
-from protopilot.plan.model import DREAM_WORD_CAP, MAX_SLUG_LENGTH, Dream, Plan, Topic
+from protopilot.plan.model import DREAM_FIELD_WORDS, DREAM_WORD_CAP, MAX_SLUG_LENGTH, Dream, Plan, Topic, dream_words
+from protopilot.plan.passes import PlanPassError, writable
 
 #: Decision 3's small count: one dream through each lens, as a plan is made.
 PLAN_PER_LENS = 1
 #: `proto dream` is asked for, so it goes wider.
 ROUND_PER_LENS = 2
+#: What a promoted dream's old reason was for: it argued something else, and must not read as why.
+EARLIER = {"proposed": "Proposed before", "set-aside": "Set aside before", "dropped": "Dropped before"}
 
 
 def _repeats(dream: Dream, other: Dream) -> bool:
@@ -25,12 +28,22 @@ def _repeats(dream: Dream, other: Dream) -> bool:
 
 def _unfit(dream: Dream, plan: Plan, held: list[Dream], lenses: tuple[Lens, ...]) -> str:
     """Why `dream` may not enter the pool, or an empty string."""
+    if verify.dream_length(dream) > DREAM_WORD_CAP:
+        return f"it runs to {verify.dream_length(dream)} words, past the cap of {DREAM_WORD_CAP}"
+    for field, most in DREAM_FIELD_WORDS.items():
+        said = getattr(dream, field)
+        try:
+            writable(said)
+        except UnicodeEncodeError:
+            return f"its {field} cannot be written as text"
+        if not said:
+            return f"its {field} is empty"
+        if dream_words(said) > most:
+            return f"its {field} runs to {dream_words(said)} words, past its {most}"
     if dream.lens not in {lens.slug for lens in lenses}:
         return f"its lens {dream.lens!r} was not asked for"
     if dream.anchor not in {topic.slug for topic in plan.topics}:
         return f"its anchor {dream.anchor!r} is not a topic"
-    if verify.dream_length(dream) > DREAM_WORD_CAP:
-        return f"it runs to {verify.dream_length(dream)} words, past the cap of {DREAM_WORD_CAP}"
     twin = next((other for other in held if _repeats(dream, other)), None)
     return f"it repeats {twin.id}" if twin else ""
 
@@ -53,7 +66,10 @@ def admit(plan: Plan, before: Plan, lenses: tuple[Lens, ...]) -> tuple[Plan, lis
 def settle(plan: Plan, before: Plan) -> tuple[Plan, list[str]]:
     """`plan` with no new dream that would fail a check, so a round cannot turn a good plan red."""
     known = {dream.id for dream in before.dreams}
-    found, _ = verify.leaks(plan, render.render(plan))
+    try:
+        found, _ = verify.leaks(plan, render.render(plan))
+    except ValueError as exc:
+        raise PlanPassError(f"this round's dreams cannot be drawn: {exc}") from exc
     copies = {leak.dream: f"its {leak.field} repeats {leak.page}" for leak in reversed(found)}
     reasons = {d.id: "evaluate gave it no verdict" for d in plan.dreams if d.verdict is None} | copies
     gone = {name: reason for name, reason in reasons.items() if name not in known}
@@ -92,9 +108,10 @@ def promoted(plan: Plan, dream: Dream) -> Plan:
     if dream.verdict == "promoted":
         raise ValueError(f"dream {dream.id} is already the topic {dream.promoted_to}")
     topic = Topic(slug=_free_slug(plan, dream.title), title=dream.title, why=f"What if {dream.what_if}")
+    earlier = f"{EARLIER.get(dream.verdict or '', 'Before')}: {dream.reason}" if dream.reason else ""
     return plan.revised(
         topics=[*plan.topics, topic],
-        dreams=_replaced(plan, dream, verdict="promoted", promoted_to=topic.slug),
+        dreams=_replaced(plan, dream, verdict="promoted", promoted_to=topic.slug, reason=earlier),
     )
 
 

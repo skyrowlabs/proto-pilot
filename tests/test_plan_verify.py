@@ -127,7 +127,7 @@ PLANTS = {
         "copied-with-other-case-and-punctuation": lambda: leaked("The Library, lent seeds as WELL as saws!"),
         "copied-inside-a-longer-sentence": lambda: leaked(f"Imagine that {WHAT_IF}, one day."),
         "copied-with-an-html-opener": lambda: leaked("a <div> beside the door", what_if="a <div> beside the door"),
-        "takes-copied": lambda: leaked("two volunteers and a van", takes="two volunteers and a van"),
+        "takes-copied": lambda: leaked("two volunteers and a borrowed van", takes="two volunteers and a borrowed van"),
     },
 }
 
@@ -292,20 +292,20 @@ AT_THE_LENGTH = "a" * 16
 
 @pytest.mark.parametrize("field", ["title", "what_if", "takes", "reason", "if_adopted"])
 def test_every_field_a_dream_writes_is_compared(field):
-    text = "two volunteers and a van"
+    text = "two volunteers and a borrowed van"
     result = judged(leaked(text, **{field: text}))
     assert result.stage == "dreams_apart"
     assert f"topics/audience.md repeats the {field} of dream d1" in result.report()
 
 
 def test_text_at_the_length_is_a_leak_and_one_character_less_is_not():
-    assert judged(leaked(AT_THE_LENGTH, takes=AT_THE_LENGTH)).stage == "dreams_apart"
-    assert judged(leaked(AT_THE_LENGTH[1:], takes=AT_THE_LENGTH[1:])).ok
+    assert judged(leaked(AT_THE_LENGTH, what_if=AT_THE_LENGTH)).stage == "dreams_apart"
+    assert judged(leaked(AT_THE_LENGTH[1:], what_if=AT_THE_LENGTH[1:])).ok
 
 
 def test_the_length_is_measured_on_the_words_and_not_on_their_punctuation():
     padded = "* a van! -- (now) *"
-    assert judged(leaked("a van now", takes=padded)).ok
+    assert judged(leaked("a van now", what_if=padded)).ok
 
 
 @pytest.mark.parametrize(
@@ -465,14 +465,22 @@ def test_a_paraphrase_passes_and_that_is_the_stated_limit():
 # -- dreams_apart and dreams_shaped: what a person settled -----------------
 
 
-@pytest.mark.parametrize("verdict", ["promoted", "dropped"])
-def test_a_dream_a_person_settled_is_no_longer_compared(verdict):
-    link = {"promoted_to": "audience"} if verdict == "promoted" else {}
-    assert states(judged(leaked(WHAT_IF, verdict=verdict, **link)))["dreams_apart"] != verify.FAILED
+def test_a_promoted_dream_is_no_longer_compared():
+    plan = leaked(WHAT_IF, verdict="promoted", promoted_to="audience")
+    assert states(judged(plan))["dreams_apart"] != verify.FAILED
 
 
-def test_only_those_two_verdicts_lift_the_comparison():
-    assert verify.SETTLED == ("dropped", "promoted")
+def test_a_dropped_dream_is_compared_except_for_the_persons_reason():
+    assert judged(leaked(WHAT_IF, verdict="dropped")).stage == "dreams_apart"
+    assert judged(
+        leaked("the first version is far too large", verdict="dropped", reason="the first version is far too large")
+    ).ok
+
+
+def test_a_takes_under_six_words_is_an_ordinary_phrase_and_that_is_the_stated_limit():
+    five, six = "a part time coordinator here", "a part time coordinator here please"
+    assert judged(leaked(five, takes=five)).ok
+    assert judged(leaked(six, takes=six)).stage == "dreams_apart"
 
 
 def test_a_promoted_dream_must_name_a_topic_the_plan_holds():

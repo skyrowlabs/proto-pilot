@@ -8,6 +8,7 @@ it is wrong is the verifier's job, and a renderer that crashed would hide it.
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
@@ -156,7 +157,9 @@ def _dream_block(dream: Dream, titles: dict[str, str]) -> str:
         f"Would take: {dream.takes}",
         *_scores(dream),
     ]
-    if dream.verdict:
+    if dream.verdict == "promoted":
+        facts += ["Verdict: promoted", *([dream.reason] if dream.reason else [])]
+    elif dream.verdict:
         facts.append(f"Verdict: {dream.verdict}" + (f". {dream.reason}" if dream.reason else ""))
     if dream.if_adopted:
         facts.append(f"If adopted: {dream.if_adopted}")
@@ -247,7 +250,7 @@ def _is_ours(path: Path) -> bool:
 
 
 def _blockers(pages: dict[str, str], tree: Path) -> list[Path]:
-    """What stands where a page must go: a link, dangling or not, a directory, a person's runbook."""
+    """What stands where a page must go: a link, dangling or not, a directory, a read-only file, a person's runbook."""
     folder = tree / TOPICS_DIR
     blocked = [folder] if folder.is_symlink() or (folder.exists() and not folder.is_dir()) else []
     for name in pages:
@@ -255,9 +258,15 @@ def _blockers(pages: dict[str, str], tree: Path) -> list[Path]:
         if name.startswith(f"{TOPICS_DIR}/") and blocked[:1] == [folder]:
             continue
         foreign = name == RUNBOOK_FILE and path.exists() and not _is_ours(path)
-        if path.is_symlink() or path.is_dir() or foreign:
+        read_only = path.is_file() and not os.access(path, os.W_OK)
+        if path.is_symlink() or path.is_dir() or foreign or read_only:
             blocked.append(path)
     return blocked
+
+
+def blocked(plan: Plan, tree: Path) -> list[Path]:
+    """What would stop `plan` being drawn in `tree`, for a caller that must know before it saves."""
+    return _blockers(render(plan), Path(tree))
 
 
 def _clear_stale(pages: dict[str, str], tree: Path, folder_free: bool) -> None:

@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import copy
 
+from protopilot.llm import LLMError
+
 IDEA = "start a community tool library"
+#: Ends a script that wants the floor: a repair is asked for, and the backend has no answer.
+NO_REPAIR = LLMError("the backend gave no answer")
 SLUGS = ["members", "lending", "space", "tools", "money", "safety"]
 PLAN_PASS_NAMES = ["scope", "outline", "connect", "consider", "start"]
 DREAM_PASS_NAMES = ["collect", "evaluate", "propose"]

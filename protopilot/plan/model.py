@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import unicodedata
 import uuid
 from contextlib import suppress
 from pathlib import Path
@@ -32,6 +33,7 @@ MODEL_VERDICTS: tuple[Verdict, ...] = ("proposed", "set-aside")
 #: `not judged` is the offline twin's, which cannot rank anything.
 Rating = Literal["low", "medium", "high", "not judged"]
 MODEL_RATINGS = ("low", "medium", "high")
+TWIN_RATINGS = (*MODEL_RATINGS, "not judged")
 RUBRIC = ("pull", "reach", "cost", "fit")
 Depth = Literal["shallow", "standard", "deep"]
 
@@ -42,12 +44,16 @@ MIN_TOPICS = min(TOPIC_COUNTS.values())
 MAX_TOPICS = max(TOPIC_COUNTS.values())
 #: A title, one sentence, and a phrase. Unconstrained dreams measured a median of 42
 #: words and a maximum of 51, so a cap above that would never bind; a dream that wants
-#: more is a topic. The fields are the budget, so a dream the schema allows fits the cap.
+#: more is a topic. The fields are the budget, so spaced text the schema allows fits the cap.
 DREAM_FIELD_WORDS = {"title": 6, "what_if": 26, "takes": 12}
 DREAM_WORD_CAP = sum(DREAM_FIELD_WORDS.values())
-#: What ends a word, in the schema's pattern and in `dream_words` alike. A model held
-#: to `\S+` joined 28 words with hyphens, so a hyphen has to break one.
-WORD_BREAK = r"\s/_\u2013\u2014-"
+#: What ends a word in the schema's pattern. A model held to `\S+` joined 28 words with
+#: hyphens, so punctuation has to break one. `dream_words` is the exact count, and stricter.
+WORD_BREAK = r"\s/_,.;:!?\u00b7\u200b\u2010-\u2015\u2212-"
+#: The longest run of letters that counts as one word, so nothing is free for having no spaces.
+MOST_WORD_CHARS = 24
+#: A run of letters, with the apostrophe of "it's" or "don't" kept in it.
+WORD = re.compile(r"[^\W_]+(?:['\u2019][^\W_]{1,2})?")
 #: Han and kana, which are written without spaces, so no space can end a word in them.
 UNSPACED = re.compile("[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\U00020000-\U0002fa1f]")
 DREAM_ID = re.compile(r"[a-z][a-z0-9_-]{0,31}")
@@ -72,9 +78,12 @@ def _checked_topic_link(value: str) -> str:
 
 
 def dream_words(text: str) -> int:
-    """Words in `text`: what `WORD_BREAK` separates, with two unspaced characters as one."""
-    parts = [part for part in re.split(f"[{WORD_BREAK}]+", text) if any(char.isalnum() for char in part)]
-    return sum(max(1, (len(UNSPACED.findall(part)) + 1) // 2) for part in parts)
+    """Words in `text`, whatever joins them: two unspaced characters are one, and a symbol is one."""
+    count = sum(unicodedata.category(char) == "So" for char in text)
+    for run in WORD.findall(text):
+        unspaced = len(UNSPACED.findall(run))
+        count += (unspaced + 1) // 2 + -(-(len(run) - unspaced) // MOST_WORD_CHARS)
+    return count
 
 
 class _Record(BaseModel):

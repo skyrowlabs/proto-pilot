@@ -7,7 +7,7 @@ name anything in the pool, which is how a set-aside or dropped dream stays unpro
 
 from __future__ import annotations
 
-from protopilot.plan.model import MODEL_RATINGS, MODEL_VERDICTS, RUBRIC, Dream, Plan
+from protopilot.plan.model import MODEL_RATINGS, MODEL_VERDICTS, RUBRIC, TWIN_RATINGS, Dream, Plan
 from protopilot.plan.passes import BRIEF, dreams_block, listed, propose, scope_block, text, topics_block
 
 NAME = "evaluate"
@@ -87,24 +87,37 @@ def offline(plan: Plan) -> dict:
     }
 
 
-def _judged(dream: Dream, row: dict) -> Dream:
+def _judged(dream: Dream, row: dict, ratings: tuple[str, ...]) -> Dream:
     if row["verdict"] not in MODEL_VERDICTS:
         raise ValueError(f"dream {dream.id} was given the verdict {row['verdict']!r}, which only a person can give")
+    for field in RUBRIC:
+        if row[field] not in ratings:
+            raise ValueError(f"dream {dream.id} was given the {field} {row[field]!r}, which is not a rating")
     scores = {field: row[field] for field in RUBRIC}
     return dream.model_copy(update={**scores, "verdict": row["verdict"], "reason": text(row["reason"])})
 
 
-def apply(plan: Plan, data: dict) -> Plan:
+def _applied(plan: Plan, data: dict, ratings: tuple[str, ...]) -> Plan:
     rows = {row["id"]: row for row in reversed(listed(data["dreams"]))}
-    known = {dream.id for dream in plan.dreams}
+    # A dream may merge only into one that will still be there: a dream evaluate never read will not.
+    targets = {dream.id for dream in plan.dreams if dream.verdict is not None or dream.id in rows}
     merged: set[str] = set()
     kept = []
     for dream in plan.dreams:
         row = rows.get(dream.id) if dream.verdict is None else None
         if row is None:
             kept.append(dream)
-        elif row["duplicate_of"] in known - merged - {dream.id}:
+        elif row["duplicate_of"] in targets - merged - {dream.id}:
             merged.add(dream.id)
         else:
-            kept.append(_judged(dream, row))
+            kept.append(_judged(dream, row, ratings))
     return plan.revised(dreams=kept)
+
+
+def apply(plan: Plan, data: dict) -> Plan:
+    return _applied(plan, data, MODEL_RATINGS)
+
+
+def apply_twin(plan: Plan, data: dict) -> Plan:
+    """The twin alone may say `not judged`: from a model it would be four scores missing."""
+    return _applied(plan, data, TWIN_RATINGS)

@@ -7,10 +7,11 @@ it had nothing to look at, proved nothing, and the green line names it apart.
 
 Green proves structure, never truth, and `green_line` claims only what held.
 
-`dreams_apart` reads what a topic says, not what every topic page draws, and only
-dreams still on offer: a person has settled the others. It catches a copy, a changed
-word or two included. A paraphrase passes, and so does a script written without
-spaces outside Han and kana, whose text it cannot split into words.
+`dreams_apart` reads what a topic says, not what every topic page draws. A promoted
+dream's words are the topic's now, and a dropped dream's `--why` is a person's, so
+neither is compared. It catches a copy, a changed word or two included. A paraphrase
+passes, and so does a script written without spaces outside Han and kana, whose text
+it cannot split into words, and a `takes` under `MIN_TAKES_WORDS`.
 """
 
 from __future__ import annotations
@@ -37,8 +38,8 @@ MIN_LEAK_CHARS = 16
 WORDS_PER_CHANGE = 6
 LEAK_FIELDS = ("title", "what_if", "takes", "reason", "if_adopted")
 CAPPED_FIELDS = ("title", "what_if", "takes")
-#: Settled by a person, so no longer on offer: a promoted dream's words are the topic's now.
-SETTLED = ("dropped", "promoted")
+#: `takes` is the field of ordinary phrases, so a short one in a topic is a coincidence.
+MIN_TAKES_WORDS = 6
 
 Pages = dict[str, str]
 
@@ -292,6 +293,12 @@ def copied(words: str, line: str) -> bool:
     return len(ours) - matched <= slack and spread - matched <= slack
 
 
+def _compared(dream: Dream, field: str, words: str) -> bool:
+    if dream.verdict == "promoted" or (dream.verdict == "dropped" and field == "reason"):
+        return False
+    return len(words) >= MIN_LEAK_CHARS and (field != "takes" or len(words.split()) >= MIN_TAKES_WORDS)
+
+
 class Leak(NamedTuple):
     dream: str
     field: str
@@ -310,11 +317,9 @@ def leaks(plan: Plan, pages: Pages) -> tuple[list[Leak], bool]:
     names = {plain(plan.title), plain(plan.idea), plain(plan.direction)}
     found, compared = [], False
     for dream in plan.dreams:
-        if dream.verdict in SETTLED:
-            continue
         for field in LEAK_FIELDS:
             words = plain(getattr(dream, field))
-            if len(words) >= MIN_LEAK_CHARS and words not in names:
+            if _compared(dream, field, words) and words not in names:
                 compared = True
                 found += [
                     Leak(dream.id, field, name)
@@ -343,6 +348,10 @@ CHECKS: tuple[Callable[[Plan, Pages], CheckResult], ...] = (
 )
 
 
+#: What each dream check read, for the green line to say only of the ones that held.
+DREAM_CLAIMS = (("dreams_shaped", "their shape"), ("dreams_apart", "that they stay apart"))
+
+
 def _listed(names: Iterable[str]) -> str:
     return ", ".join(names)
 
@@ -367,8 +376,9 @@ def green_line(results: Iterable[CheckResult]) -> str:
     parts.append(f"Held: {_listed(held)}.")
     if empty:
         parts.append(f"No subject, so these proved nothing: {_listed(empty)}.")
-    if {"dreams_shaped", "dreams_apart"} & set(held):
-        parts.append("Dreams are guesses, not findings: their checks read their shape and that they stay apart.")
+    read = [said for name, said in DREAM_CLAIMS if name in held]
+    if read:
+        parts.append(f"Dreams are guesses, not findings: their checks read {' and '.join(read)}.")
     if "sources_fetched" in held:
         parts.append(
             "A source retrieved this run proves a summary of it was read, not that a claim is in the original."

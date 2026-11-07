@@ -8,7 +8,19 @@ from pathlib import Path
 
 import pytest
 from fakes import FakeLLM
-from plan_script import GOOD, IDEA, PASS_NAMES, PLAN_PASS_NAMES, SLUGS, consider_of, edge, outline_of, script, step
+from plan_script import (
+    GOOD,
+    IDEA,
+    NO_REPAIR,
+    PASS_NAMES,
+    PLAN_PASS_NAMES,
+    SLUGS,
+    consider_of,
+    edge,
+    outline_of,
+    script,
+    step,
+)
 
 from protopilot.console import progress
 from protopilot.jobs import Job
@@ -25,7 +37,7 @@ def job_for(direction: str = "") -> Job:
 
 
 def run(tree: Path, **overrides: object) -> Plan:
-    pipeline.run_plan(job_for(), tree, FakeLLM(script(**overrides)))
+    pipeline.run_plan(job_for(), tree, FakeLLM([*script(**overrides), NO_REPAIR]))
     return Plan.load(tree)
 
 
@@ -39,7 +51,7 @@ def refused(tree: Path, **overrides: object) -> str:
 
 def red(tree: Path, **overrides: object) -> str:
     """The floor's account of a run the fake model has no repair for."""
-    assert not pipeline.run_plan(job_for(), tree, FakeLLM(script(**overrides))).ok
+    assert not pipeline.run_plan(job_for(), tree, FakeLLM([*script(**overrides), NO_REPAIR])).ok
     return (tree / "RUNBOOK.md").read_text(encoding="utf-8")
 
 

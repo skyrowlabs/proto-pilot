@@ -381,7 +381,7 @@ def _stdin_is_terminal() -> bool:
     return bool(sys.stdin and sys.stdin.isatty())
 
 
-def _plan_step(job, target: Path, work):
+def _plan_step(job, target: Path, work, after=None):
     """One half of a plan on its job, followed to the end; returns what `work` returned."""
     from protopilot.jobs import STORE
     from protopilot.plan import pipeline
@@ -403,7 +403,7 @@ def _plan_step(job, target: Path, work):
     if refused:
         raise click.ClickException(refused[0])  # it says all there is, and what to do next
     if job.status != "done":
-        raise click.ClickException(f"{job.error}\n  {pipeline.after_failure(target)}")
+        raise click.ClickException(f"{job.error}\n  {(after or pipeline.after_failure)(target)}")
     return produced[0]
 
 
@@ -551,8 +551,9 @@ class _DreamCommand(click.Group):
 def _dream_step(target: Path, work) -> None:
     """Run one pool change as its own job, and exit as a red plan exits."""
     from protopilot.jobs import STORE
+    from protopilot.plan import pipeline
 
-    if not _plan_step(STORE.create(str(target)), target, work).ok:
+    if not _plan_step(STORE.create(str(target)), target, work, pipeline.after_dream_failure).ok:
         sys.exit(1)
 
 

@@ -3,17 +3,18 @@
 Lightness is the schema's job: a dream is a title, a what-if, an anchor and what it
 would take, each under its share of the cap. `apply` numbers them itself, so a dream's
 id is never the model's, and reads no verdict. What it stores may still be over the
-cap or off the list; `dreaming.admit` says which, so one bad dream costs only itself.
+cap, blank or off the list; `dreaming.admit` says which, so one bad dream costs only itself.
 """
 
 from __future__ import annotations
 
 import re
 
+from protopilot.plan import baseline
 from protopilot.plan import lenses as lens_data
 from protopilot.plan.lenses import LENSES, Lens
-from protopilot.plan.model import DREAM_FIELD_WORDS, WORD_BREAK, Dream, Plan
-from protopilot.plan.passes import BRIEF, dreams_block, listed, scope_block, text, topics_block
+from protopilot.plan.model import DREAM_FIELD_WORDS, MOST_WORD_CHARS, WORD_BREAK, Dream, Plan
+from protopilot.plan.passes import BRIEF, dreams_block, listed, scope_block, topics_block
 
 NAME = "collect"
 #: `render` writes the "What if", so a model's own would read twice.
@@ -34,15 +35,20 @@ it. Dreams that could have come from any other lens are wasted.
 - `anchor`: the slug of the topic this extends.
 - `lens`: the slug of the lens it came through.
 
-These limits are hard, and a hyphen, slash or dash ends a word just as a space does.
+These limits are hard, and punctuation ends a word just as a space does.
 A dream that needs more is a topic, so cut it. No research and no phases. Do not
 repeat a dream already in the pool, and do not copy the plan's own sentences.
 """
 
 
 def word_pattern(most: int) -> str:
-    """A JSON Schema `pattern` for text of at most `most` words, as `dream_words` counts them."""
-    return f"^[^{WORD_BREAK}]+([{WORD_BREAK}]+[^{WORD_BREAK}]+){{0,{most - 1}}}$"
+    """A JSON Schema `pattern` for at most `most` words of spaced text.
+
+    A regular expression cannot halve unspaced characters, so for those it is only an upper
+    bound: Han may pass it and be over by `dream_words`, which `dreaming.admit` then says.
+    """
+    word = f"[^{WORD_BREAK}]{{1,{MOST_WORD_CHARS}}}"
+    return f"^{word}([{WORD_BREAK}]+{word}){{0,{most - 1}}}[{WORD_BREAK}]*$"
 
 
 def next_number(dreams: list[Dream]) -> int:
@@ -113,11 +119,11 @@ def apply(plan: Plan, data: dict, lenses: tuple[Lens, ...] = LENSES, per_lens: i
     fresh = [
         Dream(
             id=f"d{first + offset}",
-            title=text(row["title"]),
-            what_if=text(WHAT_IF_OPENING.sub("", text(row["what_if"]))),
-            lens=text(row["lens"]),
-            anchor=text(row["anchor"]),
-            takes=text(row["takes"]),
+            title=baseline.clean(row["title"]),
+            what_if=WHAT_IF_OPENING.sub("", baseline.clean(row["what_if"])),
+            lens=baseline.clean(row["lens"]),
+            anchor=baseline.clean(row["anchor"]),
+            takes=baseline.clean(row["takes"]),
         )
         for offset, row in enumerate(rows)
     ]

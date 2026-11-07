@@ -9,10 +9,11 @@ Each module exports:
     apply(plan, data)  -> a new Plan
 
 A pass that takes options, as `collect` takes its lenses, takes them by keyword in
-all four.
+all four. A pass whose twin may say what a model may not also has `apply_twin`.
 
 `apply` reads only the fields it names, so no pass can reach `researched`,
-`sources` or a finding. Whatever it refuses reaches the job as `PlanPassError`.
+`sources` or a finding. A response of the wrong shape, and any `ValueError` from
+`apply`, reach the job as `PlanPassError`. Anything else `apply` raises is a bug here.
 """
 
 from __future__ import annotations
@@ -39,9 +40,15 @@ class PlanPassError(RuntimeError):
     """A pass cannot go on, usually because of what the model returned."""
 
 
+def writable(line: str) -> str:
+    """`line`, refused if a page could not hold it: JSON can carry a lone surrogate."""
+    line.encode("utf-8")
+    return line
+
+
 def text(value: str) -> str:
     """One line of model text, which must say something: it lands in a heading or a bullet."""
-    line = clean(value)
+    line = writable(clean(value))
     if not line:
         raise ValueError("a required text field is empty")
     return line
@@ -56,7 +63,7 @@ def listed(values: list) -> list:
 
 def lines(values: list[str]) -> list[str]:
     """A list of one-line items, with the blank ones dropped."""
-    return [line for line in (clean(value) for value in listed(values)) if line]
+    return [line for line in (writable(clean(value)) for value in listed(values)) if line]
 
 
 def scope_block(plan: Plan) -> str:
@@ -85,15 +92,41 @@ def dreams_block(heading: str, dreams: list[Dream], *fields: str) -> str:
     return f"## {heading}\n\n```json\n" + json.dumps(rows, indent=2, ensure_ascii=False) + "\n```"
 
 
+def misshapen(schema: dict, value: object) -> str:
+    """Where `value` leaves the shape `schema` asks for, or an empty string. Types and required keys only."""
+    kind = schema.get("type")
+    if kind == "object":
+        if not isinstance(value, dict):
+            return f"an object was wanted, and it held {type(value).__name__}"
+        absent = [key for key in schema.get("required", []) if key not in value]
+        if absent:
+            return f"missing field {absent[0]!r}"
+        inner = [misshapen(rule, value[key]) for key, rule in schema.get("properties", {}).items() if key in value]
+        return next(filter(None, inner), "")
+    if kind == "array":
+        if not isinstance(value, list):
+            return f"a field that must be a list held {type(value).__name__}"
+        return next(filter(None, (misshapen(schema.get("items", {}), item) for item in value)), "")
+    return (
+        f"text was wanted, and it held {type(value).__name__}"
+        if kind == "string" and not isinstance(value, str)
+        else ""
+    )
+
+
 def run_pass(module: ModuleType, plan: Plan, llm: LLM, *context: str, **options: object) -> Plan:
     """Produce a pass's output and fold it into a new plan, or raise. `context` goes to `build`."""
+    unusable = f"pass {module.NAME!r} returned output that cannot be used"
     if llm.offline:
-        data = module.offline(plan, **options)
+        data, fold = module.offline(plan, **options), getattr(module, "apply_twin", module.apply)
     else:
         system, user = module.build(plan, *context, **options)
-        data = llm.structured(system=system, user=user, schema=module.schema(plan, **options), label=module.NAME)
+        schema = module.schema(plan, **options)
+        data, fold = llm.structured(system=system, user=user, schema=schema, label=module.NAME), module.apply
+        fault = misshapen(schema, data)
+        if fault:
+            raise PlanPassError(f"{unusable}: {fault}")
     try:
-        return module.apply(plan, data, **options)
-    except (AttributeError, KeyError, TypeError, ValueError) as exc:
-        detail = f"missing field {exc}" if isinstance(exc, KeyError) else exc
-        raise PlanPassError(f"pass {module.NAME!r} returned output that cannot be used: {detail}") from exc
+        return fold(plan, data, **options)
+    except ValueError as exc:
+        raise PlanPassError(f"{unusable}: {exc}") from exc

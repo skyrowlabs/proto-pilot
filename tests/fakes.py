@@ -3,6 +3,7 @@ a Docker daemon, and an API key."""
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 from typing import ClassVar
 
@@ -31,14 +32,14 @@ class FakeLLM:
     """Returns canned structured responses in order.
 
     A failed dream is an outcome, so the AssertionError below can be swallowed and the
-    test still pass. `ran_dry` keeps it, and `conftest` fails the test on a dream pass.
+    test still pass. `ran_dry` keeps it, and `conftest` fails the test on a dream pass or a repair.
     """
 
     offline = False
     ran_dry: ClassVar[list[str]] = []
 
-    def __init__(self, responses: list[dict]):
-        self.responses = list(responses)
+    def __init__(self, responses: Sequence[object]):
+        self.responses: list = list(responses)
         self.calls: list[dict] = []
 
     def structured(self, *, system: str, user: str, schema: dict, label: str) -> dict:
@@ -46,7 +47,10 @@ class FakeLLM:
         if not self.responses:
             FakeLLM.ran_dry.append(label)
             raise AssertionError(f"FakeLLM ran out of responses at pass {label!r}")
-        return self.responses.pop(0)
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
 
 
 class FakeVerifier:
