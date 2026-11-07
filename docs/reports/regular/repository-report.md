@@ -1,14 +1,16 @@
 ---
-commit_range: v0.2.1..HEAD
-generated: "2026-11-07T21:28:46Z"
-previous_release: v0.2.1
+commit_range: v0.3.0..HEAD
+generated: "2026-11-07T22:00:37Z"
+previous_release: v0.3.0
 release: unreleased
 status: in-flight
 ---
 
 # Repository Report
 
-> **Window:** unreleased (since v0.2.1) — `v0.2.1..HEAD` (75 commits, at `62ad9b8`)
+> **Window:** unreleased (since v0.3.0) — `v0.3.0..HEAD` (1 commits, at `e5a33c1`)
+
+
 
 > This edition closes the window for the next release, expected to be **v0.3.0**
 > (Release Please picks the version; nothing in the tree fixes it). It records what
