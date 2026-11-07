@@ -184,31 +184,37 @@ HTML opener in plan text.
   it is required, `--offline` included, because a prompt there cannot be answered.
 - **Research is one tool-using call per topic, on the `claude-code` backend only.**
   `ClaudeCodeLLM.research` holds `WebSearch` and `WebFetch` and nothing else, streams
-  `stream-json`, runs in an empty directory, and throws its answer away if the stream's
-  init event names any other tool or an MCP server. `structured()` and `ISOLATION` are
-  untouched. The api backend refuses research in a sentence, and `proto plan` refuses it
-  before any call unless `--no-research`; its web search has never been run here. The
-  offline twin reads nothing, so an offline plan stays stamped. `--depth` sets how many
-  findings a topic returns and pages it may read (`research.EFFORT`).
+  `stream-json`, runs in an empty directory, and throws its answer away unless every
+  init event lists its tools and MCP servers, holds none but those and
+  `StructuredOutput`, and no tool use names another (`llm.research_result`).
+  `structured()` and `ISOLATION` are untouched. The api backend refuses research in a
+  sentence, and `proto plan` refuses it before any call unless `--no-research`; its web
+  search has never been run here. The offline twin reads nothing, so an offline plan
+  stays stamped. `--depth` sets how many findings a topic returns and pages it may read
+  (`research.EFFORT`).
 - **A source is fetched only if this run's transcript says so.** `ledger.py` reads each
   `WebFetch` and its result out of the stream, never from the model's citations, and
   calls a fetch usable by a **heuristic**: a 2xx status where the CLI sends one, some
-  bytes, and text that does not read as an HTTP failure, an unfollowed redirect, a
-  bot wall, or a summary saying it read nothing. A topic returning more findings than
-  its depth allows fails, live or replayed, and every string from a page is drawn as one
-  escaped line. A failed fetch carries no error flag. `research.apply` makes a
-  finding cited only through a usable fetch of its URL; any other citation becomes an
-  assumption, its URL kept as `unfetched` for `sources.md`. `WebFetch` returns a model's
-  summary of a page, so a citation shows that summary was read, never that the claim is in
-  the source, and the green line says so.
+  bytes, and text that does not read as an HTTP failure, an unfollowed redirect, a bot
+  wall, or a summary saying it read nothing. A topic returning more findings than its
+  depth allows fails, live or replayed. Every string from a page is drawn through
+  `render.md_text`, as one line with no markdown syntax left in it, and an unfetched or
+  failed URL is drawn as inline code, never a link. A failed fetch carries no error
+  flag. `research.apply` makes a finding cited only through a usable fetch of a whole
+  http(s) URL (`WEB_URL`); any other citation becomes an assumption, its URL kept as
+  `unfetched` for `sources.md`. `ledger.normal` matches URLs without a fragment or
+  trailing slash, and keeps http/https, `www.` and `:443` apart, which errs toward an
+  assumption. `WebFetch` returns a model's summary of a page, so a citation shows that
+  summary was read, never that the claim is in the source, and the green line says so.
 - **The ledger is redrawn from transcripts, so a hand edit cannot upgrade it.** Each
   topic's raw stream lands in `.protopilot/research/<slug>.jsonl`, and its sha256 in
   `plan.json`. `sources_fetched` reads the ledger and never `Source.fetched`, and
   `rerender`, `_hand_back` and `_held` redraw the ledger from the transcripts first, so
   `fetched: true`, or a fetch typed into the ledger, stays red. Each record's state is
-  redrawn too, from its own transcript, which must carry the topic's own name, and a
-  cited finding must rest on its own topic's fetches. A forged transcript is past any
-  check here.
+  redrawn too (`ledger.reconciled`), from its own transcript, which must carry the topic's
+  own name and the recorded sha256, and a cited finding must rest on its own topic's
+  fetches. A record whose transcript fails that is `failed` with `NO_EVIDENCE`. A forged
+  transcript is past any check here.
 - **Page text never reaches a later pass.** What does is the findings, bounded in count
   and length by the research schema, as JSON under a note that they are untrusted data
   (`findings_block`). Topic pages say per topic whether research ran, failed, cited
@@ -218,7 +224,9 @@ HTML opener in plan text.
   reviewed outline is saved as `outline.json` beside the transcripts, and each topic's
   transcript as it lands, so a run that stops, or fails at a later pass, resumes on
   rerun: `resumable` finds the outline, and a topic with a transcript is replayed, not
-  asked again. The outline is removed once `plan.json` lands; the transcripts stay.
+  asked again. `pipeline.resume_refusal` refuses a resume without research, at another
+  depth, offline, or on a backend that cannot research, and the CLI asks it before
+  building a backend. The outline is removed once `plan.json` lands; the transcripts stay.
 - **A pass's `apply` reads only the fields it names**, so none but `research` can set
   `researched`, `sources` or a finding. `apply` refuses what a plan cannot hold, such as an edge or a step naming a missing
   topic. Order is the verifier's: a step ahead of its dependency lands in the plan and

@@ -63,7 +63,7 @@ proto plan "start a community tool library" --offline --yes
 | ---- | ------------ |
 | `--dir` | Target directory; the default is `./<slug>` |
 | `--direction` | Extra steer, kept as a constraint |
-| `--depth` | Topics in the outline: `shallow` 4, `standard` 6, `deep` 8, and research effort: 3–4, 4–6 or 6–8 findings a topic, reading at most 3, 5 or 8 pages. The default is `standard`, and it is refused on an offline backend |
+| `--depth` | Topics in the outline: `shallow` 4, `standard` 6, `deep` 8, and research effort: 3–4, 4–6 or 6–8 findings a topic, reading at most 3, 5 or 8 pages. A topic answering with more findings than that fails. The default is `standard`, and it is refused on an offline backend |
 | `--backend` | `api` bills API credit, `claude-code` a Claude subscription, `offline` calls no model. Beats `PROTOPILOT_LLM`; with neither set, `api` is used |
 | `--offline` | The deterministic baseline with no model call. Beats `--backend` |
 | `--yes`, `-y` | Skip scope's questions, which stay open in `PLAN.md`, and the outline review |
@@ -80,7 +80,8 @@ each, the price the run would carry, not a subscription charge.
 **Research runs on `--backend claude-code` only.** Each topic gets one call holding web
 search and web fetch and nothing else. A finding is cited only if this run fetched its
 page with usable content, which is judged by a heuristic, and anything else is labelled
-an assumption; `sources.md` lists what was cited and not fetched. A fetched page is read
+an assumption; `sources.md` lists what was cited and not fetched, and every fetch that
+failed, as plain text and never as a link. A fetched page is read
 through a model's summary of it, so a citation shows the summary was read, not that the
 claim is in the page. With `--backend api` the command refuses before any call unless
 `--no-research` is given. Offline, nothing is researched. A topic whose research fails
@@ -89,7 +90,10 @@ says so on its page and costs nothing else; `PLAN.md` names every topic not rese
 **A run that stops during research, or after it, resumes.** Rerun the same command: the
 reviewed outline and each researched topic's transcript are kept in
 `.protopilot/research/`, and no topic already done is asked again. The transcripts stay
-after the plan lands, as the evidence a rerun checks sources against.
+after the plan lands, as the evidence a rerun checks sources against. A resume is refused
+with `--no-research`, with a `--depth` other than the outline's, offline, and on a
+backend that cannot research, because finishing there would drop the research already
+done.
 
 **Dreaming runs by default, at a small count:** one dream through each of the six
 lenses, of which at most three are proposed. Dreams are guesses, not findings, and they
@@ -126,7 +130,8 @@ behind, and the error says any page may be out of date until that rerun.
 **Rerunning a finished plan verifies it again and re-renders it.** It calls no model
 and needs neither `--yes` nor a terminal. It exits 1 if the plan is red, with the same
 runbook and banners, so it is how a hand edit to `plan.json` gets checked. A source
-marked fetched by hand stays red: the check reads the run's transcripts, not the flag. With no
+marked fetched by hand stays red: the check reads the run's transcripts, not the flag. A
+topic whose transcript is missing, renamed or edited is shown as failed research. With no
 model there is no repair: to have one try again, remove the directory and start over.
 The same target with another idea or direction is refused, as is a `--depth` other
 than the plan's.

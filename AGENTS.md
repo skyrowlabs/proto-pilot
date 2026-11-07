@@ -132,8 +132,8 @@ Each was a deliberate decision, not an accident of implementation.
   above held for the `api` backend and was false for the other one. The second
   guard is `llm.ISOLATION`. A change to either half is a change to this rule.
   The plan's research call is the one exception, and holds `RESEARCH_ISOLATION`:
-  web search and fetch, no write, no shell, no MCP, checked against each stream's
-  own init event. It writes no file; its output is findings, which are data.
+  web search and fetch, no write, no shell, no MCP, checked against every init event
+  and every tool use in the stream. It writes no file; its output is findings, which are data.
 - **The stack is fixed, not chosen.** Textual over SQLAlchemy 2.0 and one
   SQLite file on the terminal target; FastAPI, server-rendered Jinja,
   SQLAlchemy 2.0 and Postgres on the web one. Neither has a JS build step, a

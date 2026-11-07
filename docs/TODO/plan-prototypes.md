@@ -229,6 +229,8 @@ Comes before research because it needs no tools and can be judged on offline out
   `fetched: true` hole. A forged transcript is out of reach and the code says so.
 - **A topic is researched only if it cites a page it fetched**; a call that cites nothing
   is recorded `nothing cited`, so `researched` never claims a plan with no source.
+- **URL matching errs toward an assumption:** http and https, `www.` and `:443` count as
+  different pages, so a citation spelt unlike its fetch is labelled an assumption.
 
 **Run once, 2026-11-07,** on the README's bakery idea at `--depth shallow`, `claude-code`:
 764s end to end, research 352s for 4 topics (64–105s each). Green, every check held.

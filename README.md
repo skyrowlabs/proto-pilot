@@ -116,9 +116,11 @@ Planning needs nothing else. Docker is only for `proto new --target web`.
 | `proto doctor` | why it will not work here |
 
 Useful flags on `plan`: `--direction` (scope, emphasis, constraints), `--depth`
-(`shallow`, `standard` or `deep`: 4, 6 or 8 topics), `--dir`, `--backend`, `--offline`
-(no API calls, see below), `--yes` (skip the questions and the review), `--no-dream`
-(skip dreaming; `proto dream` can start the pool later).
+(`shallow`, `standard` or `deep`: 4, 6 or 8 topics, and how many findings and pages
+research gives each), `--dir`, `--backend`, `--offline` (no API calls, see below),
+`--yes` (skip the questions and the review), `--no-research` (a plan in a minute or two,
+stamped *Not researched*), `--no-dream` (skip dreaming; `proto dream` can start the pool
+later). [`docs/CLI.md`](docs/CLI.md#proto-plan) has every flag.
 
 Off a terminal, `--yes` is required, so a script is refused rather than left waiting.
 Run on a folder that already holds a plan for the same idea and direction, it redraws
@@ -135,7 +137,7 @@ The prototype commands are under [Prototypes come later](#prototypes-come-later)
 |---|---|---|
 | `scope` | goal, constraints, up to three questions for you | built |
 | `outline` | the topics, each with a reason it matters | built, and **you review it** |
-| `research` | findings per topic, each cited or labelled an assumption | coming |
+| `research` | findings per topic, each cited or labelled an assumption | built, on `claude-code` only |
 | `connect` | typed links: `depends-on`, `informs`, `conflicts-with` | built |
 | `consider` | per topic: risks, unknowns, decisions someone must make | built |
 | `start` | the first few steps, each with its reason | built |
@@ -164,8 +166,10 @@ things worse. If the plan is still red you get the whole folder anyway, with a
 cannot mark a plan researched, add a source, promote a dream or remove the stamp, and the
 only model text that reaches a file name is a checked slug.
 
-**A plan pass that fails leaves no folder.** A rerun starts over from `scope`, and review
-edits are lost. A dream pass is the exception, below.
+**A plan pass that fails before research leaves no folder.** A rerun starts over from
+`scope`, and review edits are lost. Once research has begun, the reviewed outline and each
+topic's transcript are kept in `.protopilot/research/`, and rerunning the same command
+resumes without asking a finished topic again. A dream pass is the other exception, below.
 
 ### Dreaming
 
@@ -203,13 +207,20 @@ paraphrase. And the API backend has never been run for these passes.
 
 ### What a plan does not know yet
 
-Nothing is researched today, so every plan is stamped **Not researched** and has no
-sourced findings. Treat what it says as a well-organised set of questions and reasoning,
-not as facts. Only the prompt stops a model stating a fact inside a risk or a reason, and
-the stamp is there for that.
+**Research reads the web through a summary.** Each topic gets one call on the
+`claude-code` backend holding web search and web fetch and nothing else. A finding is
+cited only if that run fetched the page and got usable content back, which is judged by a
+heuristic. But a fetch returns a model's summary of the page, not the page, so a citation
+shows the summary was read, never that the claim is in the source. Everything else is an
+assumption, and a URL the model cited without a usable fetch is listed in `sources.md` as
+text, never as a link.
 
-**Research** is next, in [the plan for this work](docs/TODO/plan-prototypes.md): one call
-per topic, with every source retrieved during the run.
+**Some plans are not researched at all.** `--no-research` and `--offline` stamp the plan
+*Not researched*. The API backend's web search has never been run here, so with
+`--backend api` the command refuses before any call unless `--no-research` is given. A
+topic whose research fails says so on its page, and a promoted dream is never researched.
+Treat an unresearched topic as a well-organised set of questions and reasoning, not as
+facts: only the prompt stops a model stating a fact inside a risk or a reason.
 
 ## Works offline
 
