@@ -225,3 +225,15 @@ def isolated_registry(tmp_path, monkeypatch):
     cannot be omitted rather than where it has to be repeated.
     """
     monkeypatch.setenv("PROTOPILOT_REGISTRY", str(tmp_path / "registry" / "projects.json"))
+
+
+@pytest.fixture(autouse=True)
+def _no_dream_pass_ran_out_of_script():
+    """A script that stops short reads as a failed dream, so the test passes on a run it never made."""
+    from fakes import FakeLLM
+    from plan_script import DREAM_PASS_NAMES
+
+    FakeLLM.ran_dry.clear()
+    yield
+    hidden = [label for label in FakeLLM.ran_dry if label in DREAM_PASS_NAMES]
+    assert not hidden, f"FakeLLM ran out at {hidden}: the script is short, and dreaming swallowed the failure"

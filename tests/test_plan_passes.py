@@ -11,8 +11,7 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 from fakes import FakeLLM
-from plan_script import PASS_NAMES
-from plan_script import script as whole_script
+from plan_script import PASS_NAMES, script
 
 from protopilot import cli
 from protopilot.jobs import Job
@@ -37,12 +36,6 @@ CONSIDER = {"topics": [{"slug": s, "risks": ["r"], "unknowns": ["u?"], "decision
 START = {"steps": [{"topic": "members", "action": "Ask ten neighbours.", "why": "It tests the demand."}]}
 
 
-def script(**overrides: dict) -> list[dict]:
-    """The five responses of a good run, in pass order, with any replaced by name."""
-    good = {"scope": SCOPE, "outline": OUTLINE, "connect": CONNECT, "consider": CONSIDER, "start": START}
-    return [copy.deepcopy({**good, **overrides}[name]) for name in good]
-
-
 def job_for() -> Job:
     return Job(id="test", idea=IDEA)
 
@@ -55,10 +48,12 @@ def fail_at(tree: Path, **overrides: dict) -> str:
 
 
 def test_a_model_run_calls_each_pass_once_in_order(tmp_path):
-    llm = FakeLLM(whole_script())
+    llm = FakeLLM(script())
     pipeline.run_plan(job_for(), tmp_path / "tree", llm)
     assert [call["label"] for call in llm.calls] == PASS_NAMES
     assert llm.responses == []
+    plan = Plan.load(tmp_path / "tree")
+    assert ([dream.id for dream in plan.dreams], plan.dream_failure) == (["d1", "d2"], "")
 
 
 def test_a_model_run_is_stamped_and_holds_no_findings_or_sources(tmp_path):
@@ -158,8 +153,10 @@ def test_a_first_step_naming_no_topic_is_refused(tmp_path):
 
 def test_a_later_step_may_build_on_an_earlier_one(tmp_path):
     steps = [*START["steps"], {"topic": "lending", "action": "Lend one thing.", "why": "Members exist now."}]
-    pipeline.run_plan(job_for(), tmp_path / "tree", FakeLLM(script(start={"steps": steps})))
+    llm = FakeLLM(script(start={"steps": steps}))
+    pipeline.run_plan(job_for(), tmp_path / "tree", llm)
     assert [s.topic for s in Plan.load(tmp_path / "tree").steps] == ["members", "lending"]
+    assert llm.responses == []
 
 
 def test_no_steps_is_refused(tmp_path):
@@ -181,6 +178,7 @@ def test_a_failed_run_can_simply_be_run_again(tmp_path):
     assert "Nothing was written" in pipeline.after_failure(tree)
     pipeline.run_plan(job_for(), tree, FakeLLM(script()))
     assert (tree / "PLAN.md").is_file()
+    assert "Dreaming failed" not in (tree / "dreams.md").read_text(encoding="utf-8")
 
 
 def test_a_render_that_dies_leaves_no_entry_page_on_a_fresh_tree(tmp_path, monkeypatch):
@@ -299,7 +297,8 @@ def test_yes_runs_the_model_with_no_prompt(tmp_path, monkeypatch):
     assert result.exit_code == 0, result.output
     assert "8 in all" in result.output and "exclude it" in result.output
     plan = Plan.load(tree)
-    assert (plan.depth, plan.questions) == ("standard", ["Who runs it?"])
+    assert (plan.depth, plan.questions, plan.dream_failure) == ("standard", ["Who runs it?"], "")
+    assert llm.responses == []
 
 
 def test_a_question_answered_at_the_prompt_reaches_the_outline(tmp_path, monkeypatch, at_a_terminal):
