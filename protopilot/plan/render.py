@@ -254,14 +254,17 @@ def _source_order(source: Source) -> tuple[int, str, str]:
 
 
 #: What markdown reads as syntax inside a line of text.
-MARKDOWN_SYNTAX = re.compile(r"([\\`*_\[\]<>!|])")
+MARKDOWN_SYNTAX = re.compile(r"([\\`*_\[\]<>!|~])")
+#: What opens a block only at the start of a line: a heading, list, quote, rule or setext underline.
+BLOCK_OPENER = re.compile(r"^(?:([#+\-=>])|(\d+)([.)]))")
 #: What would end or break a link target, or an inline code span.
 URL_UNSAFE = {" ": "%20", "(": "%28", ")": "%29", "<": "%3C", ">": "%3E", "`": "%60", "[": "%5B", "]": "%5D"}
 
 
 def md_text(value: str) -> str:
-    """Research-derived text as one line of plain markdown: no syntax survives it."""
-    return MARKDOWN_SYNTAX.sub(r"\\\1", " ".join(value.split()))
+    """Research-derived text as one line of plain markdown: no syntax survives it, at its start or inside it."""
+    line = MARKDOWN_SYNTAX.sub(r"\\\1", " ".join(value.split()))
+    return BLOCK_OPENER.sub(lambda m: f"\\{m.group(1)}" if m.group(1) else f"{m.group(2)}\\{m.group(3)}", line)
 
 
 def _link_target(url: str) -> str:
