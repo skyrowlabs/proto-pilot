@@ -193,8 +193,10 @@ HTML opener in plan text.
 - **A source is fetched only if this run's transcript says so.** `ledger.py` reads each
   `WebFetch` and its result out of the stream, never from the model's citations, and
   calls a fetch usable by a **heuristic**: a 2xx status where the CLI sends one, some
-  bytes, and text that does not read as a 403, an unfollowed redirect, or a summary
-  saying it read nothing. A failed fetch carries no error flag. `research.apply` makes a
+  bytes, and text that does not read as an HTTP failure, an unfollowed redirect, a
+  bot wall, or a summary saying it read nothing. A topic returning more findings than
+  its depth allows fails, live or replayed, and every string from a page is drawn as one
+  escaped line. A failed fetch carries no error flag. `research.apply` makes a
   finding cited only through a usable fetch of its URL; any other citation becomes an
   assumption, its URL kept as `unfetched` for `sources.md`. `WebFetch` returns a model's
   summary of a page, so a citation shows that summary was read, never that the claim is in
@@ -203,8 +205,10 @@ HTML opener in plan text.
   topic's raw stream lands in `.protopilot/research/<slug>.jsonl`, and its sha256 in
   `plan.json`. `sources_fetched` reads the ledger and never `Source.fetched`, and
   `rerender`, `_hand_back` and `_held` redraw the ledger from the transcripts first, so
-  `fetched: true`, or a fetch typed into the ledger, stays red. A forged transcript is
-  past any check here.
+  `fetched: true`, or a fetch typed into the ledger, stays red. Each record's state is
+  redrawn too, from its own transcript, which must carry the topic's own name, and a
+  cited finding must rest on its own topic's fetches. A forged transcript is past any
+  check here.
 - **Page text never reaches a later pass.** What does is the findings, bounded in count
   and length by the research schema, as JSON under a note that they are untrusted data
   (`findings_block`). Topic pages say per topic whether research ran, failed, cited
