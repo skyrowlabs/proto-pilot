@@ -287,13 +287,20 @@ def research_result(transcript: str, label: str) -> dict:
     is caught on the run it stopped working on, not by a test of the argv.
     """
     events = stream_events(transcript)
-    init = next((e for e in events if e.get("type") == "system" and e.get("subtype") == "init"), None)
-    if init is None:
+    inits = [e for e in events if e.get("type") == "system" and e.get("subtype") == "init"]
+    if not inits:
         raise LLMError(f"pass {label!r}: the research stream has no init event, so its tools are unknown")
-    extra = sorted(set(init.get("tools") or []) - RESEARCH_HELD)
-    if extra or init.get("mcp_servers"):
-        held = ", ".join(extra) or "an MCP server"
-        raise LLMError(f"pass {label!r}: the research session held {held}, so its answer was not used")
+    for init in inits:
+        tools = init.get("tools")
+        servers = init.get("mcp_servers")
+        if not isinstance(tools, list) or not all(isinstance(tool, str) for tool in tools):
+            raise LLMError(f"pass {label!r}: an init event does not list its tools, so they are unknown")
+        if not isinstance(servers, list):
+            raise LLMError(f"pass {label!r}: an init event does not list its MCP servers, so they are unknown")
+        extra = sorted(set(tools) - RESEARCH_HELD)
+        if extra or servers:
+            held = ", ".join(extra) or "an MCP server"
+            raise LLMError(f"pass {label!r}: the research session held {held}, so its answer was not used")
     result = next((e for e in reversed(events) if e.get("type") == "result"), None)
     if result is None:
         raise LLMError(f"pass {label!r}: the research stream ended without a result")
