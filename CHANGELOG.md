@@ -1,5 +1,64 @@
 # Changelog
 
+## [0.3.0](https://github.com/skyrowlabs/proto-pilot/compare/v0.2.1...v0.3.0) (2026-11-07)
+
+
+### Added
+
+* **llm:** ask the API in words for what it cannot enforce ([7726beb](https://github.com/skyrowlabs/proto-pilot/commit/7726beb2ba65f168b94cdc4e2683816e88c573df))
+* **plan:** add a dream's scores and cap, and read what a topic says ([e9563e5](https://github.com/skyrowlabs/proto-pilot/commit/e9563e541710599929ea2d1d70a772b55f3bb69f))
+* **plan:** add offline proto plan, its model and renderer ([3712c5c](https://github.com/skyrowlabs/proto-pilot/commit/3712c5ce758a8c01f05cc8e65c40182b98b0b3e0))
+* **plan:** add proto dream, and let a person promote or drop a dream ([3edee0c](https://github.com/skyrowlabs/proto-pilot/commit/3edee0c4e798bbc7e14e7acb56b256a4c291d44f))
+* **plan:** add the scope, outline, connect, consider and start passes ([beeb926](https://github.com/skyrowlabs/proto-pilot/commit/beeb926375fbe3a7ede792ff5588be502850b46d))
+* **plan:** dream as a plan is made, and survive dreaming failing ([0c67a10](https://github.com/skyrowlabs/proto-pilot/commit/0c67a10f0c796fc3e6eaa8c28a97ad61a274f368))
+* **plan:** dream extensions of the idea, apart from the plan ([f6295c9](https://github.com/skyrowlabs/proto-pilot/commit/f6295c92240aeff7b2377d1ab29c637a1c2f9d0e))
+* **plan:** model passes, outline review and --depth ([2f93629](https://github.com/skyrowlabs/proto-pilot/commit/2f9362943116f59f4ae71c3c910abe251fb6a64d))
+* **plan:** offline proto plan with model, baseline and renderer ([df89ea9](https://github.com/skyrowlabs/proto-pilot/commit/df89ea90d579321c1cf2fc2a6ed66cf73650d2a1))
+* **plan:** record depth and summarise a plan for review ([02d6b4e](https://github.com/skyrowlabs/proto-pilot/commit/02d6b4ebfd2874057c6e91941afdb027ca676707))
+* **plan:** repair a red plan, bounded, and hand back what stays red ([512bc9d](https://github.com/skyrowlabs/proto-pilot/commit/512bc9d0dccd981b763754d2c0eb632e932aba39))
+* **plan:** run the passes behind an outline checkpoint and --depth ([5b152c7](https://github.com/skyrowlabs/proto-pilot/commit/5b152c77f4c0ddc6a886bc1816e3edd459691573))
+* **plan:** verify a plan's structure and repair what it can ([a8ab663](https://github.com/skyrowlabs/proto-pilot/commit/a8ab663368b0e1e1e6d177633f0ec954db1d531d))
+* **plan:** verify a plan's structure, one named check per bullet ([b66bc9e](https://github.com/skyrowlabs/proto-pilot/commit/b66bc9ed53cd45e74a887785b8fdd4c50c68cdf9))
+
+
+### Fixed
+
+* **cli:** lead the first thing a user reads with planning ([bbcedc4](https://github.com/skyrowlabs/proto-pilot/commit/bbcedc41f7c6263b732b300821b3d7180cb9f9f9))
+* **plan:** harden render order, stale sweep, slugs and citations ([1d171d2](https://github.com/skyrowlabs/proto-pilot/commit/1d171d205de51507b2ac3952848e61c2c766df67))
+* **plan:** judge a repair against the plan repair started from ([33cb511](https://github.com/skyrowlabs/proto-pilot/commit/33cb51129ee94395cc1310365182ee3dfede649d))
+* **plan:** keep dreams from costing a plan, and a verb from half landing ([2f14a0b](https://github.com/skyrowlabs/proto-pilot/commit/2f14a0bb2db2889abb33cb15ba0d8ae2bb3adbbf))
+* **plan:** keep the floor honest and everything inside the tree ([809ddab](https://github.com/skyrowlabs/proto-pilot/commit/809ddab7b3cd798d7148cc82946fa0256f5a1f17))
+* **plan:** name what blocks a page instead of a raw OSError ([3b6a886](https://github.com/skyrowlabs/proto-pilot/commit/3b6a88648005d6f9658d69770ed3a26d4bf09589))
+* **plan:** offer start every topic and let the walk hold the order ([4e5d274](https://github.com/skyrowlabs/proto-pilot/commit/4e5d27424b986211ae026c48add9ac71978e4275))
+* **plan:** refuse an existing plan for a different idea ([0ba56d5](https://github.com/skyrowlabs/proto-pilot/commit/0ba56d59d1c43226220f770c39dc4d08a7ef6e92))
+* **plan:** save atomically and refuse a plan that appears before it ([63c51a1](https://github.com/skyrowlabs/proto-pilot/commit/63c51a156b4842c56c14f2a467c26a49df5ed0ac))
+* **plan:** say what a repair did to step text, and how to retry offline ([897f37e](https://github.com/skyrowlabs/proto-pilot/commit/897f37ec72719a514b129eda7984088ecd95907d))
+* **plan:** write the entry page last so PLAN.md means every page ([7bc303f](https://github.com/skyrowlabs/proto-pilot/commit/7bc303f14c0df14d6af1ad1d8d3d0a9f414e378d))
+* **test:** type a parametrized index so pyright reads one dream ([cd3e3c1](https://github.com/skyrowlabs/proto-pilot/commit/cd3e3c165d87f7ba0225d201165f2080ab371bd7))
+
+
+### Documentation
+
+* **architecture:** name plan.json without citing a path ([76354ba](https://github.com/skyrowlabs/proto-pilot/commit/76354ba5f1b174f5b41666b2cbead9544c95e597))
+* **ideas:** pivot the product to planning, table prototyping ([d867d88](https://github.com/skyrowlabs/proto-pilot/commit/d867d887f762c9ef3d3b66f183eae3fb7bf54981))
+* **ideas:** pivot the product to planning, table prototyping ([d3c116a](https://github.com/skyrowlabs/proto-pilot/commit/d3c116a39e7265b0fc896d44adc550edc06640ed))
+* **plan:** describe dreaming as built ([5a15095](https://github.com/skyrowlabs/proto-pilot/commit/5a15095d59764ff29a2932aa94cdcd6f6f15064d))
+* **plan:** describe the model-backed proto plan run ([88d09b7](https://github.com/skyrowlabs/proto-pilot/commit/88d09b73feff7771071a0b03bbac810ee7c9549a))
+* **plan:** describe verification, repair and the floor ([5bbc527](https://github.com/skyrowlabs/proto-pilot/commit/5bbc527bf89bae7d00a039717bdd8755b10ad46e))
+* **plan:** map the offline plan pipeline for agents and readers ([0722c8a](https://github.com/skyrowlabs/proto-pilot/commit/0722c8ad8c7ee3721a45436f7857181c051b16df))
+* **plan:** tick Phase 4 of the plan ([9d38ad5](https://github.com/skyrowlabs/proto-pilot/commit/9d38ad5f519f37a302735eecf0b3b25ffba9fca7))
+* **plan:** tick the Phase 5 boxes that landed ([4b57fb7](https://github.com/skyrowlabs/proto-pilot/commit/4b57fb744d6607ac5b552e18cc7ab8272d604f17))
+* **readme:** lead with planning, move prototyping later ([eff2b62](https://github.com/skyrowlabs/proto-pilot/commit/eff2b623b284f9d6fef54d65c42023a6760fbeeb))
+* **readme:** lead with planning, move prototyping later ([35fb458](https://github.com/skyrowlabs/proto-pilot/commit/35fb458b358d9c0c8a83bf242abfa9a35e0a983d))
+* **readme:** show the verify step in the example run ([4df781c](https://github.com/skyrowlabs/proto-pilot/commit/4df781c390c297cffc339dffa93f466a131c9e41))
+* **reports:** refresh the repository report for v0.2.1..HEAD ([156049d](https://github.com/skyrowlabs/proto-pilot/commit/156049d0b40b6500605346ec2dab5887a2785768))
+* **todo:** plan prototypes and dreaming, a draft spec ([50baf87](https://github.com/skyrowlabs/proto-pilot/commit/50baf87a656b6891fbf6deda992b820b1b72b51b))
+* **todo:** plan prototypes and dreaming, a draft spec ([1c2d365](https://github.com/skyrowlabs/proto-pilot/commit/1c2d3652ef77cc1279aefc3ae3857aca6356a737))
+* **todo:** record Phase 1 and mark plan-prototypes ready ([89cf722](https://github.com/skyrowlabs/proto-pilot/commit/89cf7220d08fecaaeb01c46aa53c28cbf3628997))
+* **todo:** record the plan-prototypes rulings ([8d221fb](https://github.com/skyrowlabs/proto-pilot/commit/8d221fb67525d2ebd5d6fa2042f6f84816a9e505))
+* **todo:** record the plan-prototypes rulings ([c715a28](https://github.com/skyrowlabs/proto-pilot/commit/c715a28b147c467697f372059b755a39a2018ac4))
+* **todo:** tick Phase 3 of plan-prototypes ([df21723](https://github.com/skyrowlabs/proto-pilot/commit/df21723b5884d2f9da376985c245dd6293ac82e5))
+
 ## [0.2.1](https://github.com/skyrowlabs/proto-pilot/compare/v0.2.0...v0.2.1) (2026-11-05)
 
 
