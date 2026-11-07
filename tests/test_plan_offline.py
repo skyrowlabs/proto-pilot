@@ -7,7 +7,8 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from protopilot import cli
+from protopilot import cli, llm
+from protopilot.jobs import STORE
 
 pytestmark = [pytest.mark.unit]
 
@@ -43,6 +44,70 @@ def test_without_offline_it_refuses_and_writes_nothing(tmp_path):
     assert result.exit_code == 1
     assert "only the offline baseline" in result.output
     assert not (tmp_path / "tree").exists()
+
+
+@pytest.fixture
+def model_calls(monkeypatch) -> list[tuple]:
+    """Every attempt to build a backend, by either route; it hands back a working offline LLM."""
+    calls: list[tuple] = []
+    real = llm.build_llm
+
+    def recording(*args, **kwargs):
+        calls.append((args, kwargs))
+        return real(offline=True)
+
+    monkeypatch.setattr(cli, "build_llm", recording)
+    monkeypatch.setattr(llm, "build_llm", recording)
+    return calls
+
+
+@pytest.mark.parametrize("backend", [None, "api", "claude-code", "offline"])
+@pytest.mark.parametrize("flags", [(), ("--yes",)], ids=["plain", "yes"])
+def test_without_offline_no_backend_is_built_and_no_job_starts(tmp_path, monkeypatch, model_calls, backend, flags):
+    if backend:
+        monkeypatch.setenv("PROTOPILOT_LLM", backend)
+    jobs_before = len(STORE.all())
+    result = plan(IDEA, *flags, "--direction", "one town", "--dir", str(tmp_path / "tree"))
+    assert model_calls == []
+    assert len(STORE.all()) == jobs_before
+    assert result.exit_code == 1
+    assert "No model was called" in " ".join(result.output.split())
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_without_offline_the_default_directory_is_not_created(tmp_path, monkeypatch, model_calls):
+    monkeypatch.chdir(tmp_path)
+    assert plan(IDEA).exit_code == 1
+    assert model_calls == []
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_without_offline_an_existing_plan_is_not_touched(tmp_path, model_calls):
+    tree = tmp_path / "tree"
+    assert plan(IDEA, "--offline", "--dir", str(tree)).exit_code == 0
+    before = snapshot(tree)
+    assert plan(IDEA, "--dir", str(tree)).exit_code == 1
+    assert model_calls == []
+    assert snapshot(tree) == before
+
+
+@pytest.mark.parametrize("idea", ["", "   ", "\n\t"])
+def test_an_empty_idea_is_refused_before_any_directory_is_chosen(tmp_path, monkeypatch, idea):
+    monkeypatch.chdir(tmp_path)
+    result = plan(idea, "--offline")
+    assert result.exit_code == 1
+    assert "needs an idea" in result.output
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_two_ideas_sharing_a_default_directory_do_not_share_a_plan(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    assert plan("build a shed", "--offline").exit_code == 0
+    before = snapshot(tmp_path / "shed")
+    result = plan("make a shed", "--offline")
+    assert result.exit_code == 1
+    assert "build a shed" in " ".join(result.output.split())
+    assert snapshot(tmp_path / "shed") == before
 
 
 def test_a_directory_without_a_plan_is_refused(tmp_path):
