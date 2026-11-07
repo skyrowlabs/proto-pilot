@@ -1,7 +1,7 @@
 """The reviewed outline -> typed edges between its topics.
 
-The design runs this after research, so links rest on findings. Until research
-exists it works from the outline alone, and the prompt says so.
+It runs after research, so links rest on findings where research found any. A plan
+made without research is linked from the outline alone, and the prompt says so.
 """
 
 from __future__ import annotations
@@ -10,13 +10,14 @@ from typing import get_args
 
 from protopilot.plan import baseline
 from protopilot.plan.model import Edge, EdgeKind, Plan
-from protopilot.plan.passes import BRIEF, listed, scope_block, topics_block
+from protopilot.plan.passes import BRIEF, findings_block, listed, scope_block, topics_block
 
 NAME = "connect"
 
 SYSTEM = BRIEF + """
-Say how the topics of a plan relate. You have only their names and reasons, so
-record what follows from those and leave out what would need evidence.
+Say how the topics of a plan relate. You have their names and reasons, and any
+findings research made, so record what follows from those and leave out what would
+need more evidence.
 
 - `depends-on`: `from_topic` cannot be settled until `to_topic` is.
 - `informs`: `from_topic` would change how `to_topic` is thought about.
@@ -52,7 +53,8 @@ def schema(plan: Plan) -> dict:
 
 
 def build(plan: Plan) -> tuple[str, str]:
-    return SYSTEM, f"{scope_block(plan)}\n\n{topics_block(plan.topics)}"
+    blocks = [scope_block(plan), topics_block(plan.topics), findings_block(plan)]
+    return SYSTEM, "\n\n".join(block for block in blocks if block)
 
 
 def offline(plan: Plan) -> dict:
