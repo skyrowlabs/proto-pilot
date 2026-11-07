@@ -2,14 +2,19 @@
 
 `apply` is `connect.apply` then `start.apply`, so repair owns what they own and
 reaches no finding, source, dream or `researched`. A check on those goes to the
-floor unrepaired, which is why `FIXES` is short. Slugs stay validated, and a repair
-that returns a topic the plan lacks is refused.
+floor unrepaired, which is why `FIXES` is short. A dream fault never gets this far
+from a run: `dreaming` removes the dream instead, because a dream is not worth a
+repair. Slugs stay validated, and a repair that returns a topic the plan lacks is refused.
 
 `rejected` is the shrink guard: the plan analogue of a repair that cuts the smoke
 suite. A fault is mended, never deleted, so a repair may give up only what the
 failing check named in the plan repair started from, however many attempts it
 takes. `worsened` keeps the floor from holding a plan worse than the one before.
 Everything else is proved by verifying the whole plan again.
+
+`unsettled` is the rule a promotion adds: what the plan held before it is settled,
+so a repair there obeys what `promote.apply` obeys, and the loop or fault a new link
+caused is mended at a new link.
 """
 
 from __future__ import annotations
@@ -43,13 +48,21 @@ thrown away.
 {start.ORDER_RULES}"""
 
 
+SETTLED_RULE = """\
+A person has just promoted a new topic into this plan. Every link and step the plan
+had before is settled: keep them all, word for word. Change only links that touch the
+new topic, and add steps only as those links require.
+"""
+
+
 def fixable(result: verify.PlanVerdict) -> list[verify.CheckResult]:
     return [check for check in result.failed if check.name in FIXES]
 
 
-def failure(result: verify.PlanVerdict, rejection: str = "") -> str:
+def failure(result: verify.PlanVerdict, rejection: str = "", held: Plan | None = None) -> str:
     """What `build` is told: the failing checks repair can reach, and why its last try was thrown away."""
     text = "\n\n".join(check.report() for check in fixable(result))
+    text = f"{text}\n\n{SETTLED_RULE}" if held else text
     return f"{text}\n\nYour last repair was thrown away: {rejection}." if rejection else text
 
 
@@ -121,6 +134,19 @@ def rejected(entry: Plan, after: Plan) -> str:
         if len(links) > 1 and links <= lost:
             return "it removed every link on the loop, and one is enough"
     return _steps_lost(entry, after)
+
+
+def unsettled(held: Plan, after: Plan) -> str:
+    """Why `after` moved what `held` had settled, or an empty string. `held` is the plan before a promotion."""
+    new = {topic.slug for topic in after.topics} - {topic.slug for topic in held.topics}
+    was, now = {_key(edge) for edge in held.edges}, {_key(edge) for edge in after.edges}
+    strays = sorted(_key(e) for e in after.edges if _key(e) not in was and not new & {e.from_topic, e.to_topic})
+    steps = sorted({step.topic for step in held.steps if step not in after.steps})
+    if was - now:
+        return f"it removed settled links: {', '.join(sorted(was - now))}"
+    if strays:
+        return f"it added links between settled topics: {', '.join(strays)}"
+    return f"it changed settled steps: {', '.join(steps)}" if steps else ""
 
 
 def worsened(found: verify.PlanVerdict, after: Plan) -> str:

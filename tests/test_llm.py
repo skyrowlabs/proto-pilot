@@ -8,9 +8,20 @@ proves nothing -- these tests pin the check to an actual call.
 
 from __future__ import annotations
 
+import copy
+import importlib
+import pkgutil
+from contextlib import contextmanager
+from types import SimpleNamespace
+
 import pytest
 
-from protopilot.llm import ClaudeLLM
+from protopilot import passes
+from protopilot.llm import ClaudeLLM, _without_patterns
+from protopilot.passes import clarify
+from protopilot.plan import baseline
+from protopilot.plan.model import DREAM_FIELD_WORDS
+from protopilot.plan.passes import collect
 
 
 class FakeMessages:
@@ -138,3 +149,96 @@ def test_offline_beats_every_other_signal():
 def test_unknown_backend_is_refused():
     with pytest.raises(LLMError, match="unknown backend"):
         build_llm(backend="gpt")
+
+
+# --- a schema keyword only one backend takes ----------------------------------
+
+PATTERNED = {
+    "type": "object",
+    "properties": {"a": {"type": "array", "items": {"type": "string", "pattern": "^x$"}}},
+}
+
+
+def test_the_api_backend_asks_in_words_for_what_the_sdk_says_it_cannot_enforce():
+    assert _without_patterns(PATTERNED)["properties"]["a"]["items"] == {
+        "type": "string",
+        "description": "Must match the regular expression ^x$",
+    }
+
+
+def test_a_schema_with_no_pattern_reaches_the_api_unchanged():
+    assert _without_patterns(SCHEMA) == SCHEMA
+
+
+def test_a_field_named_pattern_is_a_field_and_not_a_keyword():
+    named = {"type": "object", "properties": {"pattern": {"type": "string"}}}
+    assert _without_patterns(named)["properties"] != {}
+
+
+def test_the_cli_backend_keeps_the_pattern_because_it_enforces_it():
+    runner = FakeRunner([(["claude"], (0, envelope(), ""))])
+    ClaudeCodeLLM(runner=runner).structured(system="s", user="u", schema=PATTERNED, label="x")
+    argv = runner.calls[0]
+    assert json.loads(argv[argv.index("--json-schema") + 1]) == PATTERNED
+
+
+class StreamingClient:
+    """The SDK at its boundary: records what `stream` was sent and answers with an empty object."""
+
+    def __init__(self):
+        self.sent: dict = {}
+        self.beta = SimpleNamespace(messages=SimpleNamespace(stream=self.stream))
+
+    @contextmanager
+    def stream(self, **kwargs):
+        self.sent = kwargs
+        reply = SimpleNamespace(stop_reason="end_turn", content=[SimpleNamespace(type="text", text="{}")])
+        yield SimpleNamespace(get_final_message=lambda: reply)
+
+
+def test_what_the_api_is_sent_holds_no_pattern():
+    client = StreamingClient()
+    assert ClaudeLLM(client=client).structured(system="s", user="u", schema=PATTERNED, label="x") == {}
+    sent = client.sent["output_config"]["format"]["schema"]
+    assert sent == _without_patterns(PATTERNED) and sent != PATTERNED
+
+
+def test_every_schema_proto_new_sends_reaches_the_api_unchanged():
+    modules = [
+        importlib.import_module(info.name) for info in pkgutil.iter_modules(passes.__path__, "protopilot.passes.")
+    ]
+    schemas = [module.SCHEMA for module in modules if hasattr(module, "SCHEMA")]
+    assert len(schemas) >= 5, "the enumeration found too few schemas to mean anything"
+    assert [schema for schema in [*schemas, clarify.schema()] if _without_patterns(schema) != schema] == []
+
+
+def test_moving_a_pattern_leaves_the_schema_it_was_given_alone():
+    given = copy.deepcopy(PATTERNED)
+    _without_patterns(given)
+    assert given == PATTERNED
+
+
+@pytest.mark.parametrize("keyword", ["anyOf", "oneOf", "allOf"])
+def test_a_pattern_inside_a_list_of_schemas_moves_too(keyword):
+    assert _without_patterns({keyword: [{"pattern": "^x$"}]}) == {
+        keyword: [{"description": "Must match the regular expression ^x$"}]
+    }
+
+
+def test_a_pattern_under_defs_moves_and_a_field_named_pattern_keeps_its_own_schema():
+    schema = {"$defs": {"x": {"pattern": "^x$"}}, "properties": {"pattern": {"type": "string"}}}
+    assert _without_patterns(schema) == {
+        "$defs": {"x": {"description": "Must match the regular expression ^x$"}},
+        "properties": {"pattern": {"type": "string"}},
+    }
+
+
+def test_collects_schema_keeps_all_but_its_patterns_and_says_each_in_words():
+    original = collect.schema(baseline.build_plan("an idea"), per_lens=2)
+    sent = _without_patterns(original)
+    assert "pattern" not in json.dumps(sent).replace("regular expression", "")
+    row, was = sent["properties"]["dreams"]["items"], original["properties"]["dreams"]["items"]
+    assert sent["properties"]["dreams"]["maxItems"] == 12 and row["required"] == was["required"]
+    assert row["properties"]["anchor"] == was["properties"]["anchor"]
+    for name in DREAM_FIELD_WORDS:
+        assert row["properties"][name]["description"].endswith(was["properties"][name]["pattern"])

@@ -331,12 +331,10 @@ def test_a_direction_is_shown_when_there_is_one():
 
 
 def test_no_dream_text_reaches_a_topic_page_or_the_plan_page(tmp_path):
-    fields = ("id", "title", "what_if", "lens", "takes", "reason", "if_adopted")
+    fields = ("title", "what_if", "lens", "takes", "reason", "if_adopted")
     dreams = [
-        Dream(
-            **{name: f"DREAM-{slug}-{name}" for name in fields},
-            anchor=slug,
-            verdict=verdict,
+        Dream.model_validate(
+            {**{name: f"DREAM-{slug}-{name}" for name in fields}, "id": f"d-{slug}", "anchor": slug, "verdict": verdict}
         )
         for slug in ("members", "stock", "space")
         for verdict in ("proposed", "set-aside", None)

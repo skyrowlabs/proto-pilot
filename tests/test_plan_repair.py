@@ -8,12 +8,12 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 from fakes import FakeLLM
-from plan_script import GOOD, IDEA, edge, repair_of, script, step
+from plan_script import GOOD, IDEA, NO_REPAIR, edge, repair_of, script, step
 
 from protopilot import cli
 from protopilot.console import progress
 from protopilot.jobs import Job
-from protopilot.llm import OfflineLLM
+from protopilot.llm import LLMError, OfflineLLM
 from protopilot.plan import baseline, pipeline, render, verify
 from protopilot.plan.model import Dream, Finding, Plan, Source, Step
 from protopilot.plan.passes import PlanPassError, repair
@@ -32,7 +32,7 @@ def job_for() -> Job:
 
 
 def run(tree: Path, *repairs: dict, **overrides: object) -> tuple[Job, FakeLLM, verify.PlanVerdict]:
-    job, llm = job_for(), FakeLLM([*script(**overrides), *repairs])
+    job, llm = job_for(), FakeLLM([*script(**overrides), *repairs, NO_REPAIR])
     return job, llm, pipeline.run_plan(job, tree, llm)
 
 
@@ -105,7 +105,8 @@ def test_a_repair_cannot_reach_anything_but_edges_and_steps(tmp_path):
     _, _, result = run(tree, forged, start=OUT_OF_ORDER)
     plan = Plan.load(tree)
     assert result.ok
-    assert (plan.researched, plan.sources, plan.dreams) == (False, [], [])
+    assert (plan.researched, plan.sources) == (False, [])
+    assert [dream.id for dream in plan.dreams] == ["d1", "d2"]
     assert [t.findings for t in plan.topics] == [[] for _ in plan.topics]
     assert render.NOT_RESEARCHED in (tree / "PLAN.md").read_text(encoding="utf-8")
 
@@ -213,7 +214,7 @@ class Backendless(FakeLLM):
 
     def structured(self, *, system: str, user: str, schema: dict, label: str) -> dict:
         if label == "repair":
-            raise RuntimeError("the backend went away")
+            raise LLMError("the backend went away")
         return super().structured(system=system, user=user, schema=schema, label=label)
 
 
@@ -258,7 +259,7 @@ UNEVALUATED = Dream(id="d1", title="Seeds", what_if="it lent seeds", lens="l", a
 def test_a_failure_repair_cannot_reach_makes_no_call_and_goes_to_the_floor(tmp_path, plan, stage):
     tree, job, llm = tmp_path / "tree", job_for(), FakeLLM([])
     llm.offline = True  # the twin's passes rebuild the plan's edges and steps, which is all this needs
-    result = pipeline.build(job, tree, plan, llm)
+    result = pipeline.build(job, tree, plan, llm, dream=False)
     assert not result.ok and result.stage == stage
     assert llm.calls == []
     assert "repair_started" not in kinds(job)
@@ -311,7 +312,7 @@ def test_the_console_fold_reads_the_floor_as_gave_up(red_tree):
 
 
 def test_a_red_plan_exits_non_zero_from_the_cli(tmp_path, monkeypatch):
-    llm = FakeLLM(script(connect={"edges": LOOP}))
+    llm = FakeLLM([*script(connect={"edges": LOOP}), NO_REPAIR])
     monkeypatch.setattr(cli, "build_llm", lambda **_: llm)
     tree = tmp_path / "tree"
     result = CliRunner().invoke(cli.main, ["plan", IDEA, "--yes", "--dir", str(tree)])

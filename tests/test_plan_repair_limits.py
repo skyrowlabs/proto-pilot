@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 from click.testing import CliRunner
 from fakes import FakeLLM
-from plan_script import GOOD, IDEA, SLUGS, consider_of, edge, repair_of, script, step
+from plan_script import GOOD, IDEA, NO_REPAIR, SLUGS, consider_of, edge, repair_of, script, step
 
 from protopilot import cli
 from protopilot.jobs import Job
@@ -32,7 +32,7 @@ def job_for() -> Job:
 
 
 def run(tree: Path, *repairs: Any, **overrides: object) -> tuple[Job, FakeLLM, verify.PlanVerdict]:
-    job, llm = job_for(), FakeLLM([*script(**overrides), *repairs])
+    job, llm = job_for(), FakeLLM([*script(**overrides), *repairs, NO_REPAIR])
     return job, llm, pipeline.run_plan(job, tree, llm)
 
 
@@ -71,9 +71,11 @@ def reviewed(
     """A run whose outline `edit` changes at the review, then `after` as the repair answers."""
     passes = {**GOOD, "consider": consider_of(slugs), **overrides}
     job = job_for()
-    llm = FakeLLM([GOOD["scope"], GOOD["outline"], passes["connect"], passes["consider"], passes["start"], *after])
+    llm = FakeLLM(
+        [GOOD["scope"], GOOD["outline"], passes["connect"], passes["consider"], passes["start"], *after, NO_REPAIR]
+    )
     draft = edit(pipeline.outlined(job, llm, pipeline.scoped(job, llm)))
-    return job, llm, pipeline.build(job, tree, draft, llm)
+    return job, llm, pipeline.build(job, tree, draft, llm, dream=False)
 
 
 def adding_insurance(plan: Plan) -> Plan:

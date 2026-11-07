@@ -16,6 +16,10 @@ only ever edits data. `_hand_back` writes, then reads the tree and checks again.
 plan still red is handed back with a RUNBOOK, `finished` says `ok=False`, and the
 CLI exits 1, as `proto new`'s floor does. A failed pass is a different thing: a
 pass that returns nothing a plan can hold leaves no tree at all.
+
+Dreaming is the exception, because dreams are extras. A plan keeps going when its
+dreaming fails, and `dreams.md` says so. `dream_round`, `promote` and `drop` work on a
+plan that is already green, and change nothing unless the result is green too.
 """
 
 from __future__ import annotations
@@ -23,20 +27,40 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TypeVar
 
-from protopilot.llm import LLM, OfflineLLM
-from protopilot.plan import baseline, render, verify
-from protopilot.plan.model import DEFAULT_DEPTH, Depth, Plan, plan_path
-from protopilot.plan.passes import connect, consider, outline, repair, run_pass, scope, start
+from protopilot.llm import LLM, LLMError, OfflineLLM
+from protopilot.plan import baseline, dreaming, render, verify
+from protopilot.plan.lenses import LENSES, Lens
+from protopilot.plan.model import DEFAULT_DEPTH, Depth, Dream, Plan, plan_path
+from protopilot.plan.passes import (
+    PlanPassError,
+    collect,
+    connect,
+    consider,
+    evaluate,
+    outline,
+)
+from protopilot.plan.passes import promote as promote_pass
+from protopilot.plan.passes import propose, repair, run_pass, scope, start
 
 #: Every model call a run makes, in order; the review sits after `BEFORE_REVIEW`.
-PASSES = (scope, outline, connect, consider, start)
+PLAN_PASSES = (scope, outline, connect, consider, start)
+DREAM_PASSES = (collect, evaluate, propose)
+PASSES = (*PLAN_PASSES, *DREAM_PASSES)
 BEFORE_REVIEW = (scope, outline)
 RENDER = "render"
+T = TypeVar("T")
+#: A model's error can be a page of text, and it lands in `dreams.md`.
+MOST_FAILURE_CHARS = 300
 
 
 class PlanRefused(Exception):
     """The target cannot take a plan; the message says why, for a person."""
+
+
+class DreamFailed(Exception):
+    """A dream pass stopped; the message says which, and why, in one line."""
 
 
 @dataclass
@@ -89,37 +113,42 @@ def _pass(job, name: str, names: list[str], work: Callable[[], tuple[object, lis
     return result
 
 
-def _names() -> list[str]:
-    return [*(module.NAME for module in PASSES), RENDER]
+def _passes(dream: bool) -> tuple:
+    return PASSES if dream else PLAN_PASSES
 
 
-def _model_pass(job, module, plan: Plan, llm: LLM) -> Plan:
-    return _pass(job, module.NAME, _names(), lambda: (run_pass(module, plan, llm), []))
+def _names(dream: bool = True) -> list[str]:
+    return [*(module.NAME for module in _passes(dream)), RENDER]
 
 
-def call_estimate(llm: LLM) -> str:
-    """The model calls this run makes, counted from `PASSES`, for the checkpoint."""
+def _model_pass(job, module, plan: Plan, llm: LLM, names: list[str]) -> Plan:
+    return _pass(job, module.NAME, names, lambda: (run_pass(module, plan, llm), []))
+
+
+def call_estimate(llm: LLM, dream: bool = True) -> str:
+    """The model calls this run makes, counted from the passes it runs, for the checkpoint."""
     excluded = "Research does not run in this build, so these numbers exclude it."
     if llm.offline:
         return f"Estimated model calls: 0, because this run is offline. {excluded}"
-    ahead = [module.NAME for module in PASSES if module not in BEFORE_REVIEW]
+    passes = _passes(dream)
+    ahead = [module.NAME for module in passes if module not in BEFORE_REVIEW]
     repairs = f"plus 0 to {repair.ATTEMPTS} repair calls, only if verification finds something repair can fix"
     still = f"{len(ahead)} still to come ({', '.join(ahead)})"
-    return f"Estimated model calls: {len(PASSES)} in all, {still}, {repairs}. {excluded}"
+    return f"Estimated model calls: {len(passes)} in all, {still}, {repairs}. {excluded}"
 
 
-def scoped(job, llm: LLM, depth: Depth | None = None) -> Plan:
+def scoped(job, llm: LLM, depth: Depth | None = None, dream: bool = True) -> Plan:
     """The plan's scope, with any questions still open. Writes no files."""
-    job.event("plan", passes=_names())
+    job.event("plan", passes=_names(dream))
     plan = scope.seed(job.idea, job.direction, None if llm.offline else depth or DEFAULT_DEPTH)
-    return _model_pass(job, scope, plan, llm)
+    return _model_pass(job, scope, plan, llm, _names(dream))
 
 
-def outlined(job, llm: LLM, plan: Plan) -> Plan:
+def outlined(job, llm: LLM, plan: Plan, dream: bool = True) -> Plan:
     """The topics, ready to review. Writes no files; the summary is the checkpoint's."""
-    plan = _model_pass(job, outline, plan, llm)
+    plan = _model_pass(job, outline, plan, llm, _names(dream))
     plan = outline.with_assumptions(plan) if llm.offline else plan
-    estimate = call_estimate(llm)
+    estimate = call_estimate(llm, dream)
     job.log(plan.summary())
     job.log(estimate)
     job.event("outline", topics=[t.slug for t in plan.topics], depth=plan.depth, estimate=estimate)
@@ -151,7 +180,7 @@ def _verified(job, plan: Plan, attempt: int, of: int) -> verify.PlanVerdict:
     return result
 
 
-def _repair_once(job, llm: LLM, checked: Checked, entry: Plan, rejection: str) -> str | None:
+def _repair_once(job, llm: LLM, checked: Checked, entry: Plan, rejection: str, held: Plan | None) -> str | None:
     """One repair, folded into `checked`. Returns why it was thrown away, "" if it landed, None to stop."""
     plan, result, attempt = checked.plan, checked.verdict, checked.attempts
     fixable = repair.fixable(result)
@@ -164,8 +193,8 @@ def _repair_once(job, llm: LLM, checked: Checked, entry: Plan, rejection: str) -
     job.log("  pass repair...")
     job.event("repair_started", attempt=attempt, stage=fixable[0].name)
     try:
-        after = run_pass(repair, plan, llm, repair.failure(result, rejection))
-    except Exception as exc:  # noqa: BLE001 -- a failed repair is an outcome
+        after = run_pass(repair, plan, llm, repair.failure(result, rejection, held))
+    except (LLMError, PlanPassError) as exc:
         job.log(f"    repair pass failed: {exc}")
         job.event("repair_failed", attempt=attempt, error=str(exc))
         checked.tried.append(f"{label}: the repair pass failed: {exc}")
@@ -180,7 +209,8 @@ def _repair_once(job, llm: LLM, checked: Checked, entry: Plan, rejection: str) -
         job.event("repair_empty", attempt=attempt, notes=notes)
         checked.tried.append(f"{label}: {notes}")
         return None
-    reason = repair.rejected(entry, after) or repair.worsened(result, after)
+    reason = repair.rejected(entry, after) or (repair.unsettled(held, after) if held else "")
+    reason = reason or repair.worsened(result, after)
     if reason:
         job.log(f"    rejected: {reason}")
         job.event("repair_rejected", attempt=attempt, reason=reason)
@@ -193,12 +223,15 @@ def _repair_once(job, llm: LLM, checked: Checked, entry: Plan, rejection: str) -
     return ""
 
 
-def repaired(job, plan: Plan, llm: LLM) -> Checked:
-    """Verify, and on red repair and verify again, up to `repair.ATTEMPTS` times, then stop."""
+def repaired(job, plan: Plan, llm: LLM, held: Plan | None = None) -> Checked:
+    """Verify, and on red repair and verify again, up to `repair.ATTEMPTS` times, then stop.
+
+    `held` is the plan before a promotion, whose links and steps a repair may not move.
+    """
     checked = Checked(plan, _verified(job, plan, 1, repair.ATTEMPTS), 1, [])
     rejection: str | None = ""
     while not checked.verdict.ok and checked.attempts <= repair.ATTEMPTS and rejection is not None:
-        rejection = _repair_once(job, llm, checked, plan, rejection)
+        rejection = _repair_once(job, llm, checked, plan, rejection, held)
         if rejection is not None:
             checked.attempts += 1
             checked.verdict = _verified(job, checked.plan, checked.attempts, repair.ATTEMPTS)
@@ -236,19 +269,73 @@ def _hand_back(job, tree: Path, names: list[str], checked: Checked, save: bool) 
     return final
 
 
-def build(job, tree: Path, plan: Plan, llm: LLM) -> verify.PlanVerdict:
+def _guarded(name: str, work: Callable[[], T]) -> T:
+    """`work`, with a backend's failure or bad output as `DreamFailed`. A bug here stays a bug."""
+    try:
+        return work()
+    except (LLMError, PlanPassError) as exc:
+        said = baseline.clean(str(exc))[:MOST_FAILURE_CHARS].rstrip(" .") or type(exc).__name__
+        raise DreamFailed(f"the {name} pass stopped: {said}.") from exc
+
+
+def _dream_pass(job, module, plan: Plan, llm: LLM, names: list[str], **options: object) -> Plan:
+    return _guarded(
+        module.NAME, lambda: _pass(job, module.NAME, names, lambda: (run_pass(module, plan, llm, **options), []))
+    )
+
+
+def _skipped(job, module, plan: Plan, names: list[str]) -> Plan:
+    """A pass with nothing to read costs no call, and still reaches the end of the list."""
+    job.log(f"    {module.NAME} has nothing to read, so no call was made")
+    return _pass(job, module.NAME, names, lambda: (plan, []))
+
+
+def _dreamed(job, plan: Plan, llm: LLM, names: list[str], lenses: tuple[Lens, ...], per_lens: int) -> Plan:
+    """One round, whole or not at all: new dreams join `plan`'s pool, or `DreamFailed` is raised."""
+    collected = _dream_pass(job, collect, plan, llm, names, lenses=lenses, per_lens=per_lens)
+    pool, notes = dreaming.admit(collected, plan, lenses)
+    for module, waiting in ((evaluate, evaluate.fresh), (propose, propose.shortlist)):
+        pool = _dream_pass(job, module, pool, llm, names) if waiting(pool) else _skipped(job, module, pool, names)
+    judged = pool
+    pool, more = _guarded("settling", lambda: dreaming.settle(judged, plan))
+    for note in [*notes, *more]:
+        job.log(f"    {note}")
+    added = len(pool.dreams) - len(plan.dreams)
+    job.log(f"    {added} new dream(s) in a pool of {len(pool.dreams)}")
+    job.event("dreamed", added=added, pool=len(pool.dreams))
+    return pool
+
+
+def _dreamed_or_noted(job, plan: Plan, llm: LLM, names: list[str]) -> Plan:
+    """A plan's own dreaming: whatever goes wrong here is written down, and the plan goes on."""
+    try:
+        dreamt = _dreamed(job, plan, llm, names, LENSES, dreaming.PLAN_PER_LENS)
+        if dreamt.dreams:
+            return dreamt
+        reason = "no dream came through it whole."
+    except DreamFailed as exc:
+        reason = str(exc)
+    job.log(f"    dreaming failed: {reason}")
+    job.event("dream_failed", error=reason)
+    return plan.revised(dream_failure=reason)
+
+
+def build(job, tree: Path, plan: Plan, llm: LLM, dream: bool = True) -> verify.PlanVerdict:
     """Everything after the review, whether a person approved it or nobody was asked."""
     tree = Path(tree)
     _refuse_if_taken(job, tree)
     job.project_dir = str(tree)
+    names = _names(dream)
 
     for module in (connect, consider, start):
-        plan = _model_pass(job, module, plan, llm)
+        plan = _model_pass(job, module, plan, llm, names)
+    if dream:
+        plan = _dreamed_or_noted(job, plan, llm, names)
     checked = repaired(job, plan, llm)
     # Again, because those passes take minutes. What is left is the instant between
     # here and the save's rename, in which another run's plan would still be replaced.
     _refuse_if_taken(job, tree)
-    return _hand_back(job, tree, _names(), checked, save=True)
+    return _hand_back(job, tree, names, checked, save=True)
 
 
 def _finish(job, tree: Path, plan: Plan, result: verify.PlanVerdict, attempts: int) -> None:
@@ -256,6 +343,9 @@ def _finish(job, tree: Path, plan: Plan, result: verify.PlanVerdict, attempts: i
         job.log("Not researched: nothing here was checked against a source.")
     if result.ok:
         job.log(result.summary)
+    if plan.dream_failure:
+        job.log(f"Dreaming failed, and this plan does not depend on it: {plan.dream_failure} {render.RETRY}")
+    if result.ok:
         job.log(f"\nPlan at {tree}. Start with {render.PLAN_FILE}.")
     else:
         job.log(f"Not verified: red at {result.stage} after {attempts} check(s).")
@@ -277,13 +367,145 @@ def rerender(job, tree: Path) -> verify.PlanVerdict:
     return _hand_back(job, tree, [RENDER], Checked(plan, result, 1, tried), save=False)
 
 
-def run_plan(job, tree: Path, llm: LLM | None = None, depth: Depth | None = None) -> verify.PlanVerdict:
+def run_plan(
+    job, tree: Path, llm: LLM | None = None, depth: Depth | None = None, dream: bool = True
+) -> verify.PlanVerdict:
     """Every half with nobody asked, or a re-render of the plan already in `tree`."""
     tree = Path(tree)
     if existing_plan(tree, job.idea, job.direction) is not None:
         return rerender(job, tree)
     llm = llm or OfflineLLM()
-    return build(job, tree, outlined(job, llm, scoped(job, llm, depth)), llm)
+    return build(job, tree, outlined(job, llm, scoped(job, llm, depth, dream), dream), llm, dream)
+
+
+def _refuse_if_blocked(plan: Plan, tree: Path) -> None:
+    blocked = ", ".join(str(path) for path in render.blocked(plan, tree))
+    if blocked:
+        raise PlanRefused(f"Nothing was changed, because a page needs this name: {blocked}. Move it, then rerun.")
+
+
+def _held(tree: Path) -> Plan:
+    """The plan in `tree`, refused unless green: a dream extends a plan that holds, so fix that first."""
+    if not plan_path(tree).exists():
+        raise PlanRefused(f"{tree} holds no plan. `proto plan` makes one; a dream needs a plan to extend.")
+    try:
+        plan = Plan.load(tree)
+    except (OSError, ValueError) as exc:
+        raise PlanRefused(f"{plan_path(tree)} cannot be read as a plan: {exc}") from exc
+    result = verify.verdict(plan, render.render(plan))
+    if not result.ok:
+        raise PlanRefused(
+            f"{tree} holds a plan that fails its checks, so nothing was changed and no model was called. "
+            f"Red at {result.stage}: {result.summary} Mend {plan_path(tree)}, then rerun."
+        )
+    _refuse_if_blocked(plan, tree)
+    return plan
+
+
+def _found(plan: Plan, dream_id: str) -> Dream:
+    try:
+        return dreaming.find(plan, dream_id)
+    except ValueError as exc:
+        raise PlanRefused(str(exc)) from exc
+
+
+def _put_back(tree: Path, before: Plan, saved: bytes) -> str:
+    """The tree as `before` drew it, and a true account of how far that got."""
+    try:
+        plan_path(tree).write_bytes(saved)
+        render.write(before, tree)
+    except (OSError, render.PageBlocked):
+        return f"{plan_path(tree)} and the pages may disagree, and a rerun may repeat it. Check them first"
+    return "the tree is back as it was"
+
+
+def _land(job, tree: Path, before: Plan, checked: Checked, names: list[str]) -> verify.PlanVerdict:
+    """Hand back a change to a held plan, which must be green. Red, or raced, leaves the tree as it was."""
+    if not checked.verdict.ok:
+        tried = "".join(f"\n  {line}" for line in checked.tried)
+        raise PlanRefused(
+            f"Nothing was changed, because the result failed its checks.\n{checked.verdict.report()}{tried}"
+        )
+    try:
+        moved = Plan.load(tree) != before
+    except (OSError, ValueError):
+        moved = True
+    if moved:
+        raise PlanRefused(f"{plan_path(tree)} changed while this ran, so this result was not written. Rerun it.")
+    _refuse_if_blocked(checked.plan, tree)
+    drawn = render.render(before)
+    edited = sorted(name for name, page in render.read(tree).items() if name in drawn and page != drawn[name])
+    if edited:
+        job.log(f"  {', '.join(edited)} differed from plan.json and are drawn over: plan.json is the truth")
+    saved = plan_path(tree).read_bytes()
+    try:
+        return _hand_back(job, tree, names, checked, save=True)
+    except (OSError, PlanRefused) as exc:
+        raise PlanRefused(f"This result could not be drawn, so {_put_back(tree, before, saved)}: {exc}") from exc
+
+
+def _once(job, plan: Plan) -> Checked:
+    return Checked(plan, _verified(job, plan, 1, 1), 1, [])
+
+
+def dream_round(
+    job, tree: Path, llm: LLM, lenses: tuple[Lens, ...] = LENSES, per_lens: int = dreaming.ROUND_PER_LENS
+) -> verify.PlanVerdict:
+    """Another round into the pool of the plan in `tree`. A failed round leaves the tree as it was."""
+    tree = Path(tree)
+    job.project_dir = str(tree)
+    plan = _held(tree)
+    names = [*(module.NAME for module in DREAM_PASSES), RENDER]
+    job.event("plan", passes=names)
+    try:
+        grown = _dreamed(job, plan, llm, names, lenses, per_lens)
+    except DreamFailed as exc:
+        raise PlanRefused(f"Dreaming failed, and nothing was changed: {exc} Rerun to try again.") from exc
+    added = len(grown.dreams) > len(plan.dreams)
+    ran_empty = "" if grown.dreams else "a round ran, and no dream came through it whole."
+    note = "" if added else plan.dream_failure or ran_empty
+    return _land(job, tree, plan, _once(job, grown.revised(dream_failure=note)), names)
+
+
+def promote(job, tree: Path, dream_id: str, llm: LLM) -> verify.PlanVerdict:
+    """A person's promotion: the dream as a topic, connected and considered, or nothing at all."""
+    tree = Path(tree)
+    job.project_dir = str(tree)
+    plan = _held(tree)
+    dream = _found(plan, dream_id)
+    names = [promote_pass.NAME, RENDER]
+    job.event("plan", passes=names)
+    try:
+        grown = dreaming.promoted(plan, dream)
+        fitted = _model_pass(job, promote_pass, grown, llm, names)
+    except (LLMError, PlanPassError, ValueError) as exc:
+        raise PlanRefused(f"Dream {dream_id} was not promoted, and nothing was changed: {exc}") from exc
+    verdict = _land(job, tree, plan, repaired(job, fitted, llm, plan), names)
+    if verdict.ok:
+        job.log(f"Dream {dream_id} is now a topic, and it is not researched: a person chose it, nothing checked it.")
+    return verdict
+
+
+def drop(job, tree: Path, dream_id: str, why: str) -> verify.PlanVerdict:
+    """A person's ruling on a dream. Calls no model, and the dream stays so no round offers it again."""
+    tree = Path(tree)
+    job.project_dir = str(tree)
+    plan = _held(tree)
+    dream = _found(plan, dream_id)
+    job.event("plan", passes=[RENDER])
+    try:
+        ruled = dreaming.dropped(plan, dream, why)
+    except ValueError as exc:
+        raise PlanRefused(str(exc)) from exc
+    return _land(job, tree, plan, _once(job, ruled), [RENDER])
+
+
+def after_dream_failure(tree: Path) -> str:
+    """What an unexpected stop left, for the dream verbs, whose rerun is not `proto plan`'s."""
+    return (
+        f"Something unexpected stopped this, so {tree} may hold it in part. Read {render.DREAMS_FILE} before "
+        "rerunning: `proto dream` calls the model and adds a round, and a verb that landed will say so."
+    )
 
 
 def after_failure(tree: Path) -> str:

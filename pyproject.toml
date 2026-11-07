@@ -1,7 +1,7 @@
 [project]
 name = "proto-pilot"
 version = "0.1.0"
-description = "Turn an idea and a little direction into a running prototype -- a terminal app by default, or a Dockerised web one."
+description = "Turn an idea and a little direction into a plan you can work from, and a running prototype when you want one."
 requires-python = ">=3.11"
 dependencies = [
     "anthropic>=0.40",

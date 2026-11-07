@@ -3,6 +3,7 @@
 proto new "an app for tracking camping gear across trips"
 proto add "let people mark items as packed"
 proto plan "start a community tool library"
+proto dream | dream promote d1 | dream drop d2 --why "..."
 proto up | down | logs | test | spec | doctor
 """
 
@@ -23,6 +24,7 @@ from protopilot import build as builder
 from protopilot import containers, registry
 from protopilot.llm import ClaudeCodeLLM, ClaudeLLM, LLMError, build_llm
 from protopilot.passes import PassContext, clarify
+from protopilot.plan.lenses import LENS_SLUGS
 from protopilot.plan.model import DEFAULT_DEPTH, TOPIC_COUNTS
 from protopilot.render import render_skeleton
 from protopilot.runner import SubprocessRunner, docker_available
@@ -222,7 +224,7 @@ def _compose(project_dir: Path, *args: str) -> int:
 @click.group()
 @click.version_option(__version__, prog_name="proto-pilot")
 def main() -> None:
-    """Turn an idea and a little direction into a running prototype."""
+    """Turn an idea and a little direction into a plan you can work from."""
 
 
 @main.command()
@@ -379,7 +381,7 @@ def _stdin_is_terminal() -> bool:
     return bool(sys.stdin and sys.stdin.isatty())
 
 
-def _plan_step(job, target: Path, work):
+def _plan_step(job, target: Path, work, after=None):
     """One half of a plan on its job, followed to the end; returns what `work` returned."""
     from protopilot.jobs import STORE
     from protopilot.plan import pipeline
@@ -401,7 +403,7 @@ def _plan_step(job, target: Path, work):
     if refused:
         raise click.ClickException(refused[0])  # it says all there is, and what to do next
     if job.status != "done":
-        raise click.ClickException(f"{job.error}\n  {pipeline.after_failure(target)}")
+        raise click.ClickException(f"{job.error}\n  {(after or pipeline.after_failure)(target)}")
     return produced[0]
 
 
@@ -468,6 +470,7 @@ def _review_outline(plan):
     help="api bills API credit; claude-code bills a Claude subscription.",
 )
 @click.option("--yes", "-y", is_flag=True, help="Skip scope's questions and the outline review.")
+@click.option("--no-dream", is_flag=True, help="Skip dreaming; `proto dream` can start the pool later.")
 def plan_command(
     idea: str,
     directory: str | None,
@@ -476,8 +479,9 @@ def plan_command(
     offline: bool,
     backend: str | None,
     yes: bool,
+    no_dream: bool,
 ) -> None:
-    """Turn IDEA into an organised set of text plans. Research does not run yet."""
+    """Turn IDEA into an organised set of text plans, and dream a little. Research does not run yet."""
     from protopilot.jobs import STORE
     from protopilot.plan import baseline, pipeline
 
@@ -516,16 +520,117 @@ def plan_command(
         )
 
     job = STORE.create(idea, direction)
-    draft = _plan_step(job, target, lambda j: pipeline.scoped(j, llm, cast("Depth | None", depth)))
+    dream = not no_dream
+    draft = _plan_step(job, target, lambda j: pipeline.scoped(j, llm, cast("Depth | None", depth), dream))
     if not yes:
         draft = _ask_questions(draft)
-    draft = _plan_step(job, target, lambda j: pipeline.outlined(j, llm, draft))
+    draft = _plan_step(job, target, lambda j: pipeline.outlined(j, llm, draft, dream))
     _echo(f"\n  -> {target}\n")
     if not yes:
         draft = _review_outline(draft)
-    result = _plan_step(job, target, lambda j: pipeline.build(j, target, draft, llm))
+    result = _plan_step(job, target, lambda j: pipeline.build(j, target, draft, llm, dream))
     if not result.ok:
         sys.exit(1)  # the tree is handed back, as `proto new`'s floor hands one back
+
+
+DREAM_ROUND = "round"
+
+
+class _DreamCommand(click.Group):
+    """`proto dream [DIR]` and its verbs share a position, so a first word that is a verb is one.
+
+    Anything else is a round, so a directory called `promote` is written `./promote`.
+    """
+
+    def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
+        first = args[0] if args else ""
+        named = first in self.commands or first in ctx.help_option_names
+        return super().parse_args(ctx, args if named else [DREAM_ROUND, *args])
+
+
+def _dream_step(target: Path, work) -> None:
+    """Run one pool change as its own job, and exit as a red plan exits."""
+    from protopilot.jobs import STORE
+    from protopilot.plan import pipeline
+
+    if not _plan_step(STORE.create(str(target)), target, work, pipeline.after_dream_failure).ok:
+        sys.exit(1)
+
+
+def _dream_llm(offline: bool, backend: str | None):
+    try:
+        return build_llm(offline=offline, backend=backend)
+    except LLMError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+
+def _dream_options(command):
+    """The flags every dream verb that may call a model takes, spelt as `proto plan` spells them."""
+    command = click.option("--offline", is_flag=True, help="Deterministic templates; no API calls.")(command)
+    return click.option(
+        "--backend",
+        type=click.Choice(["api", "claude-code", "offline"]),
+        default=None,
+        help="api bills API credit; claude-code bills a Claude subscription.",
+    )(command)
+
+
+@main.group(name="dream", cls=_DreamCommand)
+def dream_group() -> None:
+    """Add to a plan's pool of dreams, or settle one.
+
+    `proto dream [DIR]` runs another round, and takes `round`'s options. A directory named
+    like a verb is written `./promote`.
+    """
+
+
+@dream_group.command(name=DREAM_ROUND)
+@click.argument("directory", default=".", metavar="[DIR]")
+@click.option(
+    "--lens",
+    "lenses",
+    type=click.Choice(LENS_SLUGS),
+    multiple=True,
+    help="Dream through this lens only; repeat for more.",
+)
+@_dream_options
+def dream_round_command(directory: str, lenses: tuple[str, ...], offline: bool, backend: str | None) -> None:
+    """Run another round into the pool of the plan in DIR (default: cwd)."""
+    from protopilot.plan import lenses as lens_data
+    from protopilot.plan import pipeline
+
+    llm = _dream_llm(offline, backend)
+    target = Path(directory).resolve()
+    _dream_step(target, lambda j: pipeline.dream_round(j, target, llm, lens_data.chosen(lenses)))
+
+
+@dream_group.command(name="promote")
+@click.argument("dream_id", metavar="ID")
+@click.option("--dir", "directory", default=".", help="Plan directory (default: cwd).")
+@_dream_options
+def dream_promote_command(dream_id: str, directory: str, offline: bool, backend: str | None) -> None:
+    """Turn dream ID into a topic, connected and verified. Nothing else can.
+
+    Offline, the topic depends on the dream's anchor and has no risks, unknowns or
+    decisions. Either way it is not researched.
+    """
+    from protopilot.plan import pipeline
+
+    llm = _dream_llm(offline, backend)
+    target = Path(directory).resolve()
+    _dream_step(target, lambda j: pipeline.promote(j, target, dream_id, llm))
+
+
+@dream_group.command(name="drop")
+@click.argument("dream_id", metavar="ID")
+@click.option("--why", required=True, help="What ruled it out; it stays beside the dream.")
+@click.option("--dir", "directory", default=".", help="Plan directory (default: cwd).")
+def dream_drop_command(dream_id: str, why: str, directory: str) -> None:
+    """Rule out dream ID, so no later round offers it again. Calls no model."""
+    from protopilot.plan import pipeline
+
+    target = Path(directory).resolve()
+    _dream_step(target, lambda j: pipeline.drop(j, target, dream_id, why))
 
 
 @main.command()

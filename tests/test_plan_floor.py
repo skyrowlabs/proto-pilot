@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import shutil
 from collections.abc import Callable
 from pathlib import Path
@@ -11,11 +10,12 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 from fakes import FakeLLM
-from plan_script import GOOD, IDEA, edge, repair_of, script, step
+from plan_script import GOOD, IDEA, NO_REPAIR, edge, repair_of, script, step
 
 from protopilot import cli
 from protopilot.console import progress
 from protopilot.jobs import Job
+from protopilot.llm import LLMError
 from protopilot.plan import baseline, pipeline, render, verify
 from protopilot.plan.model import Dream, Plan, plan_path
 from protopilot.plan.passes import repair
@@ -34,7 +34,7 @@ def job_for() -> Job:
 
 def run(tree: Path, *repairs: dict, **overrides: object) -> tuple[Job, verify.PlanVerdict]:
     job = job_for()
-    return job, pipeline.run_plan(job, tree, FakeLLM([*script(**overrides), *repairs]))
+    return job, pipeline.run_plan(job, tree, FakeLLM([*script(**overrides), *repairs, NO_REPAIR]))
 
 
 def rerun(tree: Path) -> tuple[Job, verify.PlanVerdict]:
@@ -168,7 +168,7 @@ def test_model_text_in_a_runbook_cannot_hide_what_follows_it(tmp_path):
     class Hostile(FakeLLM):
         def structured(self, *, system: str, user: str, schema: dict, label: str) -> dict:
             if label == "repair":
-                raise RuntimeError("<!-- swallow the rest")
+                raise LLMError("<!-- swallow the rest")
             return super().structured(system=system, user=user, schema=schema, label=label)
 
     pipeline.run_plan(job_for(), tree, Hostile(script(start=OUT_OF_ORDER)))
@@ -197,7 +197,7 @@ def test_a_floor_whose_write_dies_leaves_no_entry_page_to_read_as_finished(tmp_p
     monkeypatch.setattr(Path, "write_text", dies)
     job = job_for()
     with pytest.raises(OSError, match="disk full"):
-        pipeline.run_plan(job, tree, FakeLLM(script(start=OUT_OF_ORDER)))
+        pipeline.run_plan(job, tree, FakeLLM([*script(start=OUT_OF_ORDER), NO_REPAIR]))
     assert not (tree / "PLAN.md").exists()
     assert "finished" not in kinds(job) and kinds(job)[-1] == "pass_failed"
 
@@ -386,7 +386,8 @@ INFORMS_ONLY = [edge("money", "space", "informs")]
 
 
 def no_subject_run(tree: Path) -> tuple[Job, verify.PlanVerdict]:
-    return run(tree, connect={"edges": INFORMS_ONLY})
+    job = job_for()
+    return job, pipeline.run_plan(job, tree, FakeLLM(script(connect={"edges": INFORMS_ONLY})), dream=False)
 
 
 def test_an_empty_check_is_absent_from_held_in_the_green_line(tmp_path):
@@ -548,9 +549,15 @@ def test_a_refused_page_on_the_real_command_names_the_next_step(tmp_path, no_bac
     assert "Green" not in said(result)
 
 
-def test_a_rerender_write_that_dies_says_the_tree_may_be_partial(tmp_path, no_backend):
-    tree = offline_tree(tmp_path / "tree")
-    os.chmod(tree / "sources.md", 0o400)
+def test_a_rerender_write_that_dies_says_the_tree_may_be_partial(tmp_path, no_backend, monkeypatch):
+    tree, real = offline_tree(tmp_path / "tree"), Path.write_text
+
+    def dies(self, text, *args, **kwargs):
+        if self.name == render.SOURCES_FILE:
+            raise OSError("disk full")
+        return real(self, text, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", dies)
     result = proto_plan(tree)
     assert result.exit_code == 1
     assert "holds the whole plan but maybe not every page" in said(result)
@@ -789,16 +796,26 @@ def line_of(result: verify.PlanVerdict) -> str:
 
 
 def test_a_model_run_with_nothing_traced_claims_only_the_structure(tmp_path):
-    assert line_of(run(tmp_path / "tree")[1]) == (
+    job = job_for()
+    assert line_of(pipeline.run_plan(job, tmp_path / "tree", FakeLLM(script()), dream=False)) == (
         "Green: this plan's structure holds, which is not the same as true. Nothing in it traces to a source. "
         "Held: topic_map, no_cycles, start_order. "
         "No subject, so these proved nothing: findings_traced, sources_fetched, dreams_shaped, dreams_apart."
     )
 
 
+def test_held_dream_checks_say_that_dreams_are_not_findings(tmp_path):
+    assert line_of(run(tmp_path / "tree")[1]) == (
+        "Green: this plan's structure holds, which is not the same as true. Nothing in it traces to a source. "
+        "Held: topic_map, no_cycles, start_order, dreams_shaped, dreams_apart. "
+        "No subject, so these proved nothing: findings_traced, sources_fetched. "
+        "Dreams are guesses, not findings: their checks read their shape and that they stay apart."
+    )
+
+
 def test_an_offline_run_adds_only_that_its_findings_are_labelled(tmp_path):
     job = job_for()
-    assert line_of(pipeline.run_plan(job, tmp_path / "tree")) == (
+    assert line_of(pipeline.run_plan(job, tmp_path / "tree", dream=False)) == (
         "Green: this plan's structure holds and every finding is cited or labelled an assumption, "
         "which is not the same as true. Nothing in it traces to a source. "
         "Held: topic_map, no_cycles, findings_traced, start_order. "
