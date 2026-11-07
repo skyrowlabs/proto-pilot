@@ -53,12 +53,12 @@ def snapshot(tree: Path) -> dict[str, bytes]:
 
 
 class RenderBlocked(Job):
-    """Puts a directory where PLAN.md belongs once the baseline is done, so a real write fails."""
+    """Puts a directory where PLAN.md belongs as the render starts, so a real write fails."""
 
     def event(self, kind: str, **fields: object) -> None:
         super().event(kind, **fields)
-        if kind == "pass_done" and fields["name"] == "baseline":
-            (Path(self.project_dir) / render.PLAN_FILE).mkdir()
+        if kind == "pass_started" and fields["name"] == "render":
+            (Path(self.project_dir) / render.PLAN_FILE).mkdir(parents=True)
 
 
 # -- events ---------------------------------------------------------------
@@ -67,12 +67,17 @@ class RenderBlocked(Job):
 def test_a_fresh_run_emits_the_whole_sequence_in_order(tmp_path):
     job, tree = job_for(), tmp_path / "tree"
     pipeline.run_plan(job, tree)
-    assert events(job) == [
-        {"kind": "plan", "passes": ["baseline", "render"]},
-        {"kind": "pass_started", "name": "baseline", "index": 1, "of": 2},
-        {"kind": "pass_done", "name": "baseline", "index": 1, "of": 2, "files": [PLAN_JSON]},
-        {"kind": "pass_started", "name": "render", "index": 2, "of": 2},
-        {"kind": "pass_done", "name": "render", "index": 2, "of": 2, "files": PAGES},
+    passes = [(n, i) for i, n in enumerate(["scope", "outline", "connect", "consider", "start"], start=1)]
+    sequence = [e for e in events(job) if e["kind"] != "outline"]
+    assert sequence == [
+        {"kind": "plan", "passes": [name for name, _ in passes] + ["render"]},
+        *(
+            {"kind": kind, "name": name, "index": index, "of": 6, **extra}
+            for name, index in passes
+            for kind, extra in (("pass_started", {}), ("pass_done", {"files": []}))
+        ),
+        {"kind": "pass_started", "name": "render", "index": 6, "of": 6},
+        {"kind": "pass_done", "name": "render", "index": 6, "of": 6, "files": [PLAN_JSON, *PAGES]},
         {"kind": "finished", "ok": True, "attempts": 0, "project_dir": str(tree), "run_hint": ""},
     ]
 
@@ -105,10 +110,10 @@ def test_the_console_fold_reads_a_finished_run(tmp_path):
     job, tree = job_for(), tmp_path / "tree"
     pipeline.run_plan(job, tree)
     folded = progress.fold(job.events)
-    assert [(p.name, p.state, p.files) for p in folded.passes] == [
-        ("baseline", progress.DONE, [PLAN_JSON]),
-        ("render", progress.DONE, PAGES),
+    assert [(p.name, p.state) for p in folded.passes] == [
+        (name, progress.DONE) for name in ("scope", "outline", "connect", "consider", "start", "render")
     ]
+    assert folded.passes[-1].files == [PLAN_JSON, *PAGES]
     assert (folded.finished, folded.ok, folded.gave_up) == (True, True, False)
     assert folded.project_dir == str(tree)
 
@@ -131,7 +136,7 @@ def test_a_render_that_dies_reports_pass_failed_and_never_finishes(tmp_path):
     assert "PLAN.md" in failed["error"]
 
 
-def test_a_baseline_that_dies_never_starts_the_render(tmp_path):
+def test_a_save_that_dies_fails_the_render_pass_and_writes_nothing(tmp_path):
     blocker = tmp_path / "a_file"
     blocker.write_text("in the way")
 
@@ -139,7 +144,7 @@ def test_a_baseline_that_dies_never_starts_the_render(tmp_path):
     with pytest.raises(NotADirectoryError):
         pipeline.run_plan(job, blocker / "tree")
 
-    assert kinds(job) == [("plan", ""), ("pass_started", "baseline"), ("pass_failed", "baseline")]
+    assert kinds(job)[-2:] == [("pass_started", "render"), ("pass_failed", "render")]
     assert blocker.read_text() == "in the way"
 
 
@@ -172,7 +177,7 @@ def test_a_failed_pass_reaches_the_cli_as_an_error_exit(tmp_path):
     tree = built(tmp_path / "tree")
     (tree / "PLAN.md").unlink()
     (tree / "PLAN.md").mkdir()
-    result = CliRunner().invoke(cli.main, ["plan", IDEA, "--offline", "--dir", str(tree)])
+    result = CliRunner().invoke(cli.main, ["plan", IDEA, "--offline", "--yes", "--dir", str(tree)])
     assert result.exit_code == 1
     assert "IsADirectoryError" in result.output
 
@@ -268,7 +273,7 @@ def test_a_plan_json_that_is_a_directory_is_refused(tmp_path):
 def test_a_corrupt_plan_reaches_the_cli_as_a_sentence_not_a_traceback(tmp_path):
     tree = built(tmp_path / "tree")
     plan_path(tree).write_text("{ this is not json")
-    result = CliRunner().invoke(cli.main, ["plan", IDEA, "--offline", "--dir", str(tree)])
+    result = CliRunner().invoke(cli.main, ["plan", IDEA, "--offline", "--yes", "--dir", str(tree)])
     assert result.exit_code == 1
     assert "cannot be read as a plan" in " ".join(result.output.split())
     assert isinstance(result.exception, SystemExit)
