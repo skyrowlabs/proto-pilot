@@ -142,6 +142,27 @@ refuses with exit 1 until it is moved. A link at a page path is refused the same
 as is a directory there, except that on green nothing is drawn. Nothing is written
 outside the tree. A green run removes only a runbook this tool wrote.
 
+## A plan on the app commands
+
+`proto plan` lists its folder on this machine as kind `plan`, once `plan.json` lands,
+whether the plan is green or red, and even when a page could not be drawn. A plan made before plans were listed joins the list
+the next time `proto plan` redraws it.
+
+| Command | On a plan |
+| ------- | --------- |
+| `proto ls` | Listed with its kind, and no port or up/down state; only an app has either |
+| `proto rm` | Deletes the folder and forgets it. No Docker call is made |
+| `proto prune` | Forgets it once its `plan.json` is gone |
+| `proto up`, `down`, `test`, `add`, `reset`, `logs`, `spec`, `export` | Refused with exit 1, in a sentence that says what to do instead |
+| `proto down --all` | Passes over it |
+| `proto serve` | Listed read-only: no open, start, stop, change or delete |
+
+What a folder is comes from its own files, never from the list: a `spec.json` there
+makes it an app, and a `plan.json` a plan. A folder holding neither, including one
+whose research stopped before `plan.json` was written, is refused by `proto rm`, and
+so are `/` and any folder that is or holds your home or the list itself. Two folders
+never share a slug in the list: one whose slug is taken is listed as `_2`, `_3`.
+
 ## `proto dream`
 
 Everything that happens to a plan's pool of dreams after the plan exists. Each command

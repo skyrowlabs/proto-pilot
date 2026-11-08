@@ -24,3 +24,4 @@ docs/reports/stray.md: a fixture tests/test_doc_routing_predicate.py creates in 
 #
 # skeletor adds its entries above this block and renders nothing below it, so a
 # release's lines and yours are never adjacent and merge cleanly.
+../../../TODO/plan-prototypes.md: the frozen v0.3.0 repository report links the plan where it stood at that release; frozen editions are never edited, and the plan was filed to docs/implementations/spec/ after it

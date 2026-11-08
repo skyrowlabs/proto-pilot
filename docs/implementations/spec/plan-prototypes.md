@@ -1,20 +1,20 @@
 ---
-title: "Plan Prototypes and Dreaming"
+title: Plan Prototypes and Dreaming
 slug: plan-prototypes
-shelf_status: ready
 priority: high
+category: spec
+agent_value: 3
+completed: 2026-11-07
 updated: 2026-11-07
 tags: [plan, research, dreaming, pipeline]
-summary: "Add `proto plan`, which turns an idea into a researched, connected, organised set of text plans, plus a dreaming step that collects, evaluates and proposes lighter extensions of the idea."
+summary: Add `proto plan`, which turns an idea into a researched, connected, organised set of text plans, plus a dreaming step that collects, evaluates and proposes lighter extensions of the idea.
 ---
 
 # Plan Prototypes and Dreaming
 
 > **Status**: 🟢 Ready — all six decisions ruled and Phase 1 measured, 2026-11-06
-> **Shelf-Status**: ready
-> **Priority**: High — this is now the product; see [plans-first](../ideas/plans-first.md)
+> **Priority**: High — this is now the product; see [plans-first](../../ideas/plans-first.md)
 > **Updated**: 2026-11-07
-> **Queue-Order**: 10
 
 ## Problem
 
@@ -36,7 +36,7 @@ pursuing are never collected.
 ## Approach
 
 The tool's main output becomes **a prototype of a plan.** It keeps the promise in
-[sketches-not-scaffolds](../ideas/sketches-not-scaffolds.md): the output is evidence
+[sketches-not-scaffolds](../../ideas/sketches-not-scaffolds.md): the output is evidence
 about an idea, made to learn from. The medium changes from a running app to an
 organised set of text.
 
@@ -141,8 +141,8 @@ config, deliberately, and `ClaudeLLM` sends no tools.
       `WebFetch` allowed; record tokens, time and whether `--json-schema` holds
 - [x] Establish whether the URLs actually retrieved can be read from the run
 - [x] Record the result here and confirm or revise Decision 5
-- [ ] Same on the API backend with its server-side web search, once there is API
-      credit to run it (~deferred)
+- [ ] (~deferred) Same on the API backend with its server-side web search, once there
+      is API credit to run it
 
 **Measured 2026-11-06:** two calls on one topic, one per output format, so a small sample.
 
@@ -218,7 +218,7 @@ Comes before research because it needs no tools and can be judged on offline out
       sentence until it can be run
 
 **Built 2026-11-07.** How it works is in
-[ARCHITECTURE.md](../ARCHITECTURE.md#the-plan-pipeline). Choices this phase made:
+[ARCHITECTURE.md](../../ARCHITECTURE.md#the-plan-pipeline). Choices this phase made:
 
 - **Placement:** after the review and before `connect`, as the pipeline table says.
 - **A failed topic is recorded and the run goes on**; a stopped run resumes from
@@ -244,17 +244,33 @@ findings were labelled assumptions. A re-render from disk stayed green.
 These are the sentences that turn out to be *true only of apps*, which the second
 target showed cost more than the seam looks.
 
-- [ ] `registry.Entry` gains a `kind`; `proto ls` shows it; `port` means nothing for a plan
-- [ ] `registry.delete` refuses any tree without `spec.json`, so `proto rm` would refuse
+- [x] `registry.Entry` gains a `kind`; `proto ls` shows it; `port` means nothing for a plan
+- [x] `registry.delete` refuses any tree without `spec.json`, so `proto rm` would refuse
       a plan, and it runs `docker compose down -v` first. It needs both changed
-- [ ] `proto up`, `down`, `test`, `add`, `reset`, `logs` refuse a plan tree with a sentence
+- [x] `proto up`, `down`, `test`, `add`, `reset`, `logs` refuse a plan tree with a sentence
       that says what to do instead
-- [ ] `proto console`: decide whether a plan appears, and read-only is enough at first
-- [ ] Update `README.md` (*a prototype you can run* is no longer the whole claim),
+- [x] `proto console`: decide whether a plan appears, and read-only is enough at first
+- [x] Update `README.md` (*a prototype you can run* is no longer the whole claim),
       `docs/CLI.md` and `docs/ARCHITECTURE.md`
-- [ ] `proto new --from-plan <dir> --topic <topic>`, building a running prototype of one
-      topic (~deferred)
+- [ ] (~deferred) `proto new --from-plan <dir> --topic <topic>`, building a running
+      prototype of one topic
 - [ ] Hand the plan to the Improvement Loop for repeat research rounds (~deferred)
+
+**Built 2026-11-07.** Choices this phase made:
+
+- **`proto plan` registers its tree** as kind `plan`, with no port, once `plan.json`
+  lands, green or red, so `ls`, `rm` and `prune` reach it. A re-render registers a plan
+  made earlier, and a listed one keeps its date. An entry with no `kind` is an app.
+- **What a tree is comes from its files**, never the index: `spec.json` is an app,
+  `plan.json` a plan, anything else is refused by `rm`, research in progress included.
+- **Slugs are unique across the registry**: a slug another path holds gets `_2`, `_3`, so
+  an app and a plan from one idea are both reachable on the web, which finds by slug.
+- **The web asks the tree, not the entry**, as the CLI does, so a stale entry reaches no
+  Docker call and no delete.
+- **`spec` and `export` refuse a plan too**, with the same sentence, since both read a `Spec`.
+- **`proto console` lists no saved trees**, app or plan, and its actions reach only the run
+  it just made, so a plan does not appear there. `proto serve`, which does list them,
+  shows a plan read-only.
 
 ## Open decisions
 
@@ -274,18 +290,23 @@ All six are Jeston's rulings, 2026-11-06.
 
 ## Acceptance
 
-- [ ] `./pp test unit` green, with no network and no key
-- [ ] `proto plan "…" --offline --yes` writes the whole tree, twice, byte-identical
-- [ ] Each verifier check goes red on its planted failure, from a green baseline
-- [ ] A plan's `dreams.md` holds proposals and set-aside entries, each with a verdict,
-      and no dream text appears under `topics/`
-- [ ] `proto dream` run twice grows one pool, without duplicates
-- [ ] `proto dream promote <id>` produces a verified topic, and no other path does
-- [ ] `proto up` on a plan tree refuses and exits non-zero; `proto rm` removes it and
+- [x] `./pp test unit` green, with no network and no key: 2445 passed 2026-11-07 as uid 1000 in a user and net namespace with only `lo` up, key unset, and an outside address unreachable
+- [x] `proto plan "…" --offline --yes` writes the whole tree, twice, byte-identical
+- [x] Each verifier check goes red on its planted failure, from a green baseline
+      (`test_plan_verify.py`: `test_every_check_has_a_planted_failure`,
+      `test_a_planted_failure_turns_its_check_red`)
+- [x] A plan's `dreams.md` holds proposals and set-aside entries, each with a verdict,
+      and no dream text appears under `topics/` (`dreams_apart`;
+      `test_a_proposal_says_what_would_change_and_the_rest_sit_under_set_aside`)
+- [x] `proto dream` run twice grows one pool, without duplicates
+- [x] `proto dream promote <id>` produces a verified topic, and no other path does
+      (`test_promote_offline_adds_a_verified_topic_tied_to_its_anchor`,
+      `test_only_a_promoted_dream_may_name_a_topic`)
+- [x] `proto up` on a plan tree refuses and exits non-zero; `proto rm` removes it and
       never calls Docker
-- [ ] `proto new` output is unchanged: the golden manifests do not move
-- [ ] One real idea run end to end with research, read by a person, who can name a
-      topic they would not have thought of and a first step they would act on (~operator)
+- [x] `proto new` output is unchanged: the golden manifests do not move
+- [ ] (~operator) One real idea run end to end with research, read by a person, who can
+      name a topic they would not have thought of and a first step they would act on
 
 ## Dropped, and why
 

@@ -10,7 +10,7 @@ from click.testing import CliRunner
 from fakes import FakeLLM
 from plan_script import GOOD, IDEA, NO_REPAIR, edge, repair_of, script, step
 
-from protopilot import cli
+from protopilot import cli, registry
 from protopilot.console import progress
 from protopilot.jobs import Job
 from protopilot.llm import LLMError, OfflineLLM
@@ -125,7 +125,9 @@ def test_a_repair_with_an_unsafe_step_slug_writes_no_path_of_its_own(tmp_path):
     bad = repair_of(GOOD_EDGES, ["../../evil"])
     _, _, result = run(tree, bad, start=OUT_OF_ORDER)
     assert not result.ok
-    assert sorted(p.name for p in tmp_path.iterdir()) == ["tree"]
+    # The suite's throwaway registry sits beside the tree, and lists the plan that landed.
+    listing = registry.registry_path().parent
+    assert sorted(p.name for p in tmp_path.iterdir() if p != listing) == ["tree"]
 
 
 def test_a_repair_that_fixes_one_check_and_breaks_another_stays_red(tmp_path):

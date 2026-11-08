@@ -36,7 +36,7 @@ or test results, so this report gives none.
 ## What changed
 
 The window was the product pivot. `proto plan` was built through Phases 2–5 of
-[Plan Prototypes and Dreaming](../../TODO/plan-prototypes.md), the README was
+[Plan Prototypes and Dreaming](../../implementations/spec/plan-prototypes.md), the README was
 rewritten to lead with planning, and skeletor was upgraded from v0.72.2 to v0.81.1.
 Unlike the v0.2.1 window, most of the churn was in `protopilot/`, the product package.
 
@@ -136,7 +136,7 @@ Unlike the v0.2.1 window, most of the churn was in `protopilot/`, the product pa
 
 In queue order:
 
-1. 🟢 Ready — [Plan Prototypes and Dreaming](../../TODO/plan-prototypes.md), high
+1. 🟢 Ready — [Plan Prototypes and Dreaming](../../implementations/spec/plan-prototypes.md), high
    priority, last updated 2026-11-06. Open at `62ad9b8`: Phase 6, research
    (`docs/TODO/plan-prototypes.md:207`); Phase 7, the surfaces that assume an app
    (`:217`), including `proto ls` showing plans and `proto rm` removing a plan

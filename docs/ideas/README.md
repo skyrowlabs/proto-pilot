@@ -5,7 +5,7 @@ plan lands here. Nothing in this folder is committed to, costed, or queued.
 
 | Idea | Captured | One line |
 | ---- | -------- | -------- |
-| [Plans first](plans-first.md) | 2026-11-06 | The product is now planning; physical prototyping is tabled until an idea is concrete — **plan: [plan-prototypes](../TODO/plan-prototypes.md)** |
+| [Plans first](plans-first.md) | 2026-11-06 | The product is now planning; physical prototyping is tabled until an idea is concrete — **plan: [plan-prototypes](../implementations/spec/plan-prototypes.md)** |
 | [Sketches, not scaffolds](sketches-not-scaffolds.md) | 2026-09-03 | Emit a terminal app you learn from and throw away; ship as a tool, not a service — **plan cut: [terminal-target](../implementations/spec/terminal-target.md)** |
 | [Hosted proto.pilot](hosted.md) — **tabled** | 2026-08-28 | Put `proto new` behind a free public page to build a training corpus |
 

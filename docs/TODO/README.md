@@ -12,19 +12,9 @@ checking whether a capability already exists (parked) before rebuilding it.
 
 **Machine-readable index**: [`../todo_index.json`](../todo_index.json).
 
-**3 open plans** · **0 agent-managed**
+**2 open plans** · **0 agent-managed**
 
 ---
-
-## 🚀 Ready for Agent
-
-_Every decision made and the spec complete — ready to hand to an agent end to end._
-
-| Queue | Plan | Priority | Updated | Summary |
-| ----- | ---- | -------- | ------- | ------- |
-| 10 | [Plan Prototypes and Dreaming](plan-prototypes.md) | high | 2026-11-07 | Add `proto plan`, which turns an idea into a researched, connected, organised set of text plans, plus a dreaming step that collects, evaluates and proposes lighter extensions of the idea. |
-
-> Lower `Queue-Order` runs earlier; `—` means unnumbered, which sorts last.
 
 ## ⛔ Blocked
 

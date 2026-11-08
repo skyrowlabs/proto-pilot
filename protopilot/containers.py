@@ -81,11 +81,11 @@ def _lines(runner: Runner, argv: list[str], timeout: float = 30) -> list[str]:
 
 
 def _tree_exists(path: str) -> bool:
-    """Whether a path is still a proto-pilot project.
+    """Whether a path is still a proto-pilot app.
 
-    Deliberately the same test `registry.delete` guards on. A directory that
-    exists but has no spec in it is not ours, and its resources are not ours to
-    collect either.
+    The test `registry.delete` uses to call an app's stack down. A directory
+    that exists but has no spec in it is not an app of ours, and its resources
+    are not ours to collect either; a plan has none to collect.
     """
     return (Path(path) / SPEC_DIR / SPEC_FILENAME).exists()
 

@@ -2,7 +2,7 @@
 
 Open items, what got resolved, and what is worth doing next. Read before starting
 work; update when you resolve something. This is the working state that does not
-belong in `README.md` (the design document) or `AGENTS.md` (the rules — `CLAUDE.md`
+belong in `README.md` (what the tool is for) or `AGENTS.md` (the rules — `CLAUDE.md`
 is only a pointer at it).
 
 > **Reconstructed 2026-08-28.** This lived at `proto-pilot-notes.md`,

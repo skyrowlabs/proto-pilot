@@ -2,7 +2,7 @@
 
 > **Status: a direction, decided.** Jeston, 2026-11-06. It supersedes decision 1
 > of [sketches-not-scaffolds](sketches-not-scaffolds.md). The plan that builds it
-> is [`plan-prototypes`](../TODO/plan-prototypes.md); this doc holds the argument
+> is [`plan-prototypes`](../implementations/spec/plan-prototypes.md); this doc holds the argument
 > and the plan holds the phases.
 
 ## The decisions

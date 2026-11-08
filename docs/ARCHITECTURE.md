@@ -3,8 +3,9 @@
 The map. **This file says what the pieces are and how they connect**; it
 deliberately does not restate two things that live elsewhere:
 
-- **Why the design is this way** — [`README.md`](../README.md), which is the
-  design document and explains the five load-bearing decisions.
+- **What the tool is for, and how to use it** — [`README.md`](../README.md). Why
+  the design is this way is argued here, in [The plan pipeline](#the-plan-pipeline)
+  and [How a prototype is built](#how-a-prototype-is-built).
 - **The rules for changing it** — [`AGENTS.md`](../AGENTS.md), which carries the
   invariants and what softening one costs.
 
@@ -13,11 +14,19 @@ stale in the half nobody re-reads.
 
 ## What This Is
 
-`proto new "an idea"` turns one sentence into a running prototype. By default a
-Textual + SQLite app in your terminal; with `--target web`, a Dockerised FastAPI
-+ Postgres app in a browser. The output is something to look at this afternoon
-and throw away — not a production starting point, and the pipeline is shaped by
-that all the way down.
+**Planning is the product.** `proto plan "an idea"` turns a sentence and a little
+direction into a folder of text plans: topics, how they connect, risks, first
+steps, and dreams kept apart from the plan. Its pipeline is
+[below](#the-plan-pipeline).
+
+`proto new "an idea"` is tabled, not removed: it turns one sentence into a running
+prototype, by default a Textual + SQLite app in your terminal, and with
+`--target web` a Dockerised FastAPI + Postgres app in a browser. The output is
+something to look at this afternoon and throw away, not a production starting
+point. The data flow below is its pipeline.
+
+Both kinds of tree share the registry, `proto ls` and `proto rm`. Every other
+lifecycle verb is an app's, and refuses a plan by name.
 
 Two command-line tools live in this repo and are **not** the same thing:
 `proto` is the product (installed on PATH, `protopilot/`), `./pp` is this
@@ -25,7 +34,7 @@ repository's own tooling (`cli/`, `scripts/`). See AGENTS.md Rule 15.
 
 ## Data Flow
 
-One generation, end to end. Every arrow is a place something can be refused.
+One `proto new` generation, end to end. Every arrow is a place something can be refused.
 
 ```
   idea (one sentence)
@@ -68,8 +77,8 @@ One generation, end to end. Every arrow is a place something can be refused.
 
 | Component | Responsibility | Talks to |
 | --------- | -------------- | -------- |
-| `protopilot/cli.py` | The `proto` command: generation, prototype lifecycle, `proto plan` and `proto dream` | everything below |
-| `protopilot/web/` | `proto serve` — a web face on `proto new`, **pinned to `--target web`** | the same functions the CLI calls |
+| `protopilot/cli.py` | The `proto` command: `proto plan` and `proto dream`, generation, the lifecycle verbs, which refuse a plan | everything below |
+| `protopilot/web/` | `proto serve` — a web face on `proto new`, **pinned to `--target web`**; lists plans read-only | the same functions the CLI calls |
 | `protopilot/spec.py` | **The contract.** The only thing downstream reads about user intent | every pass |
 | `protopilot/passes/` | One module per pass; prompt, JSON Schema, and the previous pass's source. `passes/tui/` is the terminal set | `llm.py`, `files.py` |
 | `protopilot/build.py` | Orchestration: the repair loop, the runbook floor. The pass *tuple* is the target's | `passes/`, `targets/`, `verify.py` |
@@ -82,7 +91,7 @@ One generation, end to end. Every arrow is a place something can be refused.
 | `protopilot/tui_probe.py` | Runs inside a generated tree as a subprocess; reports what it painted | the generated app |
 | `protopilot/browser.py` | Loads every web screen for real; fails a page that painted nothing | Playwright, optional |
 | `protopilot/runner.py` | Every subprocess, behind a Protocol so Docker can be faked | `subprocess` |
-| `protopilot/registry.py` | JSON index of generated trees — what exists, where, on which port | the filesystem |
+| `protopilot/registry.py` | JSON index of generated trees — what exists, of which kind (`app` or `plan`), where, and an app's port | the filesystem |
 | `protopilot/containers.py` | **Docker as a second, independent source of truth**, via labels | `runner.py` |
 | `protopilot/render.py` | a target's skeleton ▶ a project directory, substituting `@@TOKEN@@` | `targets/`, `skeleton/` |
 | `protopilot/archetypes/` | What SHAPE a spec is: questions, screen rule, prompt fragment, baseline | `spec.py`, `baseline.py` |
@@ -161,7 +170,7 @@ rewrite the meaning of every spec on disk.
 `proto plan "an idea"` writes a folder of text instead of an app:
 `PLAN.md`, `topics/`, `dreams.md`, `sources.md` and a stored `plan.json`, with a
 `RUNBOOK.md` when the plan ends red. Why is [plans-first](ideas/plans-first.md); the design and what is still to build are
-[plan-prototypes](TODO/plan-prototypes.md); flags are in [CLI.md](CLI.md#proto-plan), and
+[plan-prototypes](implementations/spec/plan-prototypes.md); flags are in [CLI.md](CLI.md#proto-plan), and
 `proto dream`'s [beside them](CLI.md#proto-dream).
 
 **It is a sibling of the `Spec` pipeline, not a third target.** It shares the job
@@ -263,7 +272,7 @@ HTML opener in plan text.
   not touch it is refused, so what the plan had settled stays settled. It writes no
   finding, so the topic stays not researched. A promotion that stays red changes nothing.
 - **Verification proves structure, never truth.** `verify.py` has one check per bullet
-  of [What "verified" means](TODO/plan-prototypes.md#what-verified-means-for-text):
+  of [What "verified" means](implementations/spec/plan-prototypes.md#what-verified-means-for-text):
   `topic_map`, `no_cycles`, `findings_traced`, `sources_fetched`, `start_order`,
   `dreams_shaped` and `dreams_apart`. `dreams_apart` reads what a topic says, not what
   every topic page draws, and catches a copy with a word or two changed; **a paraphrase
@@ -318,9 +327,20 @@ HTML opener in plan text.
   exit 1, nothing is written outside the tree, and a link is neither followed nor
   removed. A green run removes a runbook only if it carries the mark, so a person's
   stays.
-- **A plan tree is not a prototype.** It is not in the registry, so `proto ls`
-  omits it, and `proto rm`, `up` and the other app commands refuse it for having no
-  `spec.json`.
+- **A plan tree is registered, and is not an app.** `build` records it as kind
+  `plan`, with no port, once `plan.json` lands, green or red; a re-render records a
+  plan made before plans were listed, and keeps an entry's date. What a verb does to
+  a tree comes from the tree's own files (`registry.tree_kind`), never from the index,
+  in the CLI and the web alike: `spec.json` is an app, `plan.json` a plan, and anything
+  else is not ours, so a tree with only research in progress is neither. The index's
+  kind is only displayed: `proto ls` prints it in a column, and reads an entry whose
+  tree no longer matches it as `gone`. `proto ls` lists a plan with no port or state,
+  `proto rm` deletes it with no Docker call, `down --all` passes over it, and `up`,
+  `down`, `test`, `add`, `reset`, `logs`, `spec` and `export` refuse it in a sentence
+  that says what to do instead. `proto serve` shows it read-only, and every route that
+  acts asks the tree first. A slug another path holds is recorded with `_2`, `_3`,
+  because the web finds an entry by slug. `proto console` lists no saved trees at
+  all, so it was left unchanged and a plan does not appear there.
 
 ## Critical Patterns
 
@@ -387,6 +407,18 @@ with no resources to label reads as coverage and is not. `proto prune` is about
 the *registry* rather than Docker and applies to any tree. What remains open is
 what these commands should *say* for a `tui` project, and that is in
 [`NOTES.md`](../NOTES.md), not here.
+
+### The registry is shared, so it is written whole and under a lock
+
+`projects.json` is written by every `proto new`, `proto plan`, `rm` and `prune`, and
+read by `proto serve` while they run. Each load-modify-save holds an exclusive
+`flock` on `projects.json.lock` beside it, so two writers never lose each other's
+entry, and `save` writes a temporary file and renames it over, so a reader never
+sees half of one. `registry.delete` is reached from an HTTP handler with a slug in
+the URL, so it trusts no caller: it refuses a tree that is neither an app nor a
+plan, `/`, and any path that is or holds your home or the registry file. The web's
+delete confirm reads its text from a `data-confirm` attribute, never from inline
+script, so a quote in a name cannot run.
 
 ### A skipped verification stage is reported as skipped
 

@@ -113,6 +113,9 @@ Planning needs nothing else. Docker is only for `proto new --target web`.
 |---|---|
 | `proto plan IDEA` | scope it, outline it with you, connect the topics, weigh the risks, pick first steps, dream a little, check the structure, write the folder |
 | `proto dream [DIR]` / `dream promote ID` / `dream drop ID --why WHY` | run another round of dreams; turn one into a topic; rule one out, with the reason kept |
+| `proto ls` | every plan and prototype on this machine, and which apps are running |
+| `proto rm` | delete one: a plan's folder, or an app's containers, data and tree |
+| `proto prune` | forget entries whose folder is gone |
 | `proto doctor` | why it will not work here |
 
 Useful flags on `plan`: `--direction` (scope, emphasis, constraints), `--depth`
@@ -129,7 +132,8 @@ the pages and checks the plan again with no model call, and exits 1 if the plan 
 **Rendered pages are not for editing.** The plan is stored as data in the folder, every
 page is drawn from it, and a re-render overwrites them.
 
-The prototype commands are under [Prototypes come later](#prototypes-come-later).
+The prototype commands are under [Prototypes come later](#prototypes-come-later). Run on a
+plan's folder, each of them refuses and says what to do instead.
 
 ## How a plan is made
 
@@ -260,10 +264,9 @@ Docker with Compose v2.
 | `proto spec` | what this project actually promised |
 | `proto archetypes` | what shapes this build can generate, and what each asks |
 | `proto targets` | what media it can generate into, and what each can build |
-| `proto ls` | every prototype on this machine, and which are running |
-| `proto rm` | delete one: containers, data and the tree |
-| `proto prune` | forget registry entries whose directory is gone |
 | `proto gc` | collect Docker resources a deleted tree left behind |
+
+`proto ls`, `proto rm` and `proto prune`, in [Commands](#commands), cover prototypes too.
 
 Three optional extras: `dev` pulls the web target's stack, `browser` adds Playwright (without
 it the web target's browser stage is reported as skipped, never as green), and `web` is

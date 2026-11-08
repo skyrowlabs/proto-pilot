@@ -1,6 +1,6 @@
 # proto.pilot Documentation
 
-A framework for prototyping ideas with agents.
+A framework for planning ideas with agents.
 
 **⚠️ AI AGENTS**: use lazy loading. See [`.github/DOCS_INDEX.md`](../.github/DOCS_INDEX.md)
 for the routing table — load only the documents a task needs.
@@ -32,10 +32,10 @@ for the routing table — load only the documents a task needs.
 | [AGENTIC_AUTOMATION.md](AGENTIC_AUTOMATION.md) | Scheduled self-maintenance jobs     |
 
 Two documents that live outside `docs/` and are read more often than anything
-in it: [`README.md`](../README.md) is the **design document** — the five
-decisions the pipeline is built on — and [`NOTES.md`](../NOTES.md) is the live
-parking lot. `ARCHITECTURE.md` is the map and links to both rather than
-restating them.
+in it: [`README.md`](../README.md) says what the tool is for and how to use
+it — planning first, prototypes later — and [`NOTES.md`](../NOTES.md) is the live
+parking lot. `ARCHITECTURE.md` is the map, and argues the design of both
+pipelines.
 
 ---
 

@@ -1,10 +1,11 @@
 {
   "_generated_by": "scripts/docs/gen_impl_index.py",
   "_note": "Generated — never hand-edit. Edit the doc's frontmatter and rerun.",
-  "count": 3,
+  "count": 4,
   "by_category": {
     "spec": [
       "archetypes-and-theme",
+      "plan-prototypes",
       "proto-console",
       "terminal-target"
     ]
@@ -28,6 +29,25 @@
       "category": "spec",
       "completed": "2026-09-01",
       "agent_value": 1
+    },
+    {
+      "slug": "plan-prototypes",
+      "title": "Plan Prototypes and Dreaming",
+      "path": "docs/implementations/spec/plan-prototypes.md",
+      "priority": "high",
+      "updated": "2026-11-07",
+      "tags": [
+        "plan",
+        "research",
+        "dreaming",
+        "pipeline"
+      ],
+      "summary": "Add `proto plan`, which turns an idea into a researched, connected, organised set of text plans, plus a dreaming step that collects, evaluates and proposes lighter extensions of the idea.",
+      "open_tasks": 0,
+      "auto_generated": false,
+      "category": "spec",
+      "completed": "2026-11-07",
+      "agent_value": 3
     },
     {
       "slug": "proto-console",
