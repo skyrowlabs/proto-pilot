@@ -1,6 +1,6 @@
 ---
 commit_range: v0.3.0..HEAD
-generated: "2026-11-07T22:00:37Z"
+generated: "2026-11-08T04:01:11Z"
 previous_release: v0.3.0
 release: unreleased
 status: in-flight
@@ -8,152 +8,106 @@ status: in-flight
 
 # Repository Report
 
-> **Window:** unreleased (since v0.3.0) — `v0.3.0..HEAD` (1 commits, at `e5a33c1`)
+> **Window:** unreleased (since v0.3.0) — `v0.3.0..HEAD` (41 commits, at `f28a4fb`)
 
 
 
-> This edition closes the window for the next release, expected to be **v0.3.0**
-> (Release Please picks the version; nothing in the tree fixes it). It records what
-> that build contained: `v0.2.1..62ad9b8`. Nothing in it was in production before
-> that release.
+Nothing in this window is in production. All of it is on `develop` and waits for
+the release after v0.3.0.
 
 ## Metrics
 
 | Figure | Value |
 | ------ | ----- |
-| Commits | 75 |
-| By type | docs 14 · chore 14 · fix 12 · feat 10 · test 8 (the other 17 subjects were untyped merge commits) |
+| Commits | 41 |
+| By type | docs 14 · fix 13 · feat 4 · test 3 · chore 1 (the other 6 are merge commits) |
 | Captures this job filed and still open (`finding_count`) | 0 |
-| Holding tank | 3 plans: 1 ready, 2 blocked; ready queue `plan-prototypes`; nothing awaiting review |
+| Holding tank | 2 plans, both blocked; ready queue empty; nothing awaiting review |
 
 Most-changed files, by number of commits touching them:
-`protopilot/plan/pipeline.py` 12, `protopilot/cli.py` 11; then 8 each for
-`README.md`, `protopilot/plan/render.py`, `docs/TODO/plan-prototypes.md` and
-`.skeletor.json`; then 7 each for `protopilot/plan/model.py`, `docs/todo_index.json`
-and `tests/test_plan_pipeline.py`. The collected data had no line counts, coverage
+`docs/ARCHITECTURE.md` 8, `docs/TODO/plan-prototypes.md` 7,
+`protopilot/plan/pipeline.py` 6; then 5 each for `protopilot/cli.py`,
+`docs/todo_index.json` and `docs/CLI.md`; then 4 each for `AGENTS.md`, `README.md`
+and `protopilot/plan/render.py`. The collected data has no line counts, coverage
 or test results, so this report gives none.
 
 ## What changed
 
-The window was the product pivot. `proto plan` was built through Phases 2–5 of
-[Plan Prototypes and Dreaming](../../implementations/spec/plan-prototypes.md), the README was
-rewritten to lead with planning, and skeletor was upgraded from v0.72.2 to v0.81.1.
-Unlike the v0.2.1 window, most of the churn was in `protopilot/`, the product package.
+The window finished [Plan Prototypes and Dreaming](../../implementations/spec/plan-prototypes.md).
+Phase 6 (research) and Phase 7 (the surfaces that assume an app) landed, and the
+plan was filed to `docs/implementations/` (`29631a0`).
 
-**The pivot (docs)**
-- Planning became the product and generating prototypes was tabled, in
-  [plans-first](../../ideas/plans-first.md) — `d3c116a`. The plan for the work was
-  drafted, its six decisions ruled and Phase 1 (a measured research call on the CLI
-  backend) recorded — `1c2d365`, `c715a28`, `89cf722`.
+**Research: the call (`protopilot/llm.py`)**
+- The research call joined the `LLM` protocol (`protopilot/llm.py:63`). The CLI
+  backend allows web tools only, on `stream-json` (`:413`) — `fa439ef`. The API
+  backend refuses it in a sentence (`:172`).
+- A stream is refused if any init event lists no tools (`6e7e529`) or the session
+  used any tool that is not a web tool (`c66db5e`); see `research_result`, `:293`.
 
-**Phase 2: model, offline baseline, renderer (`protopilot/plan/`)**
-- `model.py`, `baseline.py` and `render.py` arrived with `proto plan --offline`,
-  which wrote a byte-stable plan tree with no model calls — `3712c5c`.
-- Hardening: a plan for a different idea in an existing directory was refused
-  (`0ba56d5`); render order, stale-page sweep, slugs and citations were fixed
-  (`1d171d2`); `PLAN.md` was written last, so its presence meant every page was
-  written (`7bc303f`). Tests: `ac8e3de`.
+**Research: the pass and the ledger (`protopilot/plan/`)**
+- `bb62291` added one call per topic, resumable from `.protopilot/research/`, with
+  a ledger of fetches feeding `sources.md` and the verifier. `97f01b8` gave
+  `connect`, `consider` and `start` the findings.
+- Fixes: the research state of each topic is now redrawn from its own transcript
+  (`71206ba`, `protopilot/plan/ledger.py:11-13`); a resume is guarded in the
+  pipeline as well as the command (`a464aff`); findings past the depth's count are
+  refused (`f07f350`); page-derived text is escaped (`a3022f4`, `59507c8`); sources
+  are listed by number (`ff1d644`); dream verbs read the reconciled plan
+  (`e930533`, `protopilot/plan/pipeline.py:618-620`). Tests: `450225e`, `feeb62e`.
 
-**Phase 3: the passes and the outline checkpoint (`protopilot/plan/passes/`)**
-- `scope`, `outline`, `connect`, `consider` and `start` passes — `beeb926`. They ran
-  behind an outline review (add, drop, rename, or `--yes`) and `--depth
-  shallow|standard|deep` — `5b152c7`, `02d6b4e`.
-- Saves became atomic, and a plan appearing mid-run was refused (`63c51a1`); `start`
-  was offered every topic (`4e5d274`); a blocked page was named instead of
-  surfacing a raw `OSError` (`3b6a886`). Tests: `2015123`.
+**Plans as registry entries (`protopilot/registry.py`, `cli.py`, `web/`)**
+- `2c0dda7`: `proto ls` lists plan trees, and the app verbs refuse a plan.
+  `c6e2a97`: `down --all` says that it stops apps and never plans. `21fa97f`: a
+  plan whose render is blocked after saving still gets registered.
+- `4d53ba8`: the registry guards kinds, slugs and unsafe roots, and serialises
+  writers with `flock` (`protopilot/registry.py:112-126`).
+- `39f9168`: the console asks the tree what kind it is before it touches Docker or
+  delete. Confirm text moved out of inline script, so a quote in a name cannot run.
+  Tests: `969342e`, `tests/test_web_asks_the_tree.py`.
 
-**Phase 4: verifier and repair (`protopilot/plan/verify.py`, `passes/repair.py`)**
-- One named check per bullet of *What "verified" means* — `b66bc9e`. A red plan was
-  repaired a bounded number of times, editing `plan.json` only, and what stayed red
-  was handed back — `512bc9d`.
-- A repair was judged against the plan it started from (`33cb511`); the floor stayed
-  honest and writes stayed inside the tree (`809ddab`); a repair reported what it did
-  to step text and how to retry offline (`897f37e`). Tests: `4cbed2c`.
+**Docs**
+- README, `docs/CLI.md` and `docs/ARCHITECTURE.md` now describe plans as the
+  product and say how app verbs treat a plan (`c82f3c3`, `a4e7a85`, `2424bda`).
+  The operator's reads of the dreams and of a researched run are recorded
+  (`db442ec`, `ba3fc68`). `NOTES.md` moved into `docs/` (`e98c4cd`).
 
-**Phase 5: dreaming (`protopilot/plan/dreaming.py`, `lenses.py`, `passes/{collect,evaluate,propose,promote}.py`)**
-- Dream scores and a word cap (`e9563e5`); dreaming ran as a plan was made, and a
-  failed round did not cost the plan (`0c67a10`); `proto dream`, `proto dream promote`
-  and `proto dream drop --why` were added (`3edee0c`).
-- `2f14a0b` kept a dream round from costing a plan in repair too, made a dream verb
-  check for blocked pages first and roll the tree back if a write died, and held each
-  field to its word budget on the API backend. Tests: `3da80a8`, `b03cc00`,
-  `d2265af`, `cd3e3c1`.
-
-**Model backends (`protopilot/llm.py`)**
-- The API backend moved each schema `pattern` into a description, because the
-  Messages API does not take the keyword (`protopilot/llm.py:61`, used at `:150`) —
-  `7726beb`.
-
-**CLI and README**
-- `proto --help` led with planning — `bbcedc4`.
-- The README led with planning and moved prototyping to a later section (`35fb458`),
-  and described the model-backed run, verification and dreaming as built (`88d09b7`,
-  `5bbc527`, `4df781c`, `5a15095`). It stated at `README.md:201` that nothing was
-  researched and every plan was stamped **Not researched**; that held for this build.
-
-**Skeletor (`.skeletor.json` v0.72.2 → v0.81.1)**
-- Seven upgrade commits and two merge rounds: actionlint joined `check lint`
-  (`a8212ef`); modules declared smoke execution (`77ec281`); product gates got
-  `scripts/gates.py` (`6b61f13`); every check got an exit contract and a bare exit 3
-  stopped passing (`14d1697`, `9fd5dab`); the divergence record arrived (`29ddee5`);
-  the `check.py` conflict was ported (`291bb89`); v0.81.1 landed (`cde97be`,
-  `a42c73b`, `63ebc6b`). `557ba68` restored the template's `test_pyright_scope.py`.
-
-**Skeleton dependencies (`skeleton/web/`)**
-- pytest 8.3.4 → 9.0.3, jinja2 3.1.5 → 3.1.6 and a python-multipart bump
-  (`391cc73`, `34c83eb`, `8476f95`), with the web golden manifests updated to match
-  (`2cc6946`).
-
-**Not in this window**
-- Research (Phase 6) was not in the build: its commits were on a feature branch,
-  not on `develop` at `62ad9b8`.
+**Skeletor (`.skeletor.json` v0.81.1 → v0.81.2)** — `a03f0de`.
 
 ## Risks
 
-1. **The dream lenses have never been judged on a real idea.** Phase 5 shipped with
-   its one hand check open (`docs/TODO/plan-prototypes.md:204`): whether the lenses
-   produce different dreams and whether `evaluate` separates them. The tests pin
-   shape, caps and failure handling against `tests/fakes.py`, not the quality of
-   what a model returns. **Not filed:** it is marked `~operator`, a person's
-   reading, so no task drainer can close it.
-2. **On the API backend, `pattern` constraints were requests, not rules.**
-   `_without_patterns` (`protopilot/llm.py:61`) turned every `pattern` into a
-   sentence, so the server no longer rejected a field that broke one; the code's
-   own comment says the caller's check is what holds. The CLI backend still
-   enforced them. The API side of `proto plan` was covered by `tests/test_llm.py`
-   with a stubbed client; Phase 1's API measurement was deferred for lack of API
-   credit (`docs/TODO/plan-prototypes.md:144`), and nothing in the tree records a
-   live API run of `proto plan`.
-3. **The report-anchor check did not notice a stale window.** At v0.2.1 this
-   report still said `v0.2.0..HEAD` and `pp check reports` passed, because
-   `check()` (`scripts/docs/release_window.py:177`) checks that the anchor fields
-   are present and that `status` is `in-flight` (`:193`, `:196`), and never compares
-   `previous_release` with the newest tag. The same gap let v0.2.1 ship without
-   freezing an edition (see Errata). The code is the template's, so a fix belongs
-   in skeletor; nothing is filed here.
+1. **The research pass has been run live once.** The one recorded run is the
+   bakery idea at `--depth shallow` on `claude-code`
+   (`docs/implementations/spec/plan-prototypes.md`, Phase 6, "Run once,
+   2026-11-07"). Everything else pins behaviour against fakes. `standard` and
+   `deep` depths have no live run on record. **Not filed:** judging a run is a
+   person's reading, not a task.
+2. **Fetch "usable" is a heuristic built on an undocumented CLI field.** The
+   ledger reads `tool_use_result.code` (`protopilot/plan/ledger.py:67-71`) plus
+   text patterns (`:39`). The spec says the field is not a documented contract. If
+   the Claude CLI changes its stream shape, fetches will be misjudged and nothing
+   fails loudly. **Not filed:** the only real test is a live call, and this job
+   cannot write acceptance criteria for one that pass without network access.
+3. **On the API backend, every plan comes out Not researched.** `ClaudeLLM.research`
+   raises `ResearchUnavailable` (`protopilot/llm.py:172-174`). The API measurement is
+   still deferred for lack of credit (`docs/implementations/spec/plan-prototypes.md:144`,
+   `:217`). This is intended behaviour, but it means the two backends now produce
+   different products.
+4. **The anchor check still does not see a stale window or a stale body.** The
+   previous in-flight edition was v0.3.0's body under a re-stamped header, with
+   "1 commits, at `e5a33c1`" on its Window line, and it passed. `check()`
+   (`scripts/docs/release_window.py:177-199`) checks that the fields and the
+   Window line exist, not that they match `git`. The code comes from the template,
+   so the fix belongs in skeletor. Nothing is filed here.
 
 ## What is unfinished
 
-In queue order:
+The ready queue is empty. Both plans in the tank are blocked:
 
-1. 🟢 Ready — [Plan Prototypes and Dreaming](../../implementations/spec/plan-prototypes.md), high
-   priority, last updated 2026-11-06. Open at `62ad9b8`: Phase 6, research
-   (`docs/TODO/plan-prototypes.md:207`); Phase 7, the surfaces that assume an app
-   (`:217`), including `proto ls` showing plans and `proto rm` removing a plan
-   tree; the API research measurement (`:144`); the Phase 5 hand check (`:204`);
-   and every acceptance item (`:250`).
-2. ⛔ Blocked (product decision) — [The Improvement Loop](../../TODO/improvement-loop.md),
+1. ⛔ Blocked (product decision): [Drawing Freedom](../../TODO/drawing-freedom.md),
    low priority, tabled 2026-11-06 with prototyping.
-3. ⛔ Blocked (product decision) — [Drawing Freedom](../../TODO/drawing-freedom.md),
+2. ⛔ Blocked (product decision): [The Improvement Loop](../../TODO/improvement-loop.md),
    low priority, tabled 2026-11-06 with prototyping.
 
-## Errata
-
-**v0.2.1 has no frozen edition.** `docs/reports/releases/` holds only `v0.2.0/`.
-When v0.2.1 was tagged (`1d2ea3e`, 2026-11-04), the in-flight edition (last
-refreshed in `1c1a6db`) was still anchored at `v0.2.0..HEAD`. No freeze ran, and
-the report was not re-anchored until this edition. The v0.2.1 window was
-`v0.2.0..v0.2.1`, 59 commits (`python scripts/docs/release_window.py --release v0.2.1`).
-No report described that range. The nearest, committed in `1c1a6db`, covered 23
-commits up to `b4545f3`; the 35 commits from `1c1a6db` to the tag were never
-reported.
+The filed plan's deferred items are not in the tank: API research
+(`docs/implementations/spec/plan-prototypes.md:144`, `:217`), `proto new --from-plan`
+(`:255`), and handing a plan to the Improvement Loop (`:257`).
