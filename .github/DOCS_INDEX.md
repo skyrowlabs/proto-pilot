@@ -23,7 +23,7 @@ and makes the relevant part harder to find, not easier.
 | **Ideas, not scheduled** | ideas/README.md | `docs/ideas/README.md` |
 | **Reports / release windows** | reports/README.md | `docs/reports/README.md` |
 | **Why the pipeline is shaped this way** | README.md | `README.md` |
-| **Open items / what bit us** | NOTES.md | `NOTES.md` |
+| **Open items / what bit us** | NOTES.md | `docs/NOTES.md` |
 | **The rules for changing anything** | AGENTS.md | `AGENTS.md` |
 
 <!-- Extend as docs are added. `pp check docs` fails on an unregistered doc. -->

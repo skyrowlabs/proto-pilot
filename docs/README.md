@@ -33,7 +33,7 @@ for the routing table — load only the documents a task needs.
 
 Two documents that live outside `docs/` and are read more often than anything
 in it: [`README.md`](../README.md) says what the tool is for and how to use
-it — planning first, prototypes later — and [`NOTES.md`](../NOTES.md) is the live
+it — planning first, prototypes later — and [`NOTES.md`](NOTES.md) is the live
 parking lot. `ARCHITECTURE.md` is the map, and argues the design of both
 pipelines.
 

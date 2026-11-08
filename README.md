@@ -302,7 +302,7 @@ until a plan is concrete enough to feed it.
 Early, and honest about it. `proto plan` runs against a real model today and writes a
 real plan, researched topic by topic on the `claude-code` backend, with its structure
 checked and a pool of dreams beside it.
-`NOTES.md` is the live parking lot: open items, what got resolved, and what is worth doing next.
+`docs/NOTES.md` is the live parking lot: open items, what got resolved, and what is worth doing next.
 
 ## Working on this repo
 

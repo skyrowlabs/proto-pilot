@@ -406,7 +406,7 @@ ask. Do not extend the label vocabulary to `tui` — machinery applied to a targ
 with no resources to label reads as coverage and is not. `proto prune` is about
 the *registry* rather than Docker and applies to any tree. What remains open is
 what these commands should *say* for a `tui` project, and that is in
-[`NOTES.md`](../NOTES.md), not here.
+[`NOTES.md`](NOTES.md), not here.
 
 ### The registry is shared, so it is written whole and under a lock
 
@@ -543,7 +543,7 @@ and shows nothing, with a smoke suite that never thought to look.
 - **The five load-bearing decisions** — fixed stack, the write guard, tests
   before code, each pass reading real source, nothing handed back unobserved —
   are argued in [How a prototype is built](#how-a-prototype-is-built).
-- **What is unfinished, and what bit us** — [`NOTES.md`](../NOTES.md), the live
+- **What is unfinished, and what bit us** — [`NOTES.md`](NOTES.md), the live
   parking lot, including traps that are fixed but worth knowing.
 - **Planned work** — [`TODO/README.md`](TODO/README.md). A new plan goes
   there before any code does.
