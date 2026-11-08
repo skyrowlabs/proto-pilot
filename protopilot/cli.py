@@ -1049,7 +1049,7 @@ def prune(yes: bool) -> None:
 
 
 # What `gc` and the Docker resource labels mean for a target with no containers
-# is an OPEN QUESTION, not a task, and it is written down as one in `NOTES.md`.
+# is an OPEN QUESTION, not a task, and it is written down as one in `docs/NOTES.md`.
 # Nothing here is dead: the web target orphans a container, a volume, a network
 # and an image, and this is the only thing that finds them once the tree is
 # gone. It is also not to be extended to the terminal target, whose whole tree

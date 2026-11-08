@@ -1,6 +1,6 @@
 # Ideas — captured, not scheduled
 
-An idea that grew past a paragraph in [`NOTES.md`](../../NOTES.md) but is not a
+An idea that grew past a paragraph in [`NOTES.md`](../NOTES.md) but is not a
 plan lands here. Nothing in this folder is committed to, costed, or queued.
 
 | Idea | Captured | One line |

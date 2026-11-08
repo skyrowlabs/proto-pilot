@@ -483,8 +483,8 @@ def is_foreign(rel: str | Path) -> bool:
 #:
 #: A file rather than a directory, which the prefix match handles unchanged:
 #: `reference_docs` compares `str(path.relative_to(PROJECT_ROOT))`, and
-#: `"NOTES.md".startswith("NOTES.md")` is true.
-NOTES_FILE = PROJECT_ROOT / "NOTES.md"
+#: `"docs/NOTES.md".startswith("docs/NOTES.md")` is true.
+NOTES_FILE = PROJECT_ROOT / "docs" / "NOTES.md"
 NARRATIVE += (NOTES_FILE,)
 
 #: `docs/ideas/` is this tree's name for the template's `docs/research/`, and the

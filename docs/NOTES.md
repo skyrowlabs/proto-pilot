@@ -43,7 +43,7 @@ is only a pointer at it).
 
 - **`proto gc` / `proto prune` / the Docker resource labels have no meaning for
   a terminal tree, and what to do about that is an open question.** Raised by
-  Phase 3 of [the terminal target](docs/implementations/spec/terminal-target.md), which says
+  Phase 3 of [the terminal target](implementations/spec/terminal-target.md), which says
   outright that this is a question and not a task, so it is recorded here rather
   than half-answered in code.
 
@@ -86,7 +86,7 @@ is only a pointer at it).
 - **`jobs` and `external_apis` are recorded and ignored.** Same shape of problem:
   the spec captures them, no pass consumes them.
 - ~~**The offline baseline ignores `spec.screens`.**~~ **Closed 2026-09-01** by
-  Phase 2 of [Archetypes and Theme](docs/implementations/spec/archetypes-and-theme.md).
+  Phase 2 of [Archetypes and Theme](implementations/spec/archetypes-and-theme.md).
   `baseline.pages()` treats `spec.screens` as authoritative and generates a
   route, a template and a smoke test for every custom screen. The bug had teeth:
   `checkable_paths()` handed such a path to the browser stage, which fetched a
@@ -106,12 +106,12 @@ is only a pointer at it).
 ## Open — the direction
 
 **2026-11-06: the product is now planning; physical prototyping is tabled.** See
-[`docs/ideas/plans-first.md`](docs/ideas/plans-first.md). Items below about
+[`docs/ideas/plans-first.md`](ideas/plans-first.md). Items below about
 generated apps wait on that.
 
 - ~~**Archetypes and Theme is the next real piece of work.**~~ **Shipped
   2026-09-01**, all six phases, and filed at
-  [docs/implementations/spec/](docs/implementations/spec/archetypes-and-theme.md).
+  [docs/implementations/spec/](implementations/spec/archetypes-and-theme.md).
   `Spec` now has two orthogonal axes — `archetype` (shape) and `theme` (look) —
   with the archetype owning its questions, screens, prompt fragments and
   offline baseline, and the theme reaching the UI pass and nothing else.
@@ -189,7 +189,7 @@ generated apps wait on that.
   sibling are prose only, never a markdown link, per the trap above.
 
   Their R1 observation is the one worth carrying, and it is recorded in
-  [sketches-not-scaffolds](docs/ideas/sketches-not-scaffolds.md): tabling the
+  [sketches-not-scaffolds](ideas/sketches-not-scaffolds.md): tabling the
   hosted page **detaches** the service ambition rather than killing it, so R1
   can no longer assume proto.pilot is skyrow.ai's front door.
 
@@ -575,7 +575,7 @@ generated apps wait on that.
 
 ## Ideas — not scheduled
 
-- **[Sketches, not scaffolds](docs/ideas/sketches-not-scaffolds.md)** — the
+- **[Sketches, not scaffolds](ideas/sketches-not-scaffolds.md)** — the
   direction as of 2026-09-03. proto.pilot emits a *terminal* app you look at and
   throw away, not a web app you could build on, and ships as a tool other
   developers run rather than a service we host. The request was never "make me a
@@ -588,7 +588,7 @@ generated apps wait on that.
   write less Textual than FastAPI, so repair costs more — into a measurement
   rather than a bet.
 
-- **[Hosted proto.pilot](docs/ideas/hosted.md)** — **tabled 2026-09-03**,
+- **[Hosted proto.pilot](ideas/hosted.md)** — **tabled 2026-09-03**,
   superseded by the above. Put `proto new` behind a free public page to build a
   training corpus. Kept because most of its analysis is about the pipeline
   rather than the service and survives the decision; what is tabled is the
@@ -739,9 +739,9 @@ generated apps wait on that.
 
 - **2026-09-04 — the terminal target, all six phases, and `proto new` now
   builds one by default.** Filed at
-  [docs/implementations/spec/terminal-target.md](docs/implementations/spec/terminal-target.md) with per-phase
+  [docs/implementations/spec/terminal-target.md](implementations/spec/terminal-target.md) with per-phase
   landed notes; the go/no-go that gated it is
-  [the 2026-09-04 report](docs/reports/occasional/2026-09-04-terminal-target-go-no-go.md).
+  [the 2026-09-04 report](reports/occasional/2026-09-04-terminal-target-go-no-go.md).
 
   `targets.DEFAULT` is `tui`; `Spec.target`'s field default is still `web` and
   always will be, because that one answers "what did a spec written before the
@@ -837,7 +837,7 @@ generated apps wait on that.
   badge would have rendered empty. Four badges added to the README.
 
   `develop` cut at the same time, mirroring what sky.boss did the day *it* went
-  public — see [Branches in `CLAUDE.md`](CLAUDE.md). The workspace table in
+  public — see [Branches in `CLAUDE.md`](../CLAUDE.md). The workspace table in
   `../skyrow-workspace` still lists proto.pilot as neither public nor on
   `develop`; that is a separate repo and a separate commit.
 

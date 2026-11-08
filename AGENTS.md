@@ -208,14 +208,14 @@ because the baseline cannot read a change request.
 | `protopilot/baseline.py` | The deterministic offline implementation of every pass |
 | `protopilot/llm.py` | `LLM` Protocol + three backends |
 | `protopilot/plan/` | `proto plan` and `proto dream`: a sibling pipeline to `Spec`. `passes/` holds its model passes, research, repair and the dream passes among them, and `pipeline.py` runs them; `model.py` is `plan.json`, the truth; `render.py` draws the markdown from it; `verify.py` checks structure, never truth, and a plan still red is handed back with a `RUNBOOK.md`; `lenses.py` is the fixed lenses as data, `dreaming.py` is the pool's rules, and `ledger.py` reads what research fetched from its transcripts — see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#the-plan-pipeline) |
-| `protopilot/registry.py` | Tracked trees, each an `app` or a `plan` by its own files — see the `prune()` trap in `NOTES.md` |
+| `protopilot/registry.py` | Tracked trees, each an `app` or a `plan` by its own files — see the `prune()` trap in `docs/NOTES.md` |
 | `protopilot/targets/` | What medium a spec is built in — fifteen things, of which the plan predicted four; the contract is in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#what-a-target-owns) and a test recomputes it |
 | `skeleton/<target>/` | Copied byte-for-byte into every generated app; one tree per target |
 | `cli/`, `scripts/` | This repo's own tooling — never shipped to a user |
 
 ### Known state
 
-**[`NOTES.md`](NOTES.md) is the live parking lot** — open items, "resolved this
+**[`NOTES.md`](docs/NOTES.md) is the live parking lot** — open items, "resolved this
 session", and what is highest value next. Read it before starting work; update
 it when you resolve something. It is not superseded by `docs/TODO/`: a
 paragraph of context that is not yet a plan belongs there, and a plan belongs
@@ -465,7 +465,7 @@ than it sounds, and both bit in the same afternoon:
 
 - **The distance that matters is audience, not files.** This repo's README still
   listed a gap that had been closed an hour earlier, one commit away, because
-  `NOTES.md` is the parking lot I have the habit of updating and the README is
+  `docs/NOTES.md` is the parking lot I have the habit of updating and the README is
   for a stranger. Check the widest-audience document, not the nearest one.
 - **No test can do the semantic half.** Nothing can read "because X is broken"
   and go check whether X is still broken. `tests/test_docs_name_live_code.py`
@@ -488,7 +488,7 @@ Load on-demand only. Full mapping in `.github/DOCS_INDEX.md`.
 | Completed work (archive)   | `docs/implementations/README.md` |
 | Scheduled jobs / automation | `docs/AGENTIC_AUTOMATION.md`     |
 | The design argument        | `docs/ARCHITECTURE.md`           |
-| Live parking lot           | `NOTES.md`                       |
+| Live parking lot           | `docs/NOTES.md`                  |
 | Captured ideas (not scheduled) | `docs/ideas/README.md`       |
 | Reports (anchored to releases) | `docs/reports/README.md`     |
 
