@@ -305,8 +305,10 @@ All six are Jeston's rulings, 2026-11-06.
 - [x] `proto up` on a plan tree refuses and exits non-zero; `proto rm` removes it and
       never calls Docker
 - [x] `proto new` output is unchanged: the golden manifests do not move
-- [ ] (~operator) One real idea run end to end with research, read by a person, who can
-      name a topic they would not have thought of and a first step they would act on
+- [x] (~operator) One real idea run end to end with research, read by a person, who can
+      name a topic they would not have thought of and a first step they would act on.
+      Ruled 2026-11-07 by Jeston, on the bakery run (shallow research, 10 of 10 cited
+      sources fetched): yes, a new topic and a first step.
 
 ## Dropped, and why
 
