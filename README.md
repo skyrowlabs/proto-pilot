@@ -7,6 +7,7 @@
   <img src="https://img.shields.io/badge/stage-poc-818cf8?labelColor=1c2633" alt="stage: poc">
   <img alt="Python 3.11 to 3.14" src="https://img.shields.io/badge/python-3.11%E2%80%933.14-818cf8?labelColor=1c2633">
   <a href="#works-offline"><img alt="works offline" src="https://img.shields.io/badge/works-offline-818cf8?labelColor=1c2633"></a>
+  <img alt="skeletor version" src="docs/assets/skeletor-version.svg">
 </p>
 
 <p align="center">
