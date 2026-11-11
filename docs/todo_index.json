@@ -1,14 +1,22 @@
 {
   "_generated_by": "scripts/docs/gen_todo_index.py",
   "_note": "Generated — never hand-edit. Edit the plan's frontmatter or header lines and rerun.",
-  "count": 2,
+  "count": 4,
   "by_status": {
     "blocked": [
       "drawing-freedom",
       "improvement-loop"
+    ],
+    "planned": [
+      "living-plans"
+    ],
+    "ready": [
+      "remove-prototyping"
     ]
   },
-  "ready_queue": [],
+  "ready_queue": [
+    "remove-prototyping"
+  ],
   "plans": [
     {
       "slug": "drawing-freedom",
@@ -48,6 +56,47 @@
       ],
       "summary": "Let a prototype be told to keep getting better, with a ratchet that reverts any iteration leaving it less green than it found it.",
       "open_tasks": 28,
+      "auto_generated": false
+    },
+    {
+      "slug": "living-plans",
+      "title": "Living Plans",
+      "path": "docs/TODO/living-plans.md",
+      "shelf_status": "planned",
+      "priority": "medium",
+      "queue_order": null,
+      "blocked_on": null,
+      "updated": "2026-11-11",
+      "tags": [
+        "plan",
+        "cli",
+        "research",
+        "verify",
+        "handoff"
+      ],
+      "summary": "Let a plan be revised, tested and handed off after it is made: answer its questions, change or re-research one topic, record what a real test showed, and emit a brief another tool can start from.",
+      "open_tasks": 31,
+      "auto_generated": false
+    },
+    {
+      "slug": "remove-prototyping",
+      "title": "Remove Prototyping",
+      "path": "docs/TODO/remove-prototyping.md",
+      "shelf_status": "ready",
+      "priority": "high",
+      "queue_order": 10,
+      "blocked_on": null,
+      "updated": "2026-11-11",
+      "tags": [
+        "cli",
+        "plan",
+        "registry",
+        "tests",
+        "ci",
+        "docs"
+      ],
+      "summary": "Delete everything that generates, runs or verifies an app, both front ends included, so that the surviving CLI is plan, dream, ls, rm, prune and doctor.",
+      "open_tasks": 84,
       "auto_generated": false
     }
   ]

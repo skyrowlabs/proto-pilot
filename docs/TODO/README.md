@@ -12,9 +12,27 @@ checking whether a capability already exists (parked) before rebuilding it.
 
 **Machine-readable index**: [`../todo_index.json`](../todo_index.json).
 
-**2 open plans** · **0 agent-managed**
+**4 open plans** · **0 agent-managed**
 
 ---
+
+## 🚀 Ready for Agent
+
+_Every decision made and the spec complete — ready to hand to an agent end to end._
+
+| Queue | Plan | Priority | Updated | Summary |
+| ----- | ---- | -------- | ------- | ------- |
+| 10 | [Remove Prototyping](remove-prototyping.md) | high | 2026-11-11 | Delete everything that generates, runs or verifies an app, both front ends included, so that the surviving CLI is plan, dream, ls, rm, prune and doctor. |
+
+> Lower `Queue-Order` runs earlier; `—` means unnumbered, which sorts last.
+
+## 🔴 Planned
+
+_Not started — intended future work._
+
+| Plan | Priority | Updated | Summary |
+| ---- | -------- | ------- | ------- |
+| [Living Plans](living-plans.md) | medium | 2026-11-11 | Let a plan be revised, tested and handed off after it is made: answer its questions, change or re-research one topic, record what a real test showed, and emit a brief another tool can start from. |
 
 ## ⛔ Blocked
 
