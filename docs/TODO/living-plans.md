@@ -215,6 +215,34 @@ nothing else.
 3. Does a dropped topic's dream get set aside (proposed above) or dropped?
    **Ruled 2026-11-11: set aside, with the reason.**
 
+**Built 2026-11-11, and where the code differs from the sketch.** Each of these was
+a choice the sketch did not make or the code made for it. They stand until ruled
+otherwise.
+
+1. `ledger.reconciled` could not pick a second transcript: it read `<slug>.jsonl` by
+   name and called anything else no evidence. The name rule now takes a topic's own
+   numbered transcripts (`<slug>.2.jsonl`) and still refuses another topic's.
+2. `topic add` makes one call, the promotion's own pass, not `consider`, `connect` and
+   `start`. The table's *Reuses* column and the offline rule both say it lands as a
+   promotion does.
+3. `topic drop` runs `start` again only when no step is left, which is the one way a
+   drop fails `start_order`. The table said whenever a step named the topic.
+4. The ruling on a dropped topic's dream covers a dream anchored to it. A dream the
+   topic was *promoted from* had no rule, and `dreams_shaped` goes red on it, so it is
+   marked dropped with the person's `--why`. A set-aside dream keeps its anchor, and
+   `dreams_shaped` accepts the anchor of a remembered dropped topic on a dream no longer
+   on offer.
+5. Repair reaches links and steps and never a finding, so the held-topic guard is stated
+   in those terms. `connect` on a re-research is narrowed the same way (`only=SLUG`), or
+   it would rewrite every other topic's links.
+6. "Partly" is derived from the ledger's records, not stored, so `plan.json` kept its
+   shape. A topic research never reached now draws the same stamp in a researched plan
+   as in an unresearched one, so the first research of a `--no-research` plan redraws no
+   other topic's page.
+7. Adding a dropped title is told and then done, not refused. A research call that
+   fails changes nothing, where a first run would record the topic as failed. `PLAN.md`
+   lists dropped topics, which the sketch did not ask for.
+
 ## Phase 3 — A plan as a handoff
 
 **Problem.** A plan is read by a person and then retyped: into a prompt for a
