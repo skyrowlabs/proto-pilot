@@ -3,6 +3,7 @@
 proto plan "start a community tool library"
 proto dream | dream promote d1 | dream drop d2 --why "..."
 proto answer 1
+proto topic rename scope "The boundary"
 proto ls | rm | prune | doctor
 """
 
@@ -409,6 +410,27 @@ def answer_command(number: int | None, directory: str) -> None:
         _echo("No answer was given, so nothing was changed.")
         return
     _revise_step(target, lambda j: pipeline.answer(j, target, answers))
+
+
+@main.group(name="topic")
+def topic_group() -> None:
+    """Change the topics of a plan that is already made."""
+
+
+@topic_group.command(name="rename")
+@click.argument("slug", metavar="SLUG")
+@click.argument("title", metavar="TITLE")
+@click.option("--dir", "directory", default=".", help="Plan directory (default: cwd).")
+def topic_rename_command(slug: str, title: str, directory: str) -> None:
+    """Give topic SLUG the title TITLE. Calls no model.
+
+    The slug is the topic's identity and does not change, so its file, links, steps,
+    dreams and research stay where they are.
+    """
+    from protopilot.plan import pipeline
+
+    target = Path(directory).resolve()
+    _revise_step(target, lambda j: pipeline.rename_topic(j, target, slug, title))
 
 
 @main.command(name="ls")

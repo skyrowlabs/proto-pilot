@@ -235,3 +235,59 @@ def test_an_answer_that_cannot_be_drawn_puts_the_tree_back(tmp_path, monkeypatch
     with pytest.raises(pipeline.PlanRefused, match="the tree is back as it was: disk full"):
         pipeline.answer(job_for(), tree, {"Who runs it?": "Volunteers"})
     assert snapshot(tree) == before
+
+
+# -- proto topic rename ---------------------------------------------------
+
+
+def test_a_rename_keeps_the_slug_the_file_and_everything_keyed_on_it(tmp_path, no_backend):
+    tree = offline_plan(tmp_path / "tree")
+    before, pages = Plan.load(tree), snapshot(tree)
+    result = invoke("topic", "rename", "scope", "The boundary", "--dir", str(tree))
+    assert result.exit_code == 0, result.output
+    after = Plan.load(tree)
+    assert after == outline.rename(before, "scope", "The boundary")
+    assert sorted(snapshot(tree)) == sorted(pages)
+    assert "# The boundary" in (tree / "topics" / "scope.md").read_text(encoding="utf-8")
+    assert "now 'The boundary'" in said(result)
+
+
+def test_a_rename_redraws_only_the_pages_that_name_the_topic(tmp_path, no_backend):
+    tree = offline_plan(tmp_path / "tree")
+    before = snapshot(tree)
+    assert invoke("topic", "rename", "operations", "Keeping it going", "--dir", str(tree)).exit_code == 0
+    # Operations links to resources alone, and one dream extends it.
+    assert changed(before, snapshot(tree)) == [
+        ".protopilot/plan.json",
+        "PLAN.md",
+        "dreams.md",
+        "topics/operations.md",
+        "topics/resources.md",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("slug", "title", "reason"),
+    [
+        ("ghost", "A title", "no topic 'ghost'; it holds: audience, scope"),
+        ("scope", "  ", "a topic needs a title"),
+        ("scope", "What is in and what is out", "already called"),
+        ("2", "A title", "no topic '2'"),
+    ],
+    ids=["no-such-topic", "empty-title", "same-title", "a-number-is-not-a-slug"],
+)
+def test_a_rename_it_cannot_make_changes_nothing(tmp_path, no_backend, slug, title, reason):
+    tree = offline_plan(tmp_path / "tree")
+    before = snapshot(tree)
+    result = invoke("topic", "rename", slug, title, "--dir", str(tree))
+    assert result.exit_code == 1 and reason in said(result)
+    assert snapshot(tree) == before
+
+
+def test_a_rename_that_cannot_be_drawn_puts_the_tree_back(tmp_path, monkeypatch):
+    tree = offline_plan(tmp_path / "tree")
+    before = snapshot(tree)
+    dying_write(monkeypatch)
+    with pytest.raises(pipeline.PlanRefused, match="the tree is back as it was: disk full"):
+        pipeline.rename_topic(job_for(), tree, "scope", "The boundary")
+    assert snapshot(tree) == before

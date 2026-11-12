@@ -762,6 +762,35 @@ def answer(job, tree: Path, answers: dict[str, str]) -> verify.PlanVerdict:
     return verdict
 
 
+def _topic(plan: Plan, slug: str) -> Topic:
+    """The topic with this slug; the refusal lists the ones there are."""
+    for topic in plan.topics:
+        if topic.slug == slug:
+            return topic
+    raise PlanRefused(f"this plan has no topic {slug!r}; it holds: {', '.join(t.slug for t in plan.topics)}")
+
+
+def rename_topic(job, tree: Path, slug: str, title: str) -> verify.PlanVerdict:
+    """A topic's new title. Calls no model; the slug is its identity, so its file, links, steps and research stay."""
+    tree = Path(tree)
+    job.project_dir = str(tree)
+    plan = _held(tree, REVISE_NEEDS)
+    was = _topic(plan, slug).title
+    job.event("plan", passes=[RENDER])
+    try:
+        renamed = outline.rename(plan, slug, title)
+    except ValueError as exc:
+        raise PlanRefused(f"Nothing was changed: {exc}.") from exc
+    if renamed == plan:
+        raise PlanRefused(f"Nothing was changed: {slug} is already called {was!r}.")
+    verdict = _land(job, tree, plan, _once(job, renamed), [RENDER])
+    if verdict.ok:
+        job.log(
+            f"{slug} was {was!r} and is now {_topic(renamed, slug).title!r}. Its slug and its file keep their name."
+        )
+    return verdict
+
+
 def after_revise_failure(tree: Path) -> str:
     """What an unexpected stop left, for the verbs that revise a plan."""
     return (
