@@ -380,11 +380,11 @@ goes red, but a baseline eight points under the truth protects nothing.
 
 ## Phase 6 — Prove it, and open the PR
 
-- [ ] `./pp check pre-push` and `./pp test all`, both green
-- [ ] `proto plan "start a community tool library" --offline -y --dir <scratch>`
+- [x] `./pp check pre-push` and `./pp test all`, both green
+- [x] `proto plan "start a community tool library" --offline -y --dir <scratch>`
       writes ten files, and `git diff develop -- tests/golden/plan_offline_manifest.json`
       is empty
-- [ ] `proto --help` lists exactly `doctor`, `dream`, `ls`, `plan`, `prune`, `rm`
+- [x] `proto --help` lists exactly `doctor`, `dream`, `ls`, `plan`, `prune`, `rm`
 - [ ] `gh pr create --draft --base develop`; mark it ready when green. PRs skip
       whole-project pyright here, so after the merge watch the `develop` run for
       the merge SHA to the end
@@ -410,19 +410,19 @@ an agent cannot take. They are listed so the PR body can carry them.
 
 ## Acceptance
 
-- [ ] `git ls-files skeleton protopilot/passes protopilot/archetypes protopilot/targets protopilot/console protopilot/web`
+- [x] `git ls-files skeleton protopilot/passes protopilot/archetypes protopilot/targets protopilot/console protopilot/web`
       prints nothing
-- [ ] `grep -rnE "sqlalchemy|textual|fastapi|playwright|uvicorn|jinja" pyproject.toml protopilot`
+- [x] `grep -rnE "sqlalchemy|textual|fastapi|playwright|uvicorn|jinja" pyproject.toml protopilot`
       prints nothing
-- [ ] `python -c "import protopilot.cli as c; print(sorted(c.main.commands))"`
+- [x] `python -c "import protopilot.cli as c; print(sorted(c.main.commands))"`
       prints `['doctor', 'dream', 'ls', 'plan', 'prune', 'rm']`
-- [ ] `./pp test unit` green with zero skips, and
+- [x] `./pp test unit` green with zero skips, and
       `python scripts/check_skip_budget.py --suite unit` agrees
-- [ ] The 0.3.0 registry test in Phase 3 passes: no row is lost by an upgrade
-- [ ] `tests/golden/plan_offline_manifest.json` is byte-identical to `develop`'s
-- [ ] A wheel built from the branch runs `proto plan --offline` outside the
+- [x] The 0.3.0 registry test in Phase 3 passes: no row is lost by an upgrade
+- [x] `tests/golden/plan_offline_manifest.json` is byte-identical to `develop`'s
+- [x] A wheel built from the branch runs `proto plan --offline` outside the
       checkout
-- [ ] `git tag -l prototyping-final` prints the tag, and
+- [x] `git tag -l prototyping-final` prints the tag, and
       `git show prototyping-final:protopilot/build.py` prints the file
 - [ ] CI is green on the PR, and on `develop` at the merge SHA
 

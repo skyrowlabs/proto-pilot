@@ -52,7 +52,7 @@
         "docs"
       ],
       "summary": "Delete everything that generates, runs or verifies an app, both front ends included, so that the surviving CLI is plan, dream, ls, rm, prune and doctor.",
-      "open_tasks": 15,
+      "open_tasks": 4,
       "auto_generated": false
     }
   ]
