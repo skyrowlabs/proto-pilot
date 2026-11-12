@@ -15,15 +15,16 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
+from protopilot.plan.model import PLAN_DIR, SLUG_RE
+
 SPEC_FILENAME = "spec.json"
-SPEC_DIR = ".protopilot"
+SPEC_DIR = PLAN_DIR
 
 # Kept small on purpose. Every type here has an unambiguous mapping to a
 # SQLAlchemy column, a form input, and a seed-value generator. A type we
 # cannot render in all three places is a type that produces a broken app.
 FieldType = Literal["str", "text", "int", "float", "bool", "date", "datetime"]
 
-SLUG_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 PASCAL_RE = re.compile(r"^[A-Z][A-Za-z0-9]*$")
 
 

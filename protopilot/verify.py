@@ -11,10 +11,10 @@ import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+from protopilot.plan.verify import VerifyResult
 from protopilot.runner import CommandResult, Runner
 
 # Stages, in the order they can fail. The stage name is what the repair pass
@@ -33,23 +33,6 @@ class Verifies(Protocol):
     """
 
     def verify(self) -> "VerifyResult": ...
-
-
-@dataclass(frozen=True)
-class VerifyResult:
-    ok: bool
-    stage: str
-    summary: str
-    output: str = ""
-    logs: str = ""
-
-    def report(self) -> str:
-        parts = [f"[{self.stage}] {self.summary}"]
-        if self.output.strip():
-            parts.append("--- command output ---\n" + self.output.strip())
-        if self.logs.strip():
-            parts.append("--- container logs ---\n" + self.logs.strip())
-        return "\n\n".join(parts)
 
 
 def http_get(url: str, timeout: float = 3.0) -> tuple[int, str]:

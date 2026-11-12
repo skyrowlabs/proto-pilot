@@ -28,12 +28,12 @@ from textual.containers import Horizontal, ScrollableContainer, Vertical, Vertic
 from textual.widgets import Button, Footer, Header, Input, Label, RichLog, Select, Static, TabbedContent, TabPane
 
 from protopilot import archetypes, generation, targets
-from protopilot.console.progress import fold, lines
 from protopilot.console.review import ReviewScreen
 from protopilot.console.session import PreviewSession
 from protopilot.console.splitter import Splitter
 from protopilot.console.theme import SKYROW
 from protopilot.jobs import STORE, JobStore
+from protopilot.progress import fold, lines
 
 #: How often the panes re-read the job. A generation is a minutes-long
 #: operation whose fastest interesting event is a pass boundary, so this is

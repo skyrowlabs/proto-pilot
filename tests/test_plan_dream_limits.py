@@ -30,7 +30,6 @@ from plan_script import (
 )
 
 from protopilot import cli
-from protopilot.console.progress import DONE, FAILED, fold
 from protopilot.jobs import Job
 from protopilot.llm import LLMError, _without_patterns
 from protopilot.plan import dreaming, passes, pipeline, render, verify
@@ -39,12 +38,13 @@ from protopilot.plan.model import (
     DREAM_WORD_CAP,
     MAX_SLUG_LENGTH,
     MAX_TOPICS,
+    SLUG_RE,
     Plan,
     dream_words,
     plan_path,
 )
 from protopilot.plan.passes import collect, evaluate, outline, propose, repair
-from protopilot.spec import SLUG_RE
+from protopilot.progress import DONE, FAILED, fold
 
 pytestmark = [pytest.mark.unit]
 

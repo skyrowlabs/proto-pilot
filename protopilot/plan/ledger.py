@@ -24,10 +24,9 @@ from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
 from protopilot.llm import LLMError, stream_events
-from protopilot.plan.model import Fetch, Plan, TopicResearch
-from protopilot.spec import SPEC_DIR
+from protopilot.plan.model import PLAN_DIR, Fetch, Plan, TopicResearch
 
-RESEARCH_DIR = f"{SPEC_DIR}/research"
+RESEARCH_DIR = f"{PLAN_DIR}/research"
 DRAFT_FILE = "outline.json"
 #: Text a failed fetch comes back as, or a summary saying it read nothing. A heuristic.
 FAILED_TEXT = (

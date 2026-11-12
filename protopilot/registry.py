@@ -24,8 +24,8 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from protopilot.plan.model import plan_path
-from protopilot.spec import SPEC_DIR, SPEC_FILENAME
+from protopilot.plan.model import PLAN_DIR, plan_path
+from protopilot.spec import SPEC_FILENAME
 
 APP = "app"
 PLAN = "plan"
@@ -66,7 +66,7 @@ def tree_kind(path: Path) -> str | None:
     and a guard that trusted an index would delete whatever the index named.
     """
     root = Path(path)
-    if (root / SPEC_DIR / SPEC_FILENAME).exists():
+    if (root / PLAN_DIR / SPEC_FILENAME).exists():
         return APP
     if plan_path(root).exists():
         return PLAN
@@ -197,7 +197,7 @@ def delete(path: Path, runner=None) -> None:
     kind = tree_kind(root)
     if kind is None:
         raise NotAProject(
-            f"{root} has no {SPEC_DIR}/{SPEC_FILENAME} and no {plan_path(root).relative_to(root)}; refusing to delete"
+            f"{root} has no {PLAN_DIR}/{SPEC_FILENAME} and no {plan_path(root).relative_to(root)}; refusing to delete"
         )
     if root.parent == root or _holds(root, Path.home()) or _holds(root, registry_path()):
         raise NotAProject(f"{root} is not a safe path to delete: it is, or holds, your home or the registry")

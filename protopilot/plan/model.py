@@ -20,9 +20,11 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from protopilot.spec import SLUG_RE, SPEC_DIR
-
+#: Where a plan keeps its own files inside its tree. A plan on disk is found by this name.
+PLAN_DIR = ".protopilot"
 PLAN_FILENAME = "plan.json"
+#: A slug becomes a filename and a link target, so it is lowercase, underscored and starts with a letter.
+SLUG_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 #: A slug names a file or a directory, and a filesystem refuses a long one at write time.
 MAX_SLUG_LENGTH = 64
 
@@ -277,4 +279,4 @@ class Plan(_Record):
 
 
 def plan_path(tree: Path) -> Path:
-    return Path(tree) / SPEC_DIR / PLAN_FILENAME
+    return Path(tree) / PLAN_DIR / PLAN_FILENAME

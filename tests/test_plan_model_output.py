@@ -23,7 +23,7 @@ from plan_script import (
     step,
 )
 
-from protopilot.console import progress
+from protopilot import progress
 from protopilot.jobs import Job
 from protopilot.llm import LLMError
 from protopilot.plan import baseline, pipeline, render

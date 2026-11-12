@@ -76,13 +76,13 @@ whole of `protopilot/plan/`; `llm.py` with all three backends; `jobs.py`;
 
 ## Phase 0 — Mark the last commit that holds both layers
 
-- [ ] Confirm `develop` is clean and pushed; record its SHA in the PR body as
+- [x] Confirm `develop` is clean and pushed; record its SHA in the PR body as
       `proto-pilot@<sha>`
-- [ ] `git tag -a prototyping-final -m "last commit with proto new, both targets and both front ends" <sha>`.
+- [x] `git tag -a prototyping-final -m "last commit with proto new, both targets and both front ends" <sha>`.
       The name is safe by measurement: `tests/test_version_follows_the_tag.py`
       and `cli/__init__.py` both match `v[0-9]*`, `scripts/docs/release_window.py`
       lists `v*`, and Release Please reads `v` tags only
-- [ ] The session doing this work is on `feat/remove-prototyping`, cut from that
+- [x] The session doing this work is on `feat/remove-prototyping`, cut from that
       SHA. **An implementer subagent must not `git switch` the shared checkout**;
       the orchestrating session creates the branch before delegating
 - [ ] Put the three items under *For the operator* into the PR body, and raise
@@ -94,27 +94,27 @@ whole of `protopilot/plan/`; `llm.py` with all three backends; `jobs.py`;
 A refactor with no behaviour change. Everything deleted in Phase 3 still exists
 and still passes after this commit.
 
-- [ ] `protopilot/plan/model.py` defines `PLAN_DIR = ".protopilot"` and
+- [x] `protopilot/plan/model.py` defines `PLAN_DIR = ".protopilot"` and
       `SLUG_RE` itself and drops `from protopilot.spec import SLUG_RE, SPEC_DIR`.
       The directory name on disk does not change: a plan made before this must
       still load
-- [ ] `protopilot/plan/ledger.py` and `protopilot/registry.py` take `PLAN_DIR`
+- [x] `protopilot/plan/ledger.py` and `protopilot/registry.py` take `PLAN_DIR`
       from `protopilot.plan.model`
-- [ ] `protopilot/spec.py` re-imports both from `protopilot.plan.model` for the
+- [x] `protopilot/spec.py` re-imports both from `protopilot.plan.model` for the
       one commit it has left (`SPEC_DIR = PLAN_DIR`), so there is still one
       definition (Rule 1)
-- [ ] `VerifyResult` moves into `protopilot/plan/verify.py`; `protopilot/verify.py`
+- [x] `VerifyResult` moves into `protopilot/plan/verify.py`; `protopilot/verify.py`
       imports it from there until Phase 3
-- [ ] `git mv protopilot/console/progress.py protopilot/progress.py`, and
+- [x] `git mv protopilot/console/progress.py protopilot/progress.py`, and
       `git mv tests/test_console_progress.py tests/test_progress.py`
-- [ ] Repoint the importers: `protopilot/console/app.py:31`, `tests/test_progress.py`,
+- [x] Repoint the importers: `protopilot/console/app.py:31`, `tests/test_progress.py`,
       and `tests/test_plan_dream_limits.py`, `test_plan_floor.py`,
       `test_plan_model_output.py`, `test_plan_pipeline.py`, `test_plan_repair.py`
-- [ ] `tests/test_plan_baseline.py:11` and `tests/test_plan_dream_limits.py:47`
+- [x] `tests/test_plan_baseline.py:11` and `tests/test_plan_dream_limits.py:47`
       import `SLUG_RE` from `protopilot.plan.model`
-- [ ] Check: `grep -rnE "protopilot\.(spec|verify|console)\b" protopilot/plan tests/test_plan_*.py tests/test_progress.py`
+- [x] Check: `grep -rnE "protopilot\.(spec|verify|console)\b" protopilot/plan tests/test_plan_*.py tests/test_progress.py`
       prints nothing
-- [ ] Commit: `refactor(plan): own the constants and result type the plan borrowed`
+- [x] Commit: `refactor(plan): own the constants and result type the plan borrowed`
 
 ## Phase 2 — The docs stop describing the layer
 
@@ -395,7 +395,7 @@ goes red, but a baseline eight points under the truth protects nothing.
 Not tasks: nothing above waits on them, and a `ready` plan may not carry a step
 an agent cannot take. They are listed so the PR body can carry them.
 
-1. **Push the tag.** `git push origin prototyping-final`. The standing push
+1. **Push the tag.** Done: pushed 2026-11-11. `git push origin prototyping-final`. The standing push
    permission covers `develop` and says nothing about tags. Until it is pushed
    the old layer is recoverable from this machine only.
 2. **Report to skeletor.** `.claude/skills/release/SKILL.md:41` runs

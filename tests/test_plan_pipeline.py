@@ -9,8 +9,7 @@ import pytest
 from click.testing import CliRunner
 from plan_script import EVENT_NAMES
 
-from protopilot import cli
-from protopilot.console import progress
+from protopilot import cli, progress
 from protopilot.jobs import Job
 from protopilot.plan import pipeline, render, verify
 from protopilot.plan.model import Plan, Topic, plan_path

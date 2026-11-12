@@ -1,6 +1,6 @@
 """The event fold, tested as a function.
 
-`protopilot/console/progress.py` has no Textual import, so none of this needs a
+`protopilot/progress.py` has no Textual import, so none of this needs a
 pilot, a screen or an event loop. That is the point of the split: asking a
 rendered pane whether attempt 2 was counted is a hard way to learn it, and the
 answer would be buried under widget lifecycle either way.
@@ -15,7 +15,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from protopilot.console.progress import DONE, FAILED, PENDING, RUNNING, fold, lines  # noqa: E402
+from protopilot.progress import DONE, FAILED, PENDING, RUNNING, fold, lines  # noqa: E402
 
 pytestmark = pytest.mark.unit
 
