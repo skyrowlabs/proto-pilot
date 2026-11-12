@@ -28,7 +28,7 @@ python -m venv .venv && .venv/bin/pip install -r scripts/requirements.txt && .ve
 .venv/bin/pre-commit install --install-hooks && .venv/bin/python scripts/git/install_merge_drivers.py
 ./pp check pre-push   # every host-runnable CI gate; green on a fresh tree
 ./pp test unit        # the fast suite
-./pp check health     # can this checkout generate? (runs `proto doctor`)
+./pp check health     # can this checkout plan? (runs `proto doctor`)
 ```
 
 **Every one of them exists** — that is the claim this paragraph is making, and it
@@ -36,7 +36,7 @@ is the one worth checking. Every line but the last is shared with the README's
 Setup block, and what keeps them in step is `tests/test_setup_blocks_agree.py`
 rather than the generator, which left. The first line ends by installing
 proto.pilot itself with every extra, through the same script CI runs, because
-the unit suite imports all of them. The last line belongs to this file alone. An
+the unit suite imports the package. The last line belongs to this file alone. An
 earlier version of this file opened with a `setup` and a
 `service up` subcommand, which the CLI has never implemented — and `setup`
 could not be implemented, because the CLI cannot run until the install it would
@@ -47,17 +47,8 @@ line one reads as user error at the exact moment a reader has no way to tell.
 
 ## Services
 
-Nothing here runs as a long-lived service. The two things that listen on a
-port are the optional front end and the *output* of the tool.
-
-| Piece | Stack | Port | Purpose |
-| ----- | ----- | ---- | ------- |
-| `proto serve` | FastAPI + Jinja | 7000 | A web face on `proto new`, pinned to `--target web` because it hands back a link you click. A second *caller* of the pipeline, never a second implementation of it |
-| a generated prototype, `--target web` | FastAPI + Postgres, in Docker | first free from 8080 | The output. One compose project per tree, named `<slug>_<path-hash>` |
-| a generated prototype, `--target tui` (**default**) | Textual + SQLite, one process | none | The output. Nothing listens, nothing to orphan |
-
-The generated prototype's stack is fixed and is not this repo's stack — see the
-invariants below before changing anything under `skeleton/`.
+Nothing here runs as a service and nothing listens on a port. `proto` is a
+command that writes a folder of text and exits.
 
 ---
 
@@ -77,140 +68,76 @@ fetched, and a plan made without research is stamped *Not researched*.
 file, and only a person promotes one, through `proto dream promote`. A dream
 never costs a plan, and it extends only a plan that is green.
 
-**`proto new` is tabled, not deleted.** It works, stays in CI and gets upkeep
-only. `proto new "an idea"` turns a sentence into a running prototype: idea ->
-typed `spec.json` -> the target's skeleton copied -> five generation passes ->
-started and driven -> observed -> bounded repair loop -> a thing you can run. The
-output is something to look at this afternoon and throw away, explicitly not a
-production starting point.
-
-**The default target is `tui`** since 2026-09-04 — a Textual + SQLite app in
-your terminal, one process, no container. `--target web` is the original
-medium and stays reachable, green and generated in CI, because it is the only
-control this repo has for telling a target regression apart from a change
-regression.
+**Prototyping was removed on 2026-11-11.** `proto new`, both targets and both
+front ends left the tree; the tag `prototyping-final` is the last commit that
+holds them. Nothing here generates, runs or verifies an app, and nothing calls
+Docker.
 
 **[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) holds the reasoning.**
 [The plan pipeline](docs/ARCHITECTURE.md#the-plan-pipeline) explains planning, and
-[How a prototype is built](docs/ARCHITECTURE.md#how-a-prototype-is-built) argues the
-five load-bearing decisions of `proto new`. Read the one you are changing first; the
-second is what keeps prototyping from degenerating into a stack-picking code generator.
-
-### Naming: two "skeletons" in one tree
-
-`skeleton/` holds one fixed application tree per target — `skeleton/web/`,
-`skeleton/tui/` — copied into every *generated prototype*. **skeletor** (a
-sibling checkout at `../skeletor`, not part of this repository) is the
-generator that produced *this repository's* shell. They are unrelated, and the
-collision is unfortunate but load-bearing in both directions — do not rename
-either to resolve it, and do not confuse `skeleton/` (product data) with
-`.skeletor.json` (repo metadata).
+[Critical Patterns](docs/ARCHITECTURE.md#critical-patterns) lists what a change
+can break without anything going red. Read the first before changing a pass.
 
 ### Invariants — do not soften these
 
-These are the guarantees that make `proto new`'s generated output trustworthy.
-Each was a deliberate decision, not an accident of implementation.
+These are the guarantees that make a plan trustworthy. Each was a deliberate
+decision, not an accident of implementation.
 
-- **The model can only write a handful of paths**: on the web target `app/models.py`,
-  `app/routes.py`, `app/seed.py`, `app/templates/*.html` (except `base.html`),
-  and `tests/test_smoke.py`. Everything else is refused by
-  `protopilot/files.py` *before it reaches disk*. The list belongs to the
-  target and lives in `protopilot/targets/<name>.py`; `files.py` is the
-  mechanism and holds no list of its own, so a second target cannot inherit
-  the wrong allowlist by default — the terminal target's six are
-  `app/models.py`, `app/screens.py`, `app/seed.py`, `app/widgets.py`,
-  `app/app.tcss` and `tests/test_smoke.py`. Model output is data, not authority — the parts of
-  the tree known to work are exactly the parts the model must not be able to
-  touch. Widening this list is a significant design change, not a convenience
-  fix.
-
-  **It takes two guards, not one, and the second was missing until
-  2026-09-04.** `files.py` authorises what the returned JSON may write; it has
-  no authority over the *process* that returned it. On the `claude-code`
-  backend that process is `claude --print`, which runs with Read, Write, Bash
-  and the caller's working directory unless told otherwise — so the guarantee
-  above held for the `api` backend and was false for the other one. The second
-  guard is `llm.ISOLATION`. A change to either half is a change to this rule.
-  The plan's research call is the one exception, and holds `RESEARCH_ISOLATION`:
-  web search and fetch, no write, no shell, no MCP, checked against every init event
-  and every tool use in the stream. It writes no file; its output is findings, which are data.
-- **The stack is fixed, not chosen.** Textual over SQLAlchemy 2.0 and one
-  SQLite file on the terminal target; FastAPI, server-rendered Jinja,
-  SQLAlchemy 2.0 and Postgres on the web one. Neither has a JS build step, a
-  CDN or migrations. A generator that picks a stack per idea produces N
-  unrunnable variants. **`skeleton/<target>/` is copied byte for byte, never
-  generated**, so it is debugged once rather than once per prototype. It is
-  fixed *per target*: a target may pick a different stack, which is the one
-  thing an archetype may not do.
-- **The two defaults are different constants and must stay that way.**
-  `targets.DEFAULT` is `"tui"` — what a *new* spec is born with.
-  `Spec.target`'s field default is `"web"` — what a `spec.json` written before
-  this axis existed **means**, permanently, so an old spec still generates the
-  app it always did. Never write "the default target" without saying which.
-  Collapsing them would make the next flip silently rewrite every spec on disk;
-  `tests/test_targets.py::test_the_cli_default_and_the_field_default_are_separate_constants`
-  pins both literals.
-- **Tests are generated before the code they test.** Pass order is
-  `schema -> smoke -> seed -> routes -> ui` on the web target and
-  `schema -> smoke -> seed -> screens -> ui` on the terminal one. Smoke tests
-  come second, from the spec, when no route or screen exists yet — so they
-  describe what was *asked for*, not what got built. Reordering the passes
-  breaks this. The tuple is the target's; the invariant is not.
-- **Each pass reads the previous pass's real source**, never a description of
-  it. UI goes last and receives `routes.py`, because a template referencing a
-  context key no route passes is the most common way a generated app 500s.
-- **Nothing is handed back unobserved.** The verifier is the target's.
-  `verify.py` brings the web stack up, waits on `/healthz` (which checks the DB,
-  so it stays red while Postgres boots), runs the smoke suite inside the
-  container, and captures logs — `build -> health -> tests -> browser`.
-  `verify_tui.py` imports the terminal tree, starts it under `App.run_test`,
-  drives it, runs the smoke suite and compares the rendered screen buffer to an
-  empty application's — `import -> boot -> tests -> paint`, no daemon and no
-  port. **`paint` is the backstop, not the first line**: the skeleton's own
-  `tests/test_boots.py` asserts a non-empty buffer and ships in every generated
-  tree, so a blank app is already red at `tests`. `paint` exists for the app
-  that mounts, answers every query, shows nothing, and has a smoke suite that
-  never looked. Three repair attempts either way, then a **floor**: the tree is handed
-  back anyway with a `RUNBOOK.md` naming the red stage, the last error, and what
-  was tried. A known-broken prototype beats a mystery, and both beat a loop that
-  never terminates.
-- **The shrink guard**: if a repair shrinks the smoke suite, the file is
-  reverted. Green because there is nothing left to fail is the one failure mode
-  nobody would otherwise notice.
+- **Model output is data, not authority.** A pass's `apply` reads only the fields
+  it names, so none but `research` can set `researched`, `sources` or a finding,
+  and no pass can promote a dream or remove the *Not researched* stamp. The only
+  model text that reaches a file name is a checked slug.
+- **The process that answers is isolated too, and that takes its own guard.** On
+  the `claude-code` backend the answer comes from `claude --print`, which runs
+  with Read, Write, Bash and the caller's working directory unless told
+  otherwise. `llm.ISOLATION` is what tells it otherwise: no tool and no MCP
+  server. The research call is the one exception, and holds
+  `RESEARCH_ISOLATION`: web search and fetch, no write, no shell, no MCP, checked
+  against every init event and every tool use in the stream. It writes no file;
+  its output is findings, which are data. A change to either constant is a
+  change to this rule.
+- **A source counts only if this run's transcript shows it fetched.** The ledger
+  is redrawn from the transcripts on every read, so a hand edit cannot upgrade a
+  plan, and a plan made without research is stamped *Not researched*.
+- **Verified means the structure holds, never that the plan is true.** The green
+  line claims only what held, and a check with nothing to read is reported as
+  that and never counts as passed.
+- **Nothing is handed back unverified without saying so.** Three repair attempts
+  that can change links and steps and nothing else, then a **floor**: the tree
+  is handed back anyway with a `RUNBOOK.md`, *Not verified* banners and exit 1.
+  A known-broken plan beats a mystery, and both beat a loop that never
+  terminates.
+- **The shrink guard**: a repair that removes a healthy step or a real
+  dependency, or leaves more wrong than it found, is thrown away. Green because
+  there is nothing left to fail is the one failure mode nobody would otherwise
+  notice.
+- **Dreams are guesses, and only a person promotes one.** A dream never reaches
+  a topic file, never costs a plan, and extends only a plan that is green.
 
 ### The offline baseline is the test suite
 
-Every pass has two implementations: a prompt, and a deterministic generator in
-`protopilot/baseline.py` (and `protopilot/baseline_tui.py` for the three files
-whose content depends on the medium). `--offline` runs the second — no API
-calls, no key, a plain CRUD app.
+Every plan pass has two implementations: a prompt, and a deterministic twin
+that slices the plan `protopilot/plan/baseline.py` builds. `--offline` runs the
+second — no API calls, no key, the same bytes on every run.
 
 It exists for three reasons, in increasing importance: a fast free path to a
-skeleton; the worked example each prompt is written against; and **it is what
-the test suite runs**, so the whole pipeline is exercised on every commit with
-no key and no Docker daemon. A pipeline that can only be tested with a network
+plan's shape; the worked example each prompt is written against; and **it is
+what the test suite runs**, so the whole pipeline is exercised on every commit
+with no key and no network. A pipeline that can only be tested with a network
 call and a credit card stops being tested.
 
-**When adding or changing a pass, the baseline implementation is part of the
-change, not a follow-up.** `proto add` is the exception: it needs the model,
-because the baseline cannot read a change request.
+**When adding or changing a pass, the offline twin is part of the change, not a
+follow-up.**
 
 ### Layout
 
 | Path | What |
 | ---- | ---- |
-| `protopilot/passes/` | One module per pass. The web target's are here — `intake`, `clarify`, `models`, `smoke`, `seed`, `routes`, `ui`, `repair`; `_shared.py` holds its stack brief |
-| `protopilot/passes/tui/` | The terminal target's five, same shape; `_brief.py` holds its stack brief and the archetype fragments in that medium |
-| `protopilot/baseline_tui.py` | The deterministic offline generator for the terminal target — screens, smoke suite and stylesheet |
-| `protopilot/files.py` | The write guard — the mechanism; the allowlist itself is the target's |
-| `protopilot/verify.py` | **Web:** boot, health-wait, smoke run, log capture |
-| `protopilot/verify_tui.py` | **Terminal:** import, boot under `App.run_test`, smoke run, blank-screen check; `tui_probe.py` is the half that runs inside the tree |
-| `protopilot/baseline.py` | The deterministic offline implementation of every pass |
 | `protopilot/llm.py` | `LLM` Protocol + three backends |
-| `protopilot/plan/` | `proto plan` and `proto dream`: a sibling pipeline to `Spec`. `passes/` holds its model passes, research, repair and the dream passes among them, and `pipeline.py` runs them; `model.py` is `plan.json`, the truth; `render.py` draws the markdown from it; `verify.py` checks structure, never truth, and a plan still red is handed back with a `RUNBOOK.md`; `lenses.py` is the fixed lenses as data, `dreaming.py` is the pool's rules, and `ledger.py` reads what research fetched from its transcripts — see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#the-plan-pipeline) |
-| `protopilot/registry.py` | Tracked trees, each an `app` or a `plan` by its own files — see the `prune()` trap in `docs/NOTES.md` |
-| `protopilot/targets/` | What medium a spec is built in — fifteen things, of which the plan predicted four; the contract is in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#what-a-target-owns) and a test recomputes it |
-| `skeleton/<target>/` | Copied byte-for-byte into every generated app; one tree per target |
+| `protopilot/plan/` | `proto plan` and `proto dream`. `passes/` holds its model passes, research, repair and the dream passes among them, and `pipeline.py` runs them; `model.py` is `plan.json`, the truth; `render.py` draws the markdown from it; `verify.py` checks structure, never truth, and a plan still red is handed back with a `RUNBOOK.md`; `lenses.py` is the fixed lenses as data, `dreaming.py` is the pool's rules, and `ledger.py` reads what research fetched from its transcripts — see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#the-plan-pipeline) |
+| `protopilot/registry.py` | Tracked plan trees, each a plan by its own files — see the `prune()` trap in `docs/NOTES.md` |
+| `protopilot/jobs.py`, `protopilot/progress.py` | The job a plan runs on and its typed events, and the pure fold of those events |
+| `protopilot/runner.py` | The subprocess seam the `claude-code` backend runs through |
 | `cli/`, `scripts/` | This repo's own tooling — never shipped to a user |
 
 ### Known state
@@ -419,17 +346,15 @@ the point of use, or set the variable at `conftest.py` import time.
 ### 15. Two CLIs, Two Audiences — Never Merge Them
 
 **`proto` is the product.** Installed onto a user's PATH via
-`[project.scripts]`, run from wherever they want a plan or a prototype,
+`[project.scripts]`, run from wherever they want a plan,
 implemented in `protopilot/`. **`./pp` is this repository's own tooling** — gates, generators,
 scheduled jobs — implemented in `cli/` and `scripts/`, run from the repo root,
 never shipped.
 
 They keep separate env prefixes for the same reason: `PROTOPILOT_*` configures
 the product, `PP_*` configures the repo. A single `--help` serving both a person
-generating an app and a person maintaining the generator serves neither, and the
+planning an idea and a person maintaining the tool serves neither, and the
 first thing that goes wrong is `proto check docs` appearing in a user's shell.
-The same holds one level down: a plan and an app share `proto ls` and `proto rm`,
-and every verb that only an app can answer refuses a plan by name.
 
 Rule 5 ("keep the CLI in sync") is about `./pp`. A new *product* command belongs
 in `protopilot/cli.py` and in the README's command table.
@@ -458,7 +383,7 @@ one labelled.** You cannot always avoid citing a broken thing — sometimes it
 genuinely is why you did it — but you can refuse to let it be the only reason on
 the page. State the durable reason too, mark which one is load-bearing, and the
 day the broken thing is fixed nobody has to re-derive whether the decision still
-holds. `containers.py::known_paths` is the worked example here.
+holds.
 
 When you close a defect, grep for what cited it. Two things make that harder
 than it sounds, and both bit in the same afternoon:

@@ -142,7 +142,7 @@ refuses with exit 1 until it is moved. A link at a page path is refused the same
 as is a directory there, except that on green nothing is drawn. Nothing is written
 outside the tree. A green run removes only a runbook this tool wrote.
 
-## A plan on the app commands
+## A plan on the other verbs
 
 `proto plan` lists its folder on this machine as kind `plan`, once `plan.json` lands,
 whether the plan is green or red, and even when a page could not be drawn. A plan made before plans were listed joins the list
@@ -150,17 +150,18 @@ the next time `proto plan` redraws it.
 
 | Command | On a plan |
 | ------- | --------- |
-| `proto ls` | Listed with its kind, and no port or up/down state; only an app has either |
-| `proto rm` | Deletes the folder and forgets it. No Docker call is made |
+| `proto ls` | Listed with its kind, and `gone` once its `plan.json` is |
+| `proto rm` | Deletes the folder and forgets it |
 | `proto prune` | Forgets it once its `plan.json` is gone |
-| `proto up`, `down`, `test`, `add`, `reset`, `logs`, `spec`, `export` | Refused with exit 1, in a sentence that says what to do instead |
-| `proto down --all` | Passes over it |
-| `proto serve` | Listed read-only: no open, start, stop, change or delete |
 
-What a folder is comes from its own files, never from the list: a `spec.json` there
-makes it an app, and a `plan.json` a plan. A folder holding neither, including one
-whose research stopped before `plan.json` was written, is refused by `proto rm`, and
-so are `/` and any folder that is or holds your home or the list itself. Two folders
+What a folder is comes from its own files, never from the list: a `plan.json` there
+makes it a plan. A folder without one, including one whose research stopped before
+`plan.json` was written, is refused by `proto rm`, and so are `/` and any folder that
+is or holds your home or the list itself.
+
+**A prototype made by an older proto.pilot is not a plan.** Its row is listed as `old`,
+`proto prune` forgets the row and leaves the folder alone, and `proto rm` refuses the
+folder, saying what to run there instead. Two folders
 never share a slug in the list: one whose slug is taken is listed as `_2`, `_3`.
 
 ## `proto dream`

@@ -34,9 +34,9 @@ the model generates a Textual + SQLite terminal app as reliably as it generates
 a FastAPI web one. It does — identical repair attempts over six live runs — and
 [the report](../../docs/reports/occasional/2026-09-04-terminal-target-go-no-go.md)
 keeps the finding. The directory went when the target it gated shipped, exactly
-as the section below says it should; its prompts were **moved** into
-`protopilot/passes/tui/_brief.py` rather than deleted, because the numbers in
-that report describe those exact strings.
+as the section below says it should. That target left the tree on 2026-11-11 with
+the rest of the prototyping layer, and the prompts the report measured are
+readable at the tag `prototyping-final`.
 
 ## Deleting one
 

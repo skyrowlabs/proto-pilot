@@ -28,10 +28,10 @@ and makes the relevant part harder to find, not easier.
 
 <!-- Extend as docs are added. `pp check docs` fails on an unregistered doc. -->
 
-**Working on the generation pipeline?** `docs/ARCHITECTURE.md` for the component
+**Working on the plan pipeline?** `docs/ARCHITECTURE.md` for the component
 map and the patterns a change can violate silently, then the one pass module you
-are touching under `protopilot/passes/`. Do not load all five — each is
-self-contained, and the stack brief they share is in `protopilot/passes/_shared.py`.
+are touching under `protopilot/plan/passes/`. Do not load all of them: each is
+self-contained.
 
 ---
 

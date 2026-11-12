@@ -124,21 +124,21 @@ and `scripts/spikes/README.md`; two callables in `docs/ARCHITECTURE.md`
 (`archetypes.brief_for()`, `cli.set_port()`); and `proto new` in a shell block in
 `README.md`.
 
-- [ ] `docs/ideas/plans-first.md`: decision 2 is marked **superseded 2026-11-11**
+- [x] `docs/ideas/plans-first.md`: decision 2 is marked **superseded 2026-11-11**
       with the new ruling in one paragraph and a link to this plan; decision 3,
       *What this costs* and *What changes when* are brought in line. The
       `prototyping-final` tag is named as where the old layer can be read
-- [ ] `docs/ideas/README.md`: the plans-first row says prototyping was removed,
+- [x] `docs/ideas/README.md`: the plans-first row says prototyping was removed,
       not tabled
-- [ ] `docs/ideas/sketches-not-scaffolds.md` and `docs/ideas/hosted.md`: one
+- [x] `docs/ideas/sketches-not-scaffolds.md` and `docs/ideas/hosted.md`: one
       status line each, saying the thing they describe left the tree on
       2026-11-11. Their arguments stay; the folder is narrative
-- [ ] `README.md`: hero alt text; the nav link and the whole *Prototypes come
+- [x] `README.md`: hero alt text; the nav link and the whole *Prototypes come
       later* section go; *Commands* lists the six survivors; *Status* says
       prototyping was removed and names the tag; *Install* and *Testing* lose
       extras, Docker and the browser. Add four lines for somebody upgrading with
       old prototypes on disk (see Phase 3, *Old registries*)
-- [ ] `AGENTS.md`: *Services* (nothing listens now, so the table goes), *What
+- [x] `AGENTS.md`: *Services* (nothing listens now, so the table goes), *What
       this repo is*, *Naming: two "skeletons"* (delete; one skeleton is left and
       it is skeletor's), *Invariants*, *The offline baseline is the test suite*,
       *Layout*, Rule 15's last sentence, and Rule 16's worked example
@@ -146,17 +146,17 @@ and `scripts/spikes/README.md`; two callables in `docs/ARCHITECTURE.md`
       clause). **Keep** the two-guard paragraph's `llm.ISOLATION` and
       `RESEARCH_ISOLATION` rule as a plan invariant: it is the one that still
       binds
-- [ ] `docs/ARCHITECTURE.md`: keep *The plan pipeline*, the registry lock
+- [x] `docs/ARCHITECTURE.md`: keep *The plan pipeline*, the registry lock
       pattern and whatever of *Decisions* is about planning; delete *What a
       target owns*, *How a prototype is built*, and the web- and terminal-target
       patterns. Rewrite *What This Is*, *Data Flow* and *Components* around the
       plan pipeline. Repoint `AGENTS.md`'s two anchors into it
-- [ ] `docs/CLI.md`: the *What a plan is to the other verbs* table loses the app
+- [x] `docs/CLI.md`: the *What a plan is to the other verbs* table loses the app
       verbs, `down --all` and `serve`
-- [ ] `docs/DEVELOPMENT.md`, `docs/README.md`, `.github/DOCS_INDEX.md` (lines
+- [x] `docs/DEVELOPMENT.md`, `docs/README.md`, `.github/DOCS_INDEX.md` (lines
       33–34 route to `protopilot/passes/`), `scripts/spikes/README.md` (cites
       `protopilot/passes/tui/_brief.py`)
-- [ ] `docs/NOTES.md`: move every open item about `proto new`, a target, the
+- [x] `docs/NOTES.md`: move every open item about `proto new`, a target, the
       console, the web front end, Docker or `gc` to *Resolved* with "removed
       2026-11-11". It is narrative, so no gate asks; this is the reading pass
       Rule 16 says no test can do
@@ -173,7 +173,7 @@ and `scripts/spikes/README.md`; two callables in `docs/ARCHITECTURE.md`
       `docs/reports/releases/v0.3.0/repository-report.md:143,145` is never
       edited: add two entries to `scripts/doc_refs_allowlist.yaml` beside the
       existing `../../../TODO/plan-prototypes.md` one, with the same reason
-- [ ] `docs/implementations/spec/{terminal-target,archetypes-and-theme,proto-console}.md`
+- [x] `docs/implementations/spec/{terminal-target,archetypes-and-theme,proto-console}.md`
       are untouched. Measured: no doc holds a markdown link into `protopilot/`,
       `skeleton/` or `tests/`, and `./pp check docs` was green in the rehearsal
       with the code gone

@@ -18,96 +18,17 @@ is only a pointer at it).
 
 ## Open — pipeline gaps, in the order they bite
 
-- **The generated smoke suite is not idempotent against a persistent volume.**
-  Found 2026-09-02 by running it twice. A `turn-based-game` tree on a fresh
-  volume: `12 passed`. The same command again, same container, no changes:
-  `1 failed, 11 passed`. `test_playing_a_square_changes_the_board` plays a real
-  move and leaves it played, so the second run starts from a board the seed did
-  not create, and eventually from a game that has finished.
-
-  Nothing catches this. CI runs the suite once against a fresh tree, `proto new`
-  runs it once, and the repair loop only re-runs it after regenerating — so
-  every path that exists today gets the fresh-volume answer.
-
-  It is not cosmetic and it lands squarely on the improvement loop: that plan's
-  ratchet re-runs the suite against the same tree every iteration, so a suite
-  that goes red on its second run would revert every iteration after the first
-  and report the app as regressing when nothing changed. **Fix this before
-  building the ratchet**, or the ratchet's first honest test will be against a
-  broken measurement.
-
-  The fix is a decision, not a patch: either the generated suite resets the
-  rows it depends on (a fixture that reseeds), or the tests assert against
-  state they create rather than state the seed left. The second is better and
-  is a change to the smoke prompt and to every archetype's `smoke_py`.
-
-- **`proto gc` / `proto prune` / the Docker resource labels have no meaning for
-  a terminal tree, and what to do about that is an open question.** Raised by
-  Phase 3 of [the terminal target](implementations/spec/terminal-target.md), which says
-  outright that this is a question and not a task, so it is recorded here rather
-  than half-answered in code.
-
-  They exist because a web tree removed with `rm -rf` orphans a container, a
-  named volume, a network and an image, and `containers.py` finds them again
-  from a label carrying the tree's absolute path. A `skeleton/tui/` tree is one
-  process and one SQLite file: deleting it orphans nothing, there is no daemon
-  to ask, and `find_orphans` would have nothing to find.
-
-  **Do not delete any of it** — the web target still needs every part, and it is
-  the only mechanism this repo has for resources that outlive their tree. **Do
-  not extend it to `tui` either**, which is the tempting half: a label
-  vocabulary applied to a target with no resources to label is machinery that
-  reads as coverage and is not.
-
-  What is actually undecided is narrower than it looks. `proto prune` is about
-  the *registry*, not about Docker, and a terminal tree is registered like any
-  other — so it probably applies unchanged and just needs saying. `proto gc` and
-  the labels are the half that does not apply, and the question is whether they
-  should say so for a `tui` project or stay silent.
-
-  **Phase 5 answered what a terminal verify leaves behind, and the answer is
-  "one directory".** `verify_tui` writes a fresh SQLite file per attempt into
-  `<tree>/.dbs/`, which is inside the tree and goes when the tree goes. Nothing
-  outlives the directory, so `gc` genuinely has nothing to collect — the
-  question is now purely one of what to *say*, which makes it cheaper than it
-  looked and still not answered.
-
-  Two smaller ones opened alongside it, and both are cosmetic rather than
-  broken. `proto ls` prints a port and an up/down state for every prototype,
-  and a terminal tree has neither — it is registered with the port `free_port`
-  handed out and will always read as `down`. And `registry.record` allocates
-  that port at all, which is one number out of a range nothing will bind. The
-  honest fix for both is a registry that knows the target; the honest reason
-  not to do it today is that neither misleads anybody into a wrong action.
-
-- **`auth: "password"` is accepted by the spec and implemented by no pass.** A
-  spec can ask for it and nothing will build it. Either implement it or reject it
-  at intake; silently accepting it is the worst of the three.
-- **`jobs` and `external_apis` are recorded and ignored.** Same shape of problem:
-  the spec captures them, no pass consumes them.
-- ~~**The offline baseline ignores `spec.screens`.**~~ **Closed 2026-09-01** by
-  Phase 2 of [Archetypes and Theme](implementations/spec/archetypes-and-theme.md).
-  `baseline.pages()` treats `spec.screens` as authoritative and generates a
-  route, a template and a smoke test for every custom screen. The bug had teeth:
-  `checkable_paths()` handed such a path to the browser stage, which fetched a
-  404 and reported the screen as broken.
-
-- **The web front end generates web prototypes only, and that is pinned rather
-  than defaulted.** `protopilot/web/app.py::TARGET` is `"web"`. It used to take
-  `targets.DEFAULT`, with the reason "no target picker yet" — a workaround, and
-  the Phase 6 flip falsified it. The durable reason is that `proto serve` hands
-  back a link you click, and a terminal app has no link.
-
-  What is open is the half of the UI that would make a picker honest: a browser
-  user choosing `tui` needs to be told a path and a command rather than shown a
-  URL, and `job.url` is a single string that assumes otherwise. Small, and not
-  worth doing until somebody wants it.
+Nothing is open here for the plan pipeline. What a plan cannot do yet is in the
+README, under *What a plan does not know yet*. Every item this section held was
+about `proto new`, and is under *Resolved*, removed 2026-11-11.
 
 ## Open — the direction
 
-**2026-11-06: the product is now planning; physical prototyping is tabled.** See
-[`docs/ideas/plans-first.md`](ideas/plans-first.md). Items below about
-generated apps wait on that.
+**2026-11-11: prototyping was removed; planning is the whole product.** Planning
+became the product on 2026-11-06, and five days later the layer that generated,
+ran and verified apps left the tree. See
+[`docs/ideas/plans-first.md`](ideas/plans-first.md); the tag `prototyping-final`
+is the last commit that holds it.
 
 - ~~**Archetypes and Theme is the next real piece of work.**~~ **Shipped
   2026-09-01**, all six phases, and filed at
@@ -124,15 +45,6 @@ generated apps wait on that.
   delete form for a route that does not exist. None was findable from inside
   the test suite.
 
-- **The improvement loop comes after it**, and is not filed yet. The primitives
-  arrived with the skeletor `agentic` tier — `scripts/reporting/jobs.py`,
-  `run_ledger.py` with its two rails, `agent_runner.py`'s argv contract,
-  `fix_policy` defaulting to `none`, `declined` as a first-class outcome. What
-  is missing and is proto.pilot's own to design is the **ratchet**: an iteration
-  must leave the tree at least as green as it found it or be reverted, which the
-  per-tree `git init` already makes nearly free. Note the two loops are
-  different: skeletor's tier maintains *this repo*; the ratchet governs
-  *generated prototypes*. They share primitives, not a schedule.
 
 ## Open — going public
 
@@ -640,6 +552,106 @@ generated apps wait on that.
   the natural scoreboard. It is an experiment with a built-in grader, not a swap.
 
 ## Resolved
+
+- **2026-11-11 — removed with the prototyping layer.** Every item below was open
+  against `proto new`, a target, the console, the web front end, Docker or `gc`.
+  None was fixed: the code each describes left the tree, and is readable at the
+  tag `prototyping-final`. They are kept as written.
+
+  - **The generated smoke suite is not idempotent against a persistent volume.**
+    Found 2026-09-02 by running it twice. A `turn-based-game` tree on a fresh
+    volume: `12 passed`. The same command again, same container, no changes:
+    `1 failed, 11 passed`. `test_playing_a_square_changes_the_board` plays a real
+    move and leaves it played, so the second run starts from a board the seed did
+    not create, and eventually from a game that has finished.
+
+    Nothing catches this. CI runs the suite once against a fresh tree, `proto new`
+    runs it once, and the repair loop only re-runs it after regenerating — so
+    every path that exists today gets the fresh-volume answer.
+
+    It is not cosmetic and it lands squarely on the improvement loop: that plan's
+    ratchet re-runs the suite against the same tree every iteration, so a suite
+    that goes red on its second run would revert every iteration after the first
+    and report the app as regressing when nothing changed. **Fix this before
+    building the ratchet**, or the ratchet's first honest test will be against a
+    broken measurement.
+
+    The fix is a decision, not a patch: either the generated suite resets the
+    rows it depends on (a fixture that reseeds), or the tests assert against
+    state they create rather than state the seed left. The second is better and
+    is a change to the smoke prompt and to every archetype's `smoke_py`.
+
+  - **`proto gc` / `proto prune` / the Docker resource labels have no meaning for
+    a terminal tree, and what to do about that is an open question.** Raised by
+    Phase 3 of [the terminal target](implementations/spec/terminal-target.md), which says
+    outright that this is a question and not a task, so it is recorded here rather
+    than half-answered in code.
+
+    They exist because a web tree removed with `rm -rf` orphans a container, a
+    named volume, a network and an image, and `containers.py` finds them again
+    from a label carrying the tree's absolute path. A `skeleton/tui/` tree is one
+    process and one SQLite file: deleting it orphans nothing, there is no daemon
+    to ask, and `find_orphans` would have nothing to find.
+
+    **Do not delete any of it** — the web target still needs every part, and it is
+    the only mechanism this repo has for resources that outlive their tree. **Do
+    not extend it to `tui` either**, which is the tempting half: a label
+    vocabulary applied to a target with no resources to label is machinery that
+    reads as coverage and is not.
+
+    What is actually undecided is narrower than it looks. `proto prune` is about
+    the *registry*, not about Docker, and a terminal tree is registered like any
+    other — so it probably applies unchanged and just needs saying. `proto gc` and
+    the labels are the half that does not apply, and the question is whether they
+    should say so for a `tui` project or stay silent.
+
+    **Phase 5 answered what a terminal verify leaves behind, and the answer is
+    "one directory".** `verify_tui` writes a fresh SQLite file per attempt into
+    `<tree>/.dbs/`, which is inside the tree and goes when the tree goes. Nothing
+    outlives the directory, so `gc` genuinely has nothing to collect — the
+    question is now purely one of what to *say*, which makes it cheaper than it
+    looked and still not answered.
+
+    Two smaller ones opened alongside it, and both are cosmetic rather than
+    broken. `proto ls` prints a port and an up/down state for every prototype,
+    and a terminal tree has neither — it is registered with the port `free_port`
+    handed out and will always read as `down`. And `registry.record` allocates
+    that port at all, which is one number out of a range nothing will bind. The
+    honest fix for both is a registry that knows the target; the honest reason
+    not to do it today is that neither misleads anybody into a wrong action.
+
+  - **`auth: "password"` is accepted by the spec and implemented by no pass.** A
+    spec can ask for it and nothing will build it. Either implement it or reject it
+    at intake; silently accepting it is the worst of the three.
+  - **`jobs` and `external_apis` are recorded and ignored.** Same shape of problem:
+    the spec captures them, no pass consumes them.
+  - ~~**The offline baseline ignores `spec.screens`.**~~ **Closed 2026-09-01** by
+    Phase 2 of [Archetypes and Theme](implementations/spec/archetypes-and-theme.md).
+    `baseline.pages()` treats `spec.screens` as authoritative and generates a
+    route, a template and a smoke test for every custom screen. The bug had teeth:
+    `checkable_paths()` handed such a path to the browser stage, which fetched a
+    404 and reported the screen as broken.
+
+  - **The web front end generates web prototypes only, and that is pinned rather
+    than defaulted.** `protopilot/web/app.py::TARGET` is `"web"`. It used to take
+    `targets.DEFAULT`, with the reason "no target picker yet" — a workaround, and
+    the Phase 6 flip falsified it. The durable reason is that `proto serve` hands
+    back a link you click, and a terminal app has no link.
+
+    What is open is the half of the UI that would make a picker honest: a browser
+    user choosing `tui` needs to be told a path and a command rather than shown a
+    URL, and `job.url` is a single string that assumes otherwise. Small, and not
+    worth doing until somebody wants it.
+
+  - **The improvement loop comes after it**, and is not filed yet. The primitives
+    arrived with the skeletor `agentic` tier — `scripts/reporting/jobs.py`,
+    `run_ledger.py` with its two rails, `agent_runner.py`'s argv contract,
+    `fix_policy` defaulting to `none`, `declined` as a first-class outcome. What
+    is missing and is proto.pilot's own to design is the **ratchet**: an iteration
+    must leave the tree at least as green as it found it or be reverted, which the
+    per-tree `git init` already makes nearly free. Note the two loops are
+    different: skeletor's tier maintains *this repo*; the ratchet governs
+    *generated prototypes*. They share primitives, not a schedule.
 
 - **2026-09-04 — the CI matrix went 3.11–3.14 → 3.11 + 3.14, measured rather
   than argued.** The question was whether four versions were worth maintaining.
