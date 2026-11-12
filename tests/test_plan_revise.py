@@ -1042,3 +1042,24 @@ def test_when_the_only_researched_topic_cites_nothing_again_the_plan_is_stamped_
     assert (plan.researched, plan.sources) == (False, [])
     assert render.NOT_RESEARCHED in entry(tree) and "Partly researched" not in entry(tree)
     assert f"{render.NOT_RESEARCHED} Research ran and cited no page it fetched." in entry(tree, "topics/members.md")
+
+
+# -- what a stop nobody planned for says ----------------------------------
+
+
+def test_a_bug_in_a_verb_that_revises_says_to_read_the_plan_before_rerunning(tmp_path, monkeypatch):
+    tree = offline_plan(tmp_path / "tree")
+
+    def broken(*_: object):
+        raise KeyError("a bug")
+
+    monkeypatch.setattr(revising, "dropped", broken)
+    result = invoke("topic", "drop", "scope", "--why", "No.", "--offline", "--dir", str(tree))
+    assert result.exit_code == 1
+    assert "Something unexpected stopped this" in said(result) and "Read PLAN.md" in said(result)
+    assert "proto dream" not in said(result)
+
+
+def test_the_drop_rule_names_a_topic_the_plan_does_not_hold():
+    with pytest.raises(ValueError, match="no topic 'ghost'"):
+        revising.dropped(baseline.build_plan(IDEA), "ghost", "No.")

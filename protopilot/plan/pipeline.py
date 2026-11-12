@@ -20,6 +20,10 @@ pass that returns nothing a plan can hold leaves no tree at all.
 Dreaming is the exception, because dreams are extras. A plan keeps going when its
 dreaming fails, and `dreams.md` says so. `dream_round`, `promote` and `drop` work on a
 plan that is already green, and change nothing unless the result is green too.
+
+So do the verbs that revise a plan: `answer`, `rename_topic`, `drop_topic`, `add_topic`
+and `research_topic`. Each changes one thing, goes through `_held` and `_land`, and
+writes no other topic.
 """
 
 from __future__ import annotations

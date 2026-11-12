@@ -301,15 +301,23 @@ def _dream_llm(offline: bool, backend: str | None):
         raise click.ClickException(str(exc)) from exc
 
 
-def _dream_options(command):
-    """The flags every dream verb that may call a model takes, spelt as `proto plan` spells them."""
-    command = click.option("--offline", is_flag=True, help="Deterministic templates; no API calls.")(command)
-    return click.option(
-        "--backend",
-        type=click.Choice(["api", "claude-code", "offline"]),
-        default=None,
-        help="api bills API credit; claude-code bills a Claude subscription.",
-    )(command)
+def _backend_options(offline_help: str):
+    """The flags every verb that may call a model takes, spelt as `proto plan` spells them."""
+
+    def decorate(command):
+        command = click.option("--offline", is_flag=True, help=offline_help)(command)
+        return click.option(
+            "--backend",
+            type=click.Choice(["api", "claude-code", "offline"]),
+            default=None,
+            help="api bills API credit; claude-code bills a Claude subscription.",
+        )(command)
+
+    return decorate
+
+
+_dream_options = _backend_options("Deterministic templates; no API calls.")
+_revise_options = _backend_options("The deterministic twin; no API calls.")
 
 
 @main.group(name="dream", cls=_DreamCommand)
@@ -438,7 +446,7 @@ def topic_rename_command(slug: str, title: str, directory: str) -> None:
 @click.argument("slug", metavar="SLUG")
 @click.option("--why", required=True, help="What ruled it out; it stays in the plan.")
 @click.option("--dir", "directory", default=".", help="Plan directory (default: cwd).")
-@_dream_options
+@_revise_options
 def topic_drop_command(slug: str, why: str, directory: str, offline: bool, backend: str | None) -> None:
     """Rule out topic SLUG, with what pointed at it: its links, its step, its sources nothing else cites.
 
@@ -457,7 +465,7 @@ def topic_drop_command(slug: str, why: str, directory: str, offline: bool, backe
 @click.argument("title", metavar="TITLE")
 @click.option("--why", required=True, help="One line on why it matters to the idea.")
 @click.option("--dir", "directory", default=".", help="Plan directory (default: cwd).")
-@_dream_options
+@_revise_options
 def topic_add_command(title: str, why: str, directory: str, offline: bool, backend: str | None) -> None:
     """Add the topic TITLE to a plan, connected and verified.
 
@@ -479,12 +487,12 @@ def topic_add_command(title: str, why: str, directory: str, offline: bool, backe
     help="Give this one call the findings and pages of the next --depth up. The plan's depth is not changed.",
 )
 @click.option("--dir", "directory", default=".", help="Plan directory (default: cwd).")
-@_dream_options
+@_backend_options("Refused: research reads the web, and offline reads nothing.")
 def research_command(slug: str, deeper: bool, directory: str, offline: bool, backend: str | None) -> None:
-    """Research topic SLUG of a plan again, on the web, and replace what it found.
+    """Research topic SLUG of a plan on the web, and replace what it had found.
 
     One research call on the claude-code backend, then the topic's links and notes are
-    fitted again; no other topic is written. Its earlier transcript stays beside the new
+    fitted again; no other topic is written. An earlier transcript stays beside the new
     one. It does not run offline, and a try that stopped after its call is replayed.
     """
     from protopilot.plan import pipeline
