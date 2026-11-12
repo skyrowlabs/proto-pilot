@@ -82,3 +82,26 @@ def test_rm_refuses_an_older_prototype_and_says_what_to_run_instead(tmp_path, no
     assert result.exit_code != 0
     assert "prototype from an older proto.pilot" in said(result) and "docker compose down -v" in said(result)
     assert (old / ".protopilot" / "spec.json").exists() and [e.slug for e in registry.load()] == ["gearlist"]
+
+
+def test_rm_refuses_a_plan_beside_an_older_prototypes_spec_and_keeps_both(plan_tree, no_docker):
+    (plan_tree / ".protopilot" / "spec.json").write_text("{}")
+    result = CliRunner().invoke(cli.main, ["rm", "--dir", str(plan_tree), "--yes"])
+    assert result.exit_code == 1 and "prototype from an older proto.pilot" in said(result)
+    assert (plan_tree / ".protopilot" / "plan.json").exists() and [e.kind for e in registry.load()] == ["plan"]
+
+
+def test_rm_tells_a_stranger_it_is_not_a_plan_and_names_no_docker_command(tmp_path, no_docker):
+    stranger = tmp_path / "stranger"
+    (stranger / "src").mkdir(parents=True)
+    result = CliRunner().invoke(cli.main, ["rm", "--dir", str(stranger), "--yes"])
+    assert result.exit_code == 1 and (stranger / "src").exists()
+    assert "is not a plan (no .protopilot/plan.json); nothing was deleted" in said(result)
+    assert "docker" not in said(result)
+
+
+def test_rm_with_no_dir_deletes_the_plan_it_is_run_inside(plan_tree, no_docker, monkeypatch):
+    monkeypatch.chdir(plan_tree)
+    result = CliRunner().invoke(cli.main, ["rm", "--yes"])
+    assert result.exit_code == 0, result.output
+    assert (plan_tree.exists(), registry.load()) == (False, [])

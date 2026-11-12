@@ -164,3 +164,46 @@ def test_a_red_run_names_the_stage_and_points_at_the_runbook():
     )
     text = "\n".join(lines(p))
     assert "red at browser" in text and "RUNBOOK.md" in text
+
+
+def test_each_pass_is_drawn_with_its_state_and_the_files_it_wrote():
+    p = fold(
+        [
+            PLAN,
+            {"kind": "pass_done", "name": "schema", "files": ["PLAN.md", "topics/a.md"]},
+            {"kind": "pass_started", "name": "smoke"},
+        ]
+    )
+    assert lines(p) == ["passes  1/3", "  ✓ schema  PLAN.md, topics/a.md", "  ▸ smoke", "  · seed"]
+
+
+def test_a_failed_pass_is_drawn_apart_from_a_done_one():
+    p = fold([PLAN, {"kind": "pass_failed", "name": "smoke", "error": "boom"}])
+    assert lines(p)[1:] == ["  · schema", "  ✗ smoke", "  · seed"]
+
+
+@pytest.mark.parametrize(
+    ("events", "line"),
+    [
+        ([{"kind": "verify_started", "attempt": 1, "of": 3}], "verify  attempt 1 of 3: running"),
+        (
+            [{"kind": "verify_started", "attempt": 2, "of": 3}, {"kind": "verify_passed", "attempt": 2}],
+            "verify  attempt 2 of 3: green",
+        ),
+        (
+            [
+                {"kind": "verify_started", "attempt": 1, "of": 3},
+                {"kind": "verify_failed", "attempt": 1, "stage": "no_cycles"},
+            ],
+            "verify  attempt 1 of 3: red at no_cycles",
+        ),
+    ],
+    ids=["running", "green", "red"],
+)
+def test_the_verify_line_says_which_attempt_and_how_it_stands(events: list[dict], line: str):
+    assert lines(fold(events)) == [line]
+
+
+def test_a_finished_green_run_ends_with_its_attempts_and_nothing_about_running_it():
+    rendered = lines(fold([{"kind": "finished", "ok": True, "attempts": 2, "project_dir": "/w/n", "run_hint": "make"}]))
+    assert rendered == ["", "green in 2 attempt(s)", "", "/w/n"]

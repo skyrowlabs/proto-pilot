@@ -8,6 +8,8 @@ still asks through those names.
 
 from __future__ import annotations
 
+import sys
+
 import pytest
 from click.testing import CliRunner
 
@@ -85,3 +87,41 @@ def test_a_backend_that_answers_is_reported_with_the_model_it_would_use(doctor):
     the next `proto plan` will actually spend."""
     output = doctor().output
     assert "ok   api credit: reachable (model claude-test, effort low)" in output
+
+
+# ── the SDK check ────────────────────────────────────────────────────────
+
+
+@pytest.fixture()
+def no_sdk(monkeypatch):
+    """`import anthropic` raises ImportError, as on a machine without the SDK."""
+    monkeypatch.setitem(sys.modules, "anthropic", None)
+
+
+def test_a_missing_sdk_is_fatal_even_when_both_backends_answer(doctor, no_sdk):
+    result = doctor()
+
+    assert result.exit_code == 1
+    assert "FAIL anthropic sdk: not installed (`pip install anthropic`)" in result.output
+    assert "FAIL no backend" not in result.output and "ok   subscription" in result.output
+    assert result.output.rstrip().splitlines()[-1].startswith("not ready")
+
+
+def test_a_missing_sdk_and_no_backend_are_reported_as_two_failures(doctor, no_sdk, monkeypatch):
+    monkeypatch.setattr(product_cli, "ClaudeLLM", lambda: UnreachableBackend())
+    monkeypatch.setattr(product_cli, "ClaudeCodeLLM", lambda: UnreachableBackend())
+
+    result = doctor()
+
+    assert result.exit_code == 1
+    assert [line.split(":")[0] for line in result.output.splitlines() if line.startswith("FAIL")] == [
+        "FAIL anthropic sdk",
+        "FAIL no backend",
+    ]
+
+
+def test_an_installed_sdk_and_a_backend_read_ready(doctor):
+    result = doctor()
+    assert result.exit_code == 0, result.output
+    assert "ok   anthropic sdk: installed" in result.output
+    assert result.output.rstrip().splitlines()[-1] == "ready"

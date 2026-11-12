@@ -150,3 +150,34 @@ def test_save_leaves_no_partial_file_behind(tmp_path):
     registry.record(slug="a", name="A", path=tmp_path / "a")
     folder = registry.registry_path().parent
     assert sorted(p.name for p in folder.iterdir() if not p.name.endswith(".lock")) == ["projects.json"]
+
+
+# ── rows that are not rows ───────────────────────────────────────────
+
+
+def test_load_skips_what_is_not_a_row_and_keeps_the_rows_around_it(tmp_path):
+    plan = make_plan(tmp_path / "plan")
+    good = {"slug": "plan", "name": "Plan", "path": str(plan), "created_at": "x", "kind": "plan"}
+    rows = ["a string", 7, None, {"slug": "no_path", "name": "N", "created_at": "x"}, good]
+    registry.registry_path().write_text(json.dumps(rows))
+    assert [(e.slug, e.port, e.exists) for e in registry.load()] == [("plan", None, True)]
+    listed = CliRunner().invoke(cli.main, ["ls"])
+    assert listed.exit_code == 0 and "1 plan(s)" in listed.output
+
+
+@pytest.mark.parametrize("content", ['{"slug": "s"}', '"projects"', "null", "3"])
+def test_a_registry_that_is_not_a_list_reads_as_empty_and_the_next_plan_still_registers(tmp_path, content: str):
+    registry.registry_path().parent.mkdir(parents=True, exist_ok=True)
+    registry.registry_path().write_text(content)
+    assert registry.load() == []
+    make_plan(tmp_path / "plan")
+    assert [e.kind for e in registry.load()] == ["plan"]
+
+
+def test_a_key_this_version_does_not_know_is_dropped_on_save_and_its_row_is_kept(tmp_path):
+    odd = make_plan(tmp_path / "odd")
+    write_raw([{"slug": "odd", "name": "Odd", "path": str(odd), "created_at": "x", "kind": "plan", "later": 1}])
+    registry.record(slug="other", name="Other", path=tmp_path / "other")
+    saved = {row["slug"]: row for row in json.loads(registry.registry_path().read_text())}
+    assert set(saved) == {"odd", "other"}
+    assert "later" not in saved["odd"] and saved["odd"]["port"] is None
