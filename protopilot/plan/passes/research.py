@@ -13,6 +13,7 @@ The offline twin cannot read the web, so it records nothing and the plan stays s
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from typing import cast
@@ -94,6 +95,11 @@ def build(plan: Plan, topic: Topic) -> tuple[str, str]:
         "## The plan's other topics, for context only\n\n```json\n" + json.dumps(others, ensure_ascii=False) + "\n```",
     ]
     return system, "\n\n".join(blocks)
+
+
+def asked(plan: Plan, topic: Topic) -> str:
+    """A fingerprint of what a call for `topic` is asked, whatever its depth: the scope, the topic, the others."""
+    return hashlib.sha256(build(plan, topic)[1].encode("utf-8")).hexdigest()
 
 
 def offline(plan: Plan) -> Plan:

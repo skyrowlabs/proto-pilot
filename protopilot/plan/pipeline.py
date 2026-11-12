@@ -870,6 +870,8 @@ def add_topic(job, tree: Path, title: str, why: str, llm: LLM) -> verify.PlanVer
     except ValueError as exc:
         raise PlanRefused(f"Nothing was changed: {exc}.") from exc
     new = grown.topics[-1]
+    # No topic held this slug until now, so a mark for it is a dropped topic's and must never be replayed.
+    ledger.forget_pending(tree, new.slug)
     names = [promote_pass.NAME, RENDER]
     job.event("plan", passes=names)
     if note:
@@ -884,19 +886,26 @@ def add_topic(job, tree: Path, title: str, why: str, llm: LLM) -> verify.PlanVer
     return verdict
 
 
-def _research_try(plan: Plan, asking: Plan, tree: Path, slug: str) -> tuple[int, Plan, bool]:
-    """The transcript number a research of `slug` uses, the plan to ask with, and whether it replays a stopped try.
+def _research_try(plan: Plan, asking: Plan, tree: Path, topic: Topic) -> tuple[int, Plan, str]:
+    """The transcript number a research of `topic` uses, the plan to ask with, and why a stopped try is not replayed.
 
-    A stopped try is replayed at the depth it was asked at, unless this one asks for more than it
-    read. Anything else is a new call, numbered past every transcript the topic has on disk.
+    A stopped try is replayed, with no reason given, at the depth it was asked at, unless this run
+    asks for more than it read or anything else it was asked has changed. Any other call is new,
+    numbered past every transcript the topic has on disk, and "" then means no try was left.
     """
-    record = plan.research_of(slug)
+    record = plan.research_of(topic.slug)
     since = record.transcript if record else ""
-    left = ledger.pending(tree, slug, since)
+    fresh = ledger.next_number(tree, topic.slug, ledger.transcript_number(since, topic.slug))
+    mark = ledger.pending(tree, topic.slug)
+    if mark is None:
+        return fresh, asking, ""
     depths = list(research.EFFORT)
-    if left and left[1] in depths and depths.index(left[1]) >= depths.index(asking.depth or DEFAULT_DEPTH):
-        return left[0], plan.revised(depth=left[1]), True
-    return ledger.next_number(tree, slug, ledger.transcript_number(since, slug)), asking, False
+    why = ledger.stale(mark, tree, topic.slug, since, research.asked(plan, topic))
+    if not why and mark.depth not in depths:
+        why = "its mark names no depth research has"
+    if not why and depths.index(mark.depth) < depths.index(asking.depth or DEFAULT_DEPTH):
+        why = f"it read at depth {mark.depth}, and this run asks for more"
+    return (fresh, asking, why) if why else (mark.number, plan.revised(depth=mark.depth), "")
 
 
 def _researched_again(
@@ -907,8 +916,8 @@ def _researched_again(
     current = plan.research_of(topic.slug)
     after, record, replayed = _asked(asking, llm, tree, topic, number)
     if not replayed:
-        since = current.transcript if current else ""
-        ledger.save_pending(tree, topic.slug, number, asking.depth or DEFAULT_DEPTH, since)
+        since, depth = current.transcript if current else "", asking.depth or DEFAULT_DEPTH
+        ledger.save_pending(tree, topic.slug, number, depth, since, record.sha256, research.asked(plan, topic))
     records = [record if r.topic == topic.slug else r for r in plan.research] if current else [*plan.research, record]
     after = revising.without_orphans(plan, after.revised(depth=plan.depth, research=records), topic.slug)
     # `researched` follows the records, so a topic that cited nothing this time cannot keep the plan's stamp.
@@ -920,6 +929,18 @@ def _researched_again(
     return after, [f"{ledger.RESEARCH_DIR}/{record.transcript}"]
 
 
+#: Said when a try stops after its call. The conditions are `_research_try`'s.
+KEPT = (
+    " Its transcript is kept, and a rerun replays it instead of asking again, unless that rerun asks "
+    "for more depth or the plan has changed what research would be asked."
+)
+#: Said when the transcript a mark named could not be used, so nothing promises a replay that cannot happen.
+UNREPLAYABLE = (
+    " That was a replay of the transcript an earlier try left, and it cannot be used. It stays on disk, "
+    "and the next run asks again."
+)
+
+
 def _fitted(job, module, plan: Plan, llm: LLM, names: list[str], slug: str) -> Plan:
     return _pass(job, module.NAME, names, lambda: (run_pass(module, plan, llm, only=slug), []))
 
@@ -929,7 +950,7 @@ def research_topic(job, tree: Path, slug: str, llm: LLM, deeper: bool = False) -
 
     Its links and its notes are fitted again, and no other topic is written. `deeper` gives this
     one call the next depth's effort and stores nothing. A try that stopped after its call left a
-    transcript, and a rerun replays it.
+    marked transcript, and a rerun replays it while what it was asked still holds.
     """
     tree = Path(tree)
     job.project_dir = str(tree)
@@ -944,18 +965,24 @@ def research_topic(job, tree: Path, slug: str, llm: LLM, deeper: bool = False) -
             f"This plan is at depth {plan.depth}, the most research reads, so --deeper has nothing to add. "
             "Rerun without it. No model was called."
         )
-    number, asking, _ = _research_try(plan, plan.revised(depth=further) if further else plan, tree, slug)
+    number, asking, why_new = _research_try(plan, plan.revised(depth=further) if further else plan, tree, topic)
+    replaying = ledger.read_transcript(tree, slug, number) is not None
     names = [research.NAME, connect.NAME, consider.NAME, RENDER]
     job.event("plan", passes=names)
+    if why_new:
+        job.log(f"  the transcript an earlier try left is not replayed, because {why_new}; asking again")
     try:
         after = _pass(job, research.NAME, names, lambda: _researched_again(job, plan, asking, llm, tree, topic, number))
+    except (LLMError, PlanPassError, ValueError) as exc:
+        if replaying:
+            ledger.forget_pending(tree, slug)  # or every rerun would replay it, and fail the same way
+        left = UNREPLAYABLE if replaying else ""
+        raise PlanRefused(f"{slug} was not researched, and nothing was changed: {_short(exc)}.{left}") from exc
+    try:
         for module in (connect, consider):
             after = _fitted(job, module, after, llm, names, slug)
     except (LLMError, PlanPassError, ValueError) as exc:
-        record = plan.research_of(slug)
-        kept = ledger.pending(tree, slug, record.transcript if record else "") is not None
-        left = " Its transcript is kept, and a rerun replays it instead of asking again." if kept else ""
-        raise PlanRefused(f"{slug} was not researched, and nothing was changed: {_short(exc)}.{left}") from exc
+        raise PlanRefused(f"{slug} was not researched, and nothing was changed: {_short(exc)}.{KEPT}") from exc
     verdict = _land(job, tree, plan, repaired(job, after, llm, plan, frozenset({slug})), names)
     ledger.forget_pending(tree, slug)
     if verdict.ok:

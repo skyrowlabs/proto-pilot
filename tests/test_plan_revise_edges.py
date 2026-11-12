@@ -561,7 +561,9 @@ def test_a_mark_names_the_one_transcript_to_replay_when_a_later_one_lies_beside_
     tree = researched_plan(tmp_path / "tree")
     ledger.write_transcript(tree, "members", AGAIN, 9)
     ledger.write_transcript(tree, "members", THIRD, 10)
-    ledger.save_pending(tree, "members", 9, "standard", "members.jsonl")
+    plan = Plan.load(tree)
+    asked = research.asked(plan, plan.topics[0])
+    ledger.save_pending(tree, "members", 9, "standard", "members.jsonl", ledger.digest(AGAIN), asked)
     assert pipeline.research_topic(job_for(), tree, "members", NeverAsked(refit())).ok
     plan = Plan.load(tree)
     record = plan.research_of("members")
@@ -591,7 +593,7 @@ def test_a_deeper_try_that_stopped_is_replayed_by_a_deeper_rerun(tmp_path):
     assert (len(plan.topics[0].findings), plan.depth) == (most, "shallow")
 
 
-def test_the_verbs_that_revise_other_topics_leave_a_stopped_try_as_it_was(tmp_path):
+def test_the_verbs_that_revise_other_topics_leave_a_stopped_trys_files_as_they_were(tmp_path):
     tree = researched_plan(tmp_path / "tree")
     Plan.load(tree).revised(questions=["Who runs it?"]).save(tree)
     assert pipeline.rerender(job_for(), tree).ok
@@ -602,7 +604,8 @@ def test_the_verbs_that_revise_other_topics_leave_a_stopped_try_as_it_was(tmp_pa
     assert pipeline.add_topic(job_for(), tree, "Insurance", "It matters.", FakeLLM([BARE])).ok
     assert pipeline.drop_topic(job_for(), tree, "safety", "Later.", pipeline.OfflineLLM).ok
     assert [name for name in changed(before, snapshot(tree)) if name.startswith(ledger.RESEARCH_DIR)] == []
-    assert pipeline.research_topic(job_for(), tree, "members", NeverAsked(refit())).ok
+    # Each of them changed what a research of members is asked, so the try is evidence now and not a replay.
+    assert asked_again(tree) == (["members"], "members.3.jsonl")
 
 
 def test_a_drop_that_is_put_back_keeps_the_topics_mark_and_one_that_lands_removes_it(tmp_path, monkeypatch):

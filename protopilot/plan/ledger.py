@@ -11,7 +11,8 @@ not the page, so a citation shows that summary was read, never that a claim is i
 The transcripts live in `.protopilot/research/`, beside the reviewed outline a resumed
 run starts from. A topic researched again gets a numbered transcript beside its first,
 and its record names the one that counts. A try that has not landed is marked
-`<slug>.pending.json`, and only a marked transcript is replayed. `reconciled` redraws each record's fetches
+`<slug>.pending.json`, and only a marked transcript is replayed, and only while its
+hash and what it was asked still hold. `reconciled` redraws each record's fetches
 from that transcript, so a `fetched: true` typed into plan.json, or a fetch typed into
 the ledger, earns nothing, and a record cannot borrow another topic's transcript.
 A forged transcript is beyond any check here. `normal` keeps http/https, `www.`, `:443`
@@ -25,6 +26,7 @@ import json
 import re
 from contextlib import suppress
 from pathlib import Path
+from typing import NamedTuple
 from urllib.parse import urlsplit, urlunsplit
 
 from protopilot.llm import LLMError, stream_events
@@ -164,30 +166,56 @@ def _pending_path(tree: Path, slug: str) -> Path:
     return research_dir(tree) / f"{slug}.pending.json"
 
 
-def save_pending(tree: Path, slug: str, number: int, depth: str, since: str) -> None:
-    """Mark transcript `number` as a try not yet landed: the depth it was asked at, and the transcript it would replace."""
+class Mark(NamedTuple):
+    """What `<slug>.pending.json` says of a try not yet landed. Every field is typed by nobody we trust."""
+
+    number: int
+    depth: str
+    since: str
+    sha256: str
+    asked: str
+
+
+def save_pending(tree: Path, slug: str, number: int, depth: str, since: str, sha256: str = "", asked: str = "") -> None:
+    """Mark transcript `number` as a try not yet landed.
+
+    The mark holds the depth asked, the transcript the try would replace, the transcript's
+    hash, and a fingerprint of what was asked, so a rerun can tell whether it is the same try.
+    """
     path = _pending_path(tree, slug)
+    said = {"number": number, "depth": depth, "since": since, "sha256": sha256, "asked": asked}
     temp = path.with_name(f".{path.name}.tmp")
-    temp.write_text(json.dumps({"number": number, "depth": depth, "since": since}) + "\n", encoding="utf-8")
+    temp.write_text(json.dumps(said) + "\n", encoding="utf-8")
     temp.replace(path)
 
 
-def pending(tree: Path, slug: str, since: str) -> tuple[int, str] | None:
-    """The number and depth of the try `slug` left unlanded, if its transcript is there and it began from `since`.
-
-    Only a marked transcript is one to replay: any other on disk is evidence of an earlier
-    state, a dropped topic's included, and a new call is numbered past it.
-    """
+def pending(tree: Path, slug: str) -> Mark | None:
+    """The mark `slug` holds, as written, or None if there is none that can be read. Judging it is `stale`'s."""
     path = _pending_path(tree, slug)
     if path.is_symlink() or not path.is_file():
         return None
     try:
         said = json.loads(path.read_text(encoding="utf-8"))
-        number, depth = int(said["number"]), str(said["depth"])
-        fresh = said["since"] == since and number > transcript_number(since, slug)
-    except (ValueError, KeyError, TypeError):
+        fields = (said["depth"], said["since"], said.get("sha256", ""), said.get("asked", ""))
+        return Mark(int(said["number"]), *(str(field) for field in fields))
+    except (ValueError, KeyError, TypeError, AttributeError):
         return None
-    return (number, depth) if fresh and read_transcript(tree, slug, number) is not None else None
+
+
+def stale(mark: Mark, tree: Path, slug: str, since: str, asked: str) -> str:
+    """Why `mark`'s transcript is not this try's to replay, or an empty string.
+
+    Only a marked transcript is one to replay. Any other on disk is evidence of an earlier
+    state, a dropped topic's included, and a new call is numbered past it.
+    """
+    if not (mark.sha256 and mark.asked):
+        return "its mark does not say what was asked"
+    if mark.since != since or mark.number <= transcript_number(since, slug):
+        return "it was made before this topic's research last changed"
+    said = read_transcript(tree, slug, mark.number)
+    if said is None or digest(said) != mark.sha256:
+        return "its transcript is missing or was altered"
+    return "" if mark.asked == asked else "what research would be asked has changed since"
 
 
 def forget_pending(tree: Path, slug: str) -> None:
