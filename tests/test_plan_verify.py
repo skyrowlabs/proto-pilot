@@ -85,6 +85,7 @@ def leaked(text: str, **dream_changes: object) -> Plan:
     return plan.revised(topics=[first, *plan.topics[1:]])
 
 
+GONE = {"slug": "gone", "title": "Gone", "why": "Ruled out."}
 OVER_CAP = " ".join(["word"] * (DREAM_WORD_CAP + 1))
 
 PLANTS = {
@@ -129,6 +130,7 @@ PLANTS = {
         "ghost-anchor": lambda: full().revised(dreams=[dream(anchor="ghost")]),
         "no-verdict": lambda: full().revised(dreams=[dream(verdict=None)]),
         "over-the-cap": lambda: full().revised(dreams=[dream(takes=OVER_CAP)]),
+        "on-offer-from-a-dropped-topic": lambda: full().revised(dropped_topics=[GONE], dreams=[dream(anchor="gone")]),
     },
     "dreams_apart": {
         "what-if-copied": lambda: leaked(WHAT_IF),
@@ -521,3 +523,16 @@ def test_a_joined_up_dream_cannot_hide_from_the_cap():
 def test_the_green_line_says_dreams_are_not_findings_only_when_a_dream_check_held():
     assert "Dreams are guesses" in judged(full()).summary
     assert "Dreams are guesses" not in judged(full().revised(dreams=[])).summary
+
+
+@pytest.mark.parametrize("verdict", verify.SETTLED_VERDICTS)
+def test_a_dream_no_longer_on_offer_may_keep_the_anchor_of_a_dropped_topic(verdict):
+    promoted_to = "scope" if verdict == "promoted" else ""
+    kept = dream(anchor="gone", verdict=verdict, promoted_to=promoted_to)
+    result = judged(full().revised(dropped_topics=[GONE], dreams=[kept]))
+    assert states(result)["dreams_shaped"] == verify.PASSED
+
+
+def test_a_dropped_slug_a_live_topic_holds_again_is_an_anchor_like_any_other():
+    back = {"slug": "audience", "title": "Who it is for", "why": "Ruled out."}
+    assert states(judged(full().revised(dropped_topics=[back])))["dreams_shaped"] == verify.PASSED

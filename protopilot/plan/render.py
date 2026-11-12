@@ -142,6 +142,7 @@ def _plan_page(plan: Plan, verified: bool) -> str:
         scope.insert(0, f"**Direction:** {plan.direction}")
     topic_map = [f"[{t.title}]({_topic_file(t.slug)}): {t.why}" for t in plan.topics]
     steps = [f"{n}. **{titles.get(s.topic, s.topic)}:** {s.action} {s.why}" for n, s in enumerate(plan.steps, start=1)]
+    dropped = [f"{t.title} (`{t.slug}`): {t.why}" for t in plan.dropped_topics]
     return _page(
         f"# {plan.title}",
         _stamp(plan),
@@ -153,6 +154,11 @@ def _plan_page(plan: Plan, verified: bool) -> str:
         f"## Topic map\n\n{_bullets(topic_map)}",
         f"## How the topics connect\n\n{_bullets([_edge_line(e, titles) for e in _edges(plan)])}",
         "## Where to start\n\n" + ("\n".join(steps) or "None recorded."),
+        (
+            f"## Dropped topics\n\nA person ruled these out, and the reason is kept.\n\n{_bullets(dropped)}"
+            if dropped
+            else ""
+        ),
         f"Extensions of the idea are kept apart, in [{DREAMS_FILE}]({DREAMS_FILE}).",
     )
 
@@ -220,7 +226,8 @@ def _dream_order(dream: Dream) -> tuple[int, str, str]:
 
 
 def _dreams_page(plan: Plan) -> str:
-    titles = {t.slug: t.title for t in plan.topics}
+    titles = {t.slug: f"{t.title} (a dropped topic)" for t in plan.dropped_topics}
+    titles.update({t.slug: t.title for t in plan.topics})
     dreams = sorted(plan.dreams, key=_dream_order)
     sections = (
         ("Proposals", "proposed"),

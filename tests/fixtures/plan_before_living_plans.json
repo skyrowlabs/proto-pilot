@@ -1,0 +1,336 @@
+{
+  "slug": "community_tool_library",
+  "title": "Start a community tool library",
+  "idea": "start a community tool library",
+  "direction": "volunteer run",
+  "goal": "Decide.",
+  "audience": "Neighbours",
+  "horizon": "A year",
+  "constraints": [
+    "volunteer run",
+    "One town."
+  ],
+  "questions": [
+    "Who runs it?"
+  ],
+  "researched": true,
+  "depth": "standard",
+  "topics": [
+    {
+      "slug": "members",
+      "title": "Members",
+      "why": "members matters",
+      "findings": [
+        {
+          "text": "Most tool libraries carry liability cover.",
+          "assumption": false,
+          "source_ids": [
+            "s1"
+          ]
+        },
+        {
+          "text": "Volunteers will turn up every week.",
+          "assumption": true,
+          "source_ids": []
+        },
+        {
+          "text": "A shed can hold the first hundred tools.",
+          "assumption": true,
+          "source_ids": []
+        }
+      ],
+      "risks": [
+        "r"
+      ],
+      "unknowns": [
+        "u?"
+      ],
+      "decisions": [
+        "d"
+      ]
+    },
+    {
+      "slug": "lending",
+      "title": "Lending",
+      "why": "lending matters",
+      "findings": [
+        {
+          "text": "Loans run a week.",
+          "assumption": false,
+          "source_ids": [
+            "s2"
+          ]
+        },
+        {
+          "text": "Volunteers will turn up every week.",
+          "assumption": true,
+          "source_ids": []
+        }
+      ],
+      "risks": [
+        "r"
+      ],
+      "unknowns": [
+        "u?"
+      ],
+      "decisions": [
+        "d"
+      ]
+    },
+    {
+      "slug": "space",
+      "title": "Space",
+      "why": "space matters",
+      "findings": [
+        {
+          "text": "Volunteers will turn up every week.",
+          "assumption": true,
+          "source_ids": []
+        }
+      ],
+      "risks": [
+        "r"
+      ],
+      "unknowns": [
+        "u?"
+      ],
+      "decisions": [
+        "d"
+      ]
+    },
+    {
+      "slug": "tools",
+      "title": "Tools",
+      "why": "tools matters",
+      "findings": [],
+      "risks": [
+        "r"
+      ],
+      "unknowns": [
+        "u?"
+      ],
+      "decisions": [
+        "d"
+      ]
+    },
+    {
+      "slug": "money",
+      "title": "Money",
+      "why": "money matters",
+      "findings": [
+        {
+          "text": "Most tool libraries carry liability cover.",
+          "assumption": false,
+          "source_ids": [
+            "s1"
+          ]
+        },
+        {
+          "text": "Volunteers will turn up every week.",
+          "assumption": true,
+          "source_ids": []
+        },
+        {
+          "text": "A shed can hold the first hundred tools.",
+          "assumption": true,
+          "source_ids": []
+        }
+      ],
+      "risks": [
+        "r"
+      ],
+      "unknowns": [
+        "u?"
+      ],
+      "decisions": [
+        "d"
+      ]
+    },
+    {
+      "slug": "safety",
+      "title": "Safety",
+      "why": "safety matters",
+      "findings": [
+        {
+          "text": "Most tool libraries carry liability cover.",
+          "assumption": false,
+          "source_ids": [
+            "s1"
+          ]
+        },
+        {
+          "text": "Volunteers will turn up every week.",
+          "assumption": true,
+          "source_ids": []
+        },
+        {
+          "text": "A shed can hold the first hundred tools.",
+          "assumption": true,
+          "source_ids": []
+        }
+      ],
+      "risks": [
+        "r"
+      ],
+      "unknowns": [
+        "u?"
+      ],
+      "decisions": [
+        "d"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from_topic": "lending",
+      "to_topic": "members",
+      "kind": "depends-on"
+    },
+    {
+      "from_topic": "money",
+      "to_topic": "space",
+      "kind": "informs"
+    }
+  ],
+  "steps": [
+    {
+      "topic": "members",
+      "action": "Work on members.",
+      "why": "It comes now."
+    }
+  ],
+  "dreams": [
+    {
+      "id": "d1",
+      "title": "Seeds too",
+      "what_if": "the library lent seeds as well as saws",
+      "lens": "who-else",
+      "anchor": "members",
+      "takes": "A shelf.",
+      "verdict": "proposed",
+      "reason": "d1 decided.",
+      "if_adopted": "d1 changes the first step.",
+      "pull": "high",
+      "reach": "low",
+      "cost": "medium",
+      "fit": "high",
+      "promoted_to": ""
+    },
+    {
+      "id": "d2",
+      "title": "Bread too",
+      "what_if": "the library lent bread as well as saws",
+      "lens": "the-opposite",
+      "anchor": "members",
+      "takes": "A shelf.",
+      "verdict": "set-aside",
+      "reason": "d2 decided.",
+      "if_adopted": "",
+      "pull": "high",
+      "reach": "low",
+      "cost": "medium",
+      "fit": "high",
+      "promoted_to": ""
+    }
+  ],
+  "sources": [
+    {
+      "id": "s1",
+      "title": "A guide",
+      "url": "https://example.org/tool-libraries",
+      "fetched": true
+    },
+    {
+      "id": "s2",
+      "title": "Cover",
+      "url": "https://example.net/insurance",
+      "fetched": true
+    }
+  ],
+  "research": [
+    {
+      "topic": "members",
+      "state": "researched",
+      "failure": "",
+      "transcript": "members.jsonl",
+      "sha256": "b146f34a6e938df2a9bf2abbc937f405acaccb384c2ef61c2acb6b5c2a9cd806",
+      "fetches": [
+        {
+          "url": "https://example.org/tool-libraries",
+          "usable": true,
+          "why": ""
+        }
+      ],
+      "unfetched": []
+    },
+    {
+      "topic": "lending",
+      "state": "researched",
+      "failure": "",
+      "transcript": "lending.jsonl",
+      "sha256": "36fedf8e35f85172299dec80a766e13633c6fd5b87143d591a1c69fba0478780",
+      "fetches": [
+        {
+          "url": "https://example.net/insurance",
+          "usable": true,
+          "why": ""
+        }
+      ],
+      "unfetched": []
+    },
+    {
+      "topic": "space",
+      "state": "nothing cited",
+      "failure": "",
+      "transcript": "space.jsonl",
+      "sha256": "0fffc61773cef205be4e033c86fd5c7f1ab2faa852c4f04fbed0c6b25db65356",
+      "fetches": [
+        {
+          "url": "https://x.test/403",
+          "usable": false,
+          "why": "HTTP 403"
+        }
+      ],
+      "unfetched": []
+    },
+    {
+      "topic": "tools",
+      "state": "failed",
+      "failure": "timed out",
+      "transcript": "",
+      "sha256": "",
+      "fetches": [],
+      "unfetched": []
+    },
+    {
+      "topic": "money",
+      "state": "researched",
+      "failure": "",
+      "transcript": "money.jsonl",
+      "sha256": "b146f34a6e938df2a9bf2abbc937f405acaccb384c2ef61c2acb6b5c2a9cd806",
+      "fetches": [
+        {
+          "url": "https://example.org/tool-libraries",
+          "usable": true,
+          "why": ""
+        }
+      ],
+      "unfetched": []
+    },
+    {
+      "topic": "safety",
+      "state": "researched",
+      "failure": "",
+      "transcript": "safety.jsonl",
+      "sha256": "b146f34a6e938df2a9bf2abbc937f405acaccb384c2ef61c2acb6b5c2a9cd806",
+      "fetches": [
+        {
+          "url": "https://example.org/tool-libraries",
+          "usable": true,
+          "why": ""
+        }
+      ],
+      "unfetched": []
+    }
+  ]
+}

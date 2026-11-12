@@ -1,12 +1,12 @@
-"""A topic a person promoted from a dream -> connected and considered, and nothing else moved.
+"""A topic a person promoted from a dream, or added -> connected and considered, and nothing else moved.
 
 The new topic is always the plan's last. Its links and notes come from one call, and
 every link must touch it, so what the plan had settled stays settled. A link that
 breaks the order or closes a loop is the verifier's to find and repair's to mend.
 
-Offline it depends on the dream's anchor, which is true of any extension and cannot
-close a loop, and its risks, unknowns and decisions stay empty, as a person's added
-topic does. Research is another pass: nothing here writes a finding.
+Offline a promoted topic depends on its dream's anchor, which is true of any extension
+and cannot close a loop, and an added one is linked to nothing. Its risks, unknowns
+and decisions stay empty either way. Research is another pass: nothing here writes a finding.
 """
 
 from __future__ import annotations
@@ -17,7 +17,8 @@ from protopilot.plan.passes import BRIEF, connect, consider, lines, listed, scop
 NAME = "promote"
 
 SYSTEM = BRIEF + """
-A person has made a new topic out of an extension of this idea. Fit it into the plan.
+A person has put a new topic into this plan, their own or one made out of an extension
+of the idea. Fit it into the plan.
 
 - `edges`: how the new topic relates to the others. Every edge must have the new topic
   at one end, and the slugs you are given are the only ones to use.
@@ -50,9 +51,10 @@ def build(plan: Plan) -> tuple[str, str]:
 
 def offline(plan: Plan) -> dict:
     new = _new(plan)
-    anchor = next(dream.anchor for dream in plan.dreams if dream.promoted_to == new.slug)
-    edge = {"from_topic": new.slug, "to_topic": anchor, "kind": "depends-on"}
-    return {"edges": [edge], **dict.fromkeys(consider.FIELDS, [])}
+    held = {topic.slug for topic in plan.topics}
+    anchors = [dream.anchor for dream in plan.dreams if dream.promoted_to == new.slug and dream.anchor in held]
+    edges = [{"from_topic": new.slug, "to_topic": anchor, "kind": "depends-on"} for anchor in anchors[:1]]
+    return {"edges": edges, **dict.fromkeys(consider.FIELDS, [])}
 
 
 def apply(plan: Plan, data: dict) -> Plan:

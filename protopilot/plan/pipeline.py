@@ -33,7 +33,7 @@ from typing import TypeVar
 
 from protopilot import registry
 from protopilot.llm import LLM, LLMError, OfflineLLM, ResearchUnavailable, research_result
-from protopilot.plan import baseline, dreaming, ledger, render, verify
+from protopilot.plan import baseline, dreaming, ledger, render, revising, verify
 from protopilot.plan.lenses import LENSES, Lens
 from protopilot.plan.model import DEFAULT_DEPTH, Depth, Dream, Plan, Topic, TopicResearch, plan_path
 from protopilot.plan.passes import (
@@ -310,7 +310,15 @@ def _verified(job, plan: Plan, attempt: int, of: int) -> verify.PlanVerdict:
     return result
 
 
-def _repair_once(job, llm: LLM, checked: Checked, entry: Plan, rejection: str, held: Plan | None) -> str | None:
+def _repair_once(
+    job,
+    llm: LLM,
+    checked: Checked,
+    entry: Plan,
+    rejection: str,
+    held: Plan | None,
+    touched: frozenset[str] | None = None,
+) -> str | None:
     """One repair, folded into `checked`. Returns why it was thrown away, "" if it landed, None to stop."""
     plan, result, attempt = checked.plan, checked.verdict, checked.attempts
     fixable = repair.fixable(result)
@@ -323,7 +331,7 @@ def _repair_once(job, llm: LLM, checked: Checked, entry: Plan, rejection: str, h
     job.log("  pass repair...")
     job.event("repair_started", attempt=attempt, stage=fixable[0].name)
     try:
-        after = run_pass(repair, plan, llm, repair.failure(result, rejection, held))
+        after = run_pass(repair, plan, llm, repair.failure(result, rejection, held, touched))
     except (LLMError, PlanPassError) as exc:
         job.log(f"    repair pass failed: {exc}")
         job.event("repair_failed", attempt=attempt, error=str(exc))
@@ -339,7 +347,7 @@ def _repair_once(job, llm: LLM, checked: Checked, entry: Plan, rejection: str, h
         job.event("repair_empty", attempt=attempt, notes=notes)
         checked.tried.append(f"{label}: {notes}")
         return None
-    reason = repair.rejected(entry, after) or (repair.unsettled(held, after) if held else "")
+    reason = repair.rejected(entry, after) or (repair.unsettled(held, after, touched) if held else "")
     reason = reason or repair.worsened(result, after)
     if reason:
         job.log(f"    rejected: {reason}")
@@ -353,15 +361,16 @@ def _repair_once(job, llm: LLM, checked: Checked, entry: Plan, rejection: str, h
     return ""
 
 
-def repaired(job, plan: Plan, llm: LLM, held: Plan | None = None) -> Checked:
+def repaired(job, plan: Plan, llm: LLM, held: Plan | None = None, touched: frozenset[str] | None = None) -> Checked:
     """Verify, and on red repair and verify again, up to `repair.ATTEMPTS` times, then stop.
 
-    `held` is the plan before a promotion, whose links and steps a repair may not move.
+    `held` is the plan before a person's change, and `touched` the topics that change was about: a
+    repair may move the links and steps of those alone. With no `touched`, they are the new topics.
     """
     checked = Checked(plan, _verified(job, plan, 1, repair.ATTEMPTS), 1, [])
     rejection: str | None = ""
     while not checked.verdict.ok and checked.attempts <= repair.ATTEMPTS and rejection is not None:
-        rejection = _repair_once(job, llm, checked, plan, rejection, held)
+        rejection = _repair_once(job, llm, checked, plan, rejection, held, touched)
         if rejection is not None:
             checked.attempts += 1
             checked.verdict = _verified(job, checked.plan, checked.attempts, repair.ATTEMPTS)
@@ -788,6 +797,63 @@ def rename_topic(job, tree: Path, slug: str, title: str) -> verify.PlanVerdict:
         job.log(
             f"{slug} was {was!r} and is now {_topic(renamed, slug).title!r}. Its slug and its file keep their name."
         )
+    return verdict
+
+
+def drop_topic(job, tree: Path, slug: str, why: str, backend: Callable[[], LLM]) -> verify.PlanVerdict:
+    """A person's ruling on a topic: it goes, with what pointed at it, and the plan says what went.
+
+    `backend` is built only if the drop leaves no first step, which is the one case `start` runs again.
+    """
+    tree = Path(tree)
+    job.project_dir = str(tree)
+    plan = _held(tree, REVISE_NEEDS)
+    title = _topic(plan, slug).title
+    try:
+        after, notes = revising.dropped(plan, slug, why)
+    except ValueError as exc:
+        raise PlanRefused(f"Nothing was changed: {exc}.") from exc
+    restart = verify.start_order(after, {}).state == verify.FAILED
+    names = [start.NAME, RENDER] if restart else [RENDER]
+    job.event("plan", passes=names)
+    for note in notes:
+        job.log(f"  {note}")
+    if restart:
+        job.log("  no step is left to begin on, so `start` runs again")
+        try:
+            llm = backend()
+            checked = repaired(job, _model_pass(job, start, after, llm, names), llm, plan, frozenset({slug}))
+        except (LLMError, PlanPassError) as exc:
+            raise PlanRefused(f"{slug} was not dropped, and nothing was changed: {exc}") from exc
+    else:
+        checked = _once(job, after)
+    verdict = _land(job, tree, plan, checked, names)
+    if verdict.ok:
+        job.log(f"{title} ({slug}) is dropped, and {render.PLAN_FILE} keeps the reason.")
+    return verdict
+
+
+def add_topic(job, tree: Path, title: str, why: str, llm: LLM) -> verify.PlanVerdict:
+    """A person's new topic, connected and considered as a promoted dream is, or nothing at all."""
+    tree = Path(tree)
+    job.project_dir = str(tree)
+    plan = _held(tree, REVISE_NEEDS)
+    try:
+        grown, note = revising.added(plan, title, why)
+    except ValueError as exc:
+        raise PlanRefused(f"Nothing was changed: {exc}.") from exc
+    new = grown.topics[-1]
+    names = [promote_pass.NAME, RENDER]
+    job.event("plan", passes=names)
+    if note:
+        job.log(f"  {note.rstrip('.')}. It is a topic again because a person added it.")
+    try:
+        fitted = _model_pass(job, promote_pass, grown, llm, names)
+    except (LLMError, PlanPassError) as exc:
+        raise PlanRefused(f"{new.title!r} was not added, and nothing was changed: {exc}") from exc
+    verdict = _land(job, tree, plan, repaired(job, fitted, llm, plan), names)
+    if verdict.ok:
+        job.log(f"{new.title} is now the topic {new.slug}, and it is not researched: a person chose it.")
     return verdict
 
 

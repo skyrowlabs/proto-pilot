@@ -3,7 +3,7 @@
 proto plan "start a community tool library"
 proto dream | dream promote d1 | dream drop d2 --why "..."
 proto answer 1
-proto topic rename scope "The boundary"
+proto topic add "Insurance" --why "..." | topic drop scope --why "..." | topic rename scope "The boundary"
 proto ls | rm | prune | doctor
 """
 
@@ -431,6 +431,43 @@ def topic_rename_command(slug: str, title: str, directory: str) -> None:
 
     target = Path(directory).resolve()
     _revise_step(target, lambda j: pipeline.rename_topic(j, target, slug, title))
+
+
+@topic_group.command(name="drop")
+@click.argument("slug", metavar="SLUG")
+@click.option("--why", required=True, help="What ruled it out; it stays in the plan.")
+@click.option("--dir", "directory", default=".", help="Plan directory (default: cwd).")
+@_dream_options
+def topic_drop_command(slug: str, why: str, directory: str, offline: bool, backend: str | None) -> None:
+    """Rule out topic SLUG, with what pointed at it: its links, its step, its sources nothing else cites.
+
+    A dream that extended it is set aside, never deleted, and the topic is remembered
+    with the reason. A model is called only if the drop leaves no first step.
+    """
+    from protopilot.plan import pipeline
+
+    target = Path(directory).resolve()
+    _revise_step(
+        target, lambda j: pipeline.drop_topic(j, target, slug, why, lambda: build_llm(offline=offline, backend=backend))
+    )
+
+
+@topic_group.command(name="add")
+@click.argument("title", metavar="TITLE")
+@click.option("--why", required=True, help="One line on why it matters to the idea.")
+@click.option("--dir", "directory", default=".", help="Plan directory (default: cwd).")
+@_dream_options
+def topic_add_command(title: str, why: str, directory: str, offline: bool, backend: str | None) -> None:
+    """Add the topic TITLE to a plan, connected and verified.
+
+    Offline, it is linked to nothing and has no risks, unknowns or decisions. Either
+    way it is not researched.
+    """
+    from protopilot.plan import pipeline
+
+    llm = _dream_llm(offline, backend)
+    target = Path(directory).resolve()
+    _revise_step(target, lambda j: pipeline.add_topic(j, target, title, why, llm))
 
 
 @main.command(name="ls")
