@@ -113,7 +113,40 @@ commit is a change in that repo, under its own rules.
 
 ### Dogfood record
 
-_Empty until Phase 1 runs._
+Two runs so far, both 2026-11-11, `--depth standard`, `claude-code` backend,
+`-y`. The idea and direction were written from the workspace's one-line
+descriptions without opening either project's notes. The trees are in
+`tmp/dogfood/` of the primary checkout, not yet committed to their repos.
+**The operator's five-line read of each is still owed.**
+
+| Run | Wall time | Topics researched | Cited findings | Fetches usable | Ended |
+| --- | --- | --- | --- | --- | --- |
+| house.fly | 21m43s | 6 of 6 | 25 | 23 of 34 | green |
+| Node Zero | 22m42s | 5 of 6 (one failed) | 24 | 24 of 28 | green |
+
+Then, with this phase's verbs run from the unmerged branch on those two trees:
+`proto answer` twice on house.fly with Jeston's answers; `proto topic add`
+("Handing tasks to other smart devices and robots"); `proto research` on the
+new topic (5 cited findings, 113s) and on the observation topic (3, 162s); and
+`proto research` on Node Zero's failed topic (5, 157s). All landed green.
+
+What the runs showed about the tool, as observed by the session that ran them:
+
+- `-y` skipped scope's questions, and both plans ended with two open questions
+  that decided the topic list. Phase 2's `answer` is what closed them.
+- An answered question renders as the question and the answer run together in
+  one constraint bullet. It reads badly.
+- Jeston's second house.fly answer (own home first, then a product) bears on
+  the build-order topic and the tool said nothing. One vote for open question 2.
+- **`topic add` and `research` left *Where to start* unchanged.** After the
+  purpose changed and a seventh topic was added, the five steps were the same
+  five. Nothing offers a refreshed start; that needs a ruling.
+- A failed research call rendered a truncated fragment of the model's usage
+  JSON as its reason in `PLAN.md`, and kept no transcript, so the cause is
+  unknown. File it through `./pp bug`.
+- About a third of house.fly's fetches gave nothing usable.
+- "Horizon: Not established" and the direction repeated verbatim as the first
+  constraint read as filler.
 
 ## Phase 2 — Revise a plan after it is made
 
