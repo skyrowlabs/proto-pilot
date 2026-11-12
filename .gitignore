@@ -37,6 +37,5 @@ npm-debug.log*
 .claude/settings.local.json
 .claude/worktrees/
 
-# Generated prototypes — throwaway output, not source. `proto serve` and
-# `proto new` default their workspace here.
+# Scratch output from running `proto` inside the checkout — not source.
 prototypes/

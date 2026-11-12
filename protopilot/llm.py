@@ -20,8 +20,8 @@ from typing import Any, Protocol
 DEFAULT_MODEL = "claude-opus-5"
 DEFAULT_EFFORT = "high"
 
-# Streaming, and a large ceiling: a routes pass for a five-entity app is a lot
-# of tokens, and a non-streaming request at this size trips the SDK's HTTP
+# Streaming, and a large ceiling: a pass can return a lot of tokens, and a
+# non-streaming request at this size trips the SDK's HTTP
 # timeout rather than returning a partial answer.
 MAX_TOKENS = 64000
 
@@ -137,13 +137,13 @@ class ClaudeLLM:
             self._client = anthropic.Anthropic()
 
     def check(self) -> None:
-        """Prove a generation would actually run, not merely authenticate.
+        """Prove a run would actually work, not merely authenticate.
 
         Three things can be separately wrong and only the third is obvious:
         constructing `Anthropic()` resolves nothing (the SDK defers credential
         lookup to the first request, so a bare constructor succeeds with no
         key at all); `models.retrieve` proves the credential but not the
-        balance; and a zero balance fails only once a real generation is
+        balance; and a zero balance fails only once a real run is
         already three passes deep. So this asks for one token. It costs a
         fraction of a cent, and it is the only check that fails in the same
         place a run would.
@@ -186,7 +186,7 @@ class ClaudeLLM:
                 "format": {"type": "json_schema", "schema": _without_patterns(schema)},
             },
             # Server-side fallback: a safety refusal on one pass would
-            # otherwise abort a generation that is most of the way done.
+            # otherwise abort a run that is most of the way done.
             betas=["server-side-fallback-2026-07-01"],
             fallbacks="default",
             system=[
@@ -358,9 +358,7 @@ class ClaudeCodeLLM:
         self.model = model or os.environ.get("PROTOPILOT_MODEL", DEFAULT_MODEL)
         self.effort = effort or os.environ.get("PROTOPILOT_EFFORT", DEFAULT_EFFORT)
         self.binary = binary or os.environ.get("PROTOPILOT_CLAUDE_BIN", "claude")
-        # SVG-heavy UI passes run long: 15 minutes was not enough for a
-        # chess board's worth of drawn pieces, and a timeout mid-generation
-        # costs every pass before it.
+        # Long on purpose: a timeout mid-run costs every pass before it.
         self.timeout = timeout or float(os.environ.get("PROTOPILOT_TIMEOUT", "2700"))
         if runner is None:
             from protopilot.runner import SubprocessRunner

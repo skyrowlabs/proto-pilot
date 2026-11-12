@@ -396,11 +396,11 @@ def _say_if_interpreter_differs() -> None:
 
 @check.command()
 def health() -> None:
-    """Can this checkout actually generate a prototype?
+    """Can this checkout actually make a plan?
 
     Delegated to `proto doctor` rather than reimplemented. That command already
-    answers this exact question for a user -- Docker, the SDK, credentials, the
-    browser stage, a free port -- and a second copy here would be a second
+    answers this exact question for a user -- the SDK and credentials for each
+    backend -- and a second copy here would be a second
     answer to a question with one owner, drifting the moment either side gains
     a check. See AGENTS.md Rule 1.
 

@@ -88,7 +88,7 @@ def test_a_fresh_run_emits_the_whole_sequence_in_order(tmp_path):
             "summary": verify.verdict(plan, render.render(plan)).summary,
             "no_subject": ["sources_fetched", "dreams_shaped", "dreams_apart"],
         },
-        {"kind": "finished", "ok": True, "attempts": 1, "project_dir": str(tree), "run_hint": ""},
+        {"kind": "finished", "ok": True, "attempts": 1, "project_dir": str(tree)},
     ]
 
 

@@ -1,9 +1,7 @@
 """The event fold, tested as a function.
 
-`protopilot/progress.py` has no Textual import, so none of this needs a
-pilot, a screen or an event loop. That is the point of the split: asking a
-rendered pane whether attempt 2 was counted is a hard way to learn it, and the
-answer would be buried under widget lifecycle either way.
+`protopilot/progress.py` imports no view, so none of this needs one: a fold is
+asked directly whether attempt 2 was counted.
 """
 
 from __future__ import annotations
@@ -20,7 +18,6 @@ from protopilot.progress import DONE, FAILED, PENDING, RUNNING, fold, lines  # n
 pytestmark = pytest.mark.unit
 
 PLAN = {"kind": "plan", "passes": ["schema", "smoke", "seed"]}
-SPEC = {"kind": "spec", "name": "A Tiny Notes", "slug": "a_tiny_notes", "target": "tui", "archetype": "crud"}
 
 
 def states(p) -> dict:
@@ -29,7 +26,7 @@ def states(p) -> dict:
 
 def test_nothing_folds_to_nothing():
     p = fold([])
-    assert p.passes == [] and not p.finished and not p.name
+    assert p.passes == [] and not p.finished
     assert lines(p) == [], "an empty fold must render nothing, not a frame of empty labels"
 
 
@@ -117,20 +114,20 @@ def test_giving_up_is_not_the_same_question_as_not_being_ok():
         [
             {"kind": "verify_failed", "attempt": 1, "stage": "smoke", "summary": "x"},
             {"kind": "exhausted", "attempts": 1, "stage": "smoke"},
-            {"kind": "finished", "ok": False, "attempts": 1, "project_dir": "/tmp/t", "run_hint": "cd {directory}"},
+            {"kind": "finished", "ok": False, "attempts": 1, "project_dir": "/tmp/t"},
         ]
     )
     assert red.gave_up and red.stage == "smoke"
 
-    green = fold([{"kind": "finished", "ok": True, "attempts": 1, "project_dir": "/tmp/t", "run_hint": ""}])
+    green = fold([{"kind": "finished", "ok": True, "attempts": 1, "project_dir": "/tmp/t"}])
     assert green.finished and green.ok and not green.gave_up
 
 
 def test_an_unknown_event_kind_is_ignored_rather_than_raising():
     """The channel is append-only and additive, so an older reader meeting a
     newer producer must degrade to a less detailed view, never to a crash."""
-    p = fold([PLAN, {"kind": "something_invented_next_month", "detail": 1}, {"kind": "spec", "name": "X"}])
-    assert p.name == "X" and len(p.passes) == 3
+    p = fold([PLAN, {"kind": "something_invented_next_month", "detail": 1}, {"kind": "verify_started", "attempt": 1}])
+    assert p.verify_attempt == 1 and len(p.passes) == 3
 
 
 def test_a_rejected_repair_is_counted_separately_from_an_applied_one():
@@ -147,77 +144,14 @@ def test_a_rejected_repair_is_counted_separately_from_an_applied_one():
     assert "1 rejected" in "\n".join(lines(p))
 
 
-def test_the_preview_carries_the_generated_apps_own_screen():
-    """The only field here that describes what was **built** rather than how.
-
-    Everything else in `Progress` is about the build — which pass, which
-    attempt, what was patched. The screen is the result, and it exists because
-    the terminal verifier already boots the app and composites it to decide
-    whether it painted; without this it was thrown away the moment the verdict
-    was returned.
-    """
-    painted = "┌── Pong ──┐\n│  ●       │\n└──────────┘"
-    p = fold([PLAN, {"kind": "preview", "screen": painted, "target": "tui"}])
-    assert p.screen == painted
-
-    # And it is not rendered into the progress text: that region is a summary
-    # of the build, and a screenshot pasted into it would push everything the
-    # summary is for off the top.
-    assert painted not in "\n".join(lines(p))
-
-
-def test_a_run_with_no_preview_leaves_the_field_empty():
-    """A target whose verifier has no screen to show emits no `preview` event,
-    rather than every target growing a field so that one of them can be
-    asked."""
-    assert fold([PLAN, {"kind": "verify_passed", "attempt": 1, "summary": "green"}]).screen == ""
-
-
 # -- rendering ------------------------------------------------------------
 
 
 def test_the_directory_is_on_a_line_of_its_own():
-    """Somebody who had just generated a prototype could not find it.
-
-    The path and the run command used to share one line — `cd <path> && make
-    run` — which is the thing you *type* and not the thing you *look for*, and
-    it wraps at exactly the point where the path stops being readable. So the
-    directory gets its own line, unadorned, and the command follows it.
-    """
-    directory = "/srv/work/proto-pilot/prototypes/pong_simulator"
-    rendered = lines(
-        fold(
-            [
-                {
-                    "kind": "finished",
-                    "ok": True,
-                    "attempts": 1,
-                    "project_dir": directory,
-                    "run_hint": "cd {directory} && make run",
-                }
-            ]
-        )
-    )
+    """A long path is found by eye and copied whole only when nothing shares its line."""
+    directory = "/srv/work/plans/community_tool_library"
+    rendered = lines(fold([{"kind": "finished", "ok": True, "attempts": 1, "project_dir": directory}]))
     assert directory in rendered, f"the path is not on a line by itself: {rendered}"
-    assert f"cd {directory} && make run" in rendered, "the command to run it is gone"
-
-
-def test_the_run_hint_is_filled_in_with_the_real_directory():
-    """`RUN_HINT` is a template the target owns. A view that printed it raw
-    would show a person `cd {directory} && make run` and expect them to guess."""
-    p = fold(
-        [
-            {
-                "kind": "finished",
-                "ok": True,
-                "attempts": 1,
-                "project_dir": "/w/notes",
-                "run_hint": "cd {directory} && make run",
-            },
-        ]
-    )
-    assert "cd /w/notes && make run" in lines(p)
-    assert "{directory}" not in "\n".join(lines(p))
 
 
 def test_a_red_run_names_the_stage_and_points_at_the_runbook():
@@ -225,7 +159,7 @@ def test_a_red_run_names_the_stage_and_points_at_the_runbook():
         [
             {"kind": "verify_failed", "attempt": 3, "stage": "browser", "summary": "x"},
             {"kind": "exhausted", "attempts": 3, "stage": "browser"},
-            {"kind": "finished", "ok": False, "attempts": 3, "project_dir": "/w/n", "run_hint": ""},
+            {"kind": "finished", "ok": False, "attempts": 3, "project_dir": "/w/n"},
         ]
     )
     text = "\n".join(lines(p))

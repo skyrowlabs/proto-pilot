@@ -1,14 +1,11 @@
-"""Where prototypes go after you close the terminal.
+"""Where plans go after you close the terminal.
 
-A generated tree used to be findable only by remembering the directory you
-ran `proto new` in, which is fine for one prototype and useless for twenty.
-The registry is a flat JSON file of every project this machine has generated:
-enough to list them, relaunch one, and notice when a directory has been
-deleted out from under it.
+A flat JSON file of every plan this machine has made: enough to list them and
+to notice when a directory has been deleted out from under one.
 
-Two kinds share it: an `app` from `proto new`, and a `plan` from `proto plan`,
-which has no port and nothing to run. An entry written before kinds existed is
-an app, because only apps were registered then.
+A row is a `plan`, or it is not ours. A row of kind `app`, or with no kind, was
+written by an older proto.pilot for a prototype this version cannot run; it is
+kept, listed as `old`, and forgotten only by `proto prune`.
 
 Deliberately not a database. It is a list of paths.
 """
@@ -20,16 +17,19 @@ import os
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager, suppress
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields
 from datetime import datetime, timezone
 from pathlib import Path
 
 from protopilot.plan.model import PLAN_DIR, plan_path
-from protopilot.spec import SPEC_FILENAME
 
+#: A prototype an older version generated. Never written by this one, only read back.
 APP = "app"
 PLAN = "plan"
-KINDS = (APP, PLAN)
+#: The file an older version's prototype kept beside where a plan keeps `plan.json`.
+OLD_SPEC = "spec.json"
+#: What `proto ls` calls a row: a plan on disk, a plan whose tree is gone, an older prototype.
+HERE, GONE, OLD = "-", "gone", "old"
 #: Read in `load` where a hand-edited file holds a kind that is not a string; it is never ours.
 UNKNOWN = "unknown"
 
@@ -43,34 +43,45 @@ def registry_path() -> Path:
     return Path(override) if override else _state_home() / "proto-pilot" / "projects.json"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Entry:
     slug: str
     name: str
     path: str
-    # None for a plan: nothing in it listens.
-    port: int | None
+    # Nothing here sets or reads it. An older row holds one, and it is written back as read.
+    port: int | None = None
     created_at: str
     idea: str = ""
+    # A row with no kind was written before kinds existed, when only prototypes were listed.
     kind: str = APP
 
     @property
     def exists(self) -> bool:
-        return self.kind in KINDS and tree_kind(Path(self.path)) == self.kind
+        return self.kind == PLAN and tree_kind(Path(self.path)) == PLAN
+
+    @property
+    def state(self) -> str:
+        if self.exists:
+            return HERE
+        return OLD if self.kind == APP else GONE
 
 
 def tree_kind(path: Path) -> str | None:
-    """What a directory holds by our own files: `app`, `plan`, or None when it is not ours.
+    """What a directory holds by our own files: `plan`, or None when it is not ours.
 
     Asked of the tree, never of the registry, because a command is run inside a tree
-    and a guard that trusted an index would delete whatever the index named.
+    and a guard that trusted an index would delete whatever the index named. A tree
+    holding an older version's prototype is not ours even beside a plan: it may have
+    a running stack, which nothing here can stop.
     """
-    root = Path(path)
-    if (root / PLAN_DIR / SPEC_FILENAME).exists():
-        return APP
-    if plan_path(root).exists():
-        return PLAN
-    return None
+    if holds_old_prototype(path):
+        return None
+    return PLAN if plan_path(Path(path)).exists() else None
+
+
+def holds_old_prototype(path: Path) -> bool:
+    """Whether a directory holds the spec an older version's prototype kept."""
+    return (Path(path) / PLAN_DIR / OLD_SPEC).exists()
 
 
 def load() -> list[Entry]:
@@ -80,13 +91,17 @@ def load() -> list[Entry]:
     try:
         raw = json.loads(path.read_text())
     except (json.JSONDecodeError, OSError):
-        # A corrupt registry must never stop a generation. Losing the index is
-        # recoverable; refusing to build because the index is unreadable is not.
+        # A corrupt registry must never stop a plan. Losing the index is
+        # recoverable; refusing to plan because the index is unreadable is not.
         return []
+    known = {f.name for f in fields(Entry)}
     entries = []
     for item in raw if isinstance(raw, list) else []:
+        if not isinstance(item, dict):
+            continue
         try:
-            entry = Entry(**item)
+            # A key this version does not know is ignored, so the row it sits on is kept.
+            entry = Entry(**{key: value for key, value in item.items() if key in known})
         except TypeError:
             continue
         # Kept, so nothing is lost on the next save, but never one of ours: it reads as gone.
@@ -127,7 +142,7 @@ def _locked() -> Iterator[None]:
 
 
 def _unique(slug: str, taken: set[str]) -> str:
-    """`slug`, or `slug_2`, `slug_3`...: the web finds an entry by slug, so two may not share one."""
+    """`slug`, or `slug_2`, `slug_3`...: a slug names one entry, so two may not share one."""
     candidate, n = slug, 1
     while candidate in taken:
         n += 1
@@ -135,23 +150,22 @@ def _unique(slug: str, taken: set[str]) -> str:
     return candidate
 
 
-def record(*, slug: str, name: str, path: Path, port: int | None, idea: str = "", kind: str = APP) -> Entry:
-    """Add or update one project, keyed by resolved path; a slug another path holds gets a suffix."""
+def record(*, slug: str, name: str, path: Path, idea: str = "", kind: str = PLAN) -> Entry:
+    """Add or update one tree, keyed by resolved path; a slug another path holds gets a suffix."""
     resolved = str(Path(path).resolve())
     with _locked():
         entries = [e for e in load() if e.path != resolved]
-        entry = _entry(slug, name, resolved, port, idea, kind, {e.slug for e in entries})
+        entry = _entry(slug, name, resolved, idea, kind, {e.slug for e in entries})
         entries.insert(0, entry)
         save(entries)
     return entry
 
 
-def _entry(slug: str, name: str, resolved: str, port: int | None, idea: str, kind: str, taken: set[str]) -> Entry:
+def _entry(slug: str, name: str, resolved: str, idea: str, kind: str, taken: set[str]) -> Entry:
     return Entry(
         slug=_unique(slug, taken),
         name=name,
         path=resolved,
-        port=port,
         created_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         idea=idea,
         kind=kind,
@@ -165,7 +179,7 @@ def forget(path: Path) -> None:
 
 
 def prune() -> list[Entry]:
-    """Drop entries whose directory is gone. Returns what survived."""
+    """Drop every entry that is not a plan on disk. Returns what survived; no folder is touched."""
     with _locked():
         alive = [e for e in load() if e.exists]
         save(alive)
@@ -178,36 +192,23 @@ def _holds(root: Path, inner: Path) -> bool:
 
 
 class NotAProject(ValueError):
-    """Refused: the path is not a proto-pilot project."""
+    """Refused: the path is not a plan, or is not safe to delete."""
 
 
-def delete(path: Path, runner=None) -> None:
-    """Stop an app's stack and drop its data, then remove the tree. Irreversible.
+def delete(path: Path) -> None:
+    """Remove a plan's tree and forget it. Irreversible.
 
-    Guarded rather than trusting the caller: this is reached from an HTTP
-    handler with a slug in the URL, and the difference between deleting a
-    prototype and deleting a home directory is one bad lookup. A directory
-    holding neither our spec nor our plan is not ours and is never removed.
-    A plan has no stack, so it goes with no Docker call at all.
+    Guarded rather than trusting the caller: the difference between deleting a
+    plan and deleting a home directory is one bad lookup. A directory holding
+    no plan of ours is never removed.
     """
     import shutil
-    import subprocess
 
     root = Path(path).resolve()
-    kind = tree_kind(root)
-    if kind is None:
-        raise NotAProject(
-            f"{root} has no {PLAN_DIR}/{SPEC_FILENAME} and no {plan_path(root).relative_to(root)}; refusing to delete"
-        )
+    if tree_kind(root) is None:
+        raise NotAProject(f"{root} has no {plan_path(root).relative_to(root)}; refusing to delete")
     if root.parent == root or _holds(root, Path.home()) or _holds(root, registry_path()):
         raise NotAProject(f"{root} is not a safe path to delete: it is, or holds, your home or the registry")
 
-    if kind == APP:
-        call = runner or (lambda argv, cwd: subprocess.call(argv, cwd=cwd))  # noqa: S603
-        try:
-            call(["docker", "compose", "down", "-v"], str(root))
-        except OSError:
-            # No daemon, or never started. The tree still goes.
-            pass
     shutil.rmtree(root, ignore_errors=True)
     forget(root)

@@ -78,14 +78,11 @@ class VerifyResult:
     stage: str
     summary: str
     output: str = ""
-    logs: str = ""
 
     def report(self) -> str:
         parts = [f"[{self.stage}] {self.summary}"]
         if self.output.strip():
             parts.append("--- command output ---\n" + self.output.strip())
-        if self.logs.strip():
-            parts.append("--- container logs ---\n" + self.logs.strip())
         return "\n\n".join(parts)
 
 

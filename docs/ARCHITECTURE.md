@@ -251,10 +251,10 @@ one model value in a file name is a topic slug, which `model.py` checks, and
   before plans were listed, and keeps an entry's date. What a verb does to a tree
   comes from the tree's own files (`registry.tree_kind`), never from the index:
   `plan.json` is a plan and anything else is not ours, so a tree with only research
-  in progress is not, and neither is a prototype an older version generated. The
-  index's kind is only displayed: `proto ls` prints it in a column, reads a `plan`
-  entry whose tree no longer holds a plan as `gone`, and reads an entry of any
-  other kind as `old`. `proto rm` deletes a plan and refuses everything else, and
+  in progress is not, and neither is a tree holding a prototype an older version
+  generated, even beside a plan. The index's kind is only displayed: `proto ls`
+  prints it in a column, reads an `app` entry as `old`, and reads any other entry
+  that is not a plan on disk as `gone`. `proto rm` deletes a plan and refuses everything else, and
   `proto prune` forgets `old` and `gone` entries and never touches a folder. A slug
   another path holds is recorded with `_2`, `_3`, so a slug names one entry.
 

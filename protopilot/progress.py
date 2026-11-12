@@ -1,15 +1,10 @@
 """Fold a job's event list into the state a progress region draws.
 
-Deliberately a **pure function over a list of dicts**, with no Textual import
-anywhere in this module. Three reasons, in order of how much they cost when
-ignored:
+Deliberately a **pure function over a list of dicts**, importing no view. Two
+reasons:
 
-* It is the part most likely to be wrong, and the part a widget test would
-  exercise worst — asserting on rendered text through a pilot to find out
-  whether attempt 2 counted is a hard way to learn it.
-* A second view (the web front end, a `--json` status) folds the same events
-  the same way, and a fold living inside a widget is a fold that gets rewritten
-  rather than reused.
+* Any view (a reader, a `--json` status) folds the same events the same way,
+  and a fold living inside one view gets rewritten rather than reused.
 * It is the boundary where "parse the log" would otherwise creep back in. Every
   field here comes from an emit; if something is missing the answer is a new
   event, never a regex over `job.lines`.
@@ -38,10 +33,6 @@ class PassState:
 class Progress:
     """What a view needs, and nothing a view would have to compute again."""
 
-    name: str = ""
-    slug: str = ""
-    target: str = ""
-    archetype: str = ""
     passes: list[PassState] = field(default_factory=list)
     verify_attempt: int = 0
     verify_of: int = 0
@@ -53,12 +44,6 @@ class Progress:
     ok: bool = False
     attempts: int = 0
     project_dir: str = ""
-    run_hint: str = ""
-    #: The generated app's own screen, as the verifier saw it paint. A picture
-    #: of the result rather than of the process -- everything else here
-    #: describes the *build*, and this is the only field that describes what
-    #: was built.
-    screen: str = ""
 
     @property
     def done_passes(self) -> int:
@@ -76,12 +61,7 @@ def fold(events: list[dict]) -> Progress:
     p = Progress()
     for event in events:
         kind = event.get("kind", "")
-        if kind == "spec":
-            p.name = str(event.get("name", ""))
-            p.slug = str(event.get("slug", ""))
-            p.target = str(event.get("target", ""))
-            p.archetype = str(event.get("archetype", ""))
-        elif kind == "plan":
+        if kind == "plan":
             # Named before any of them runs, so the list is complete from the
             # first frame and fills in rather than growing.
             p.passes = [PassState(name=str(n)) for n in event.get("passes", [])]
@@ -103,14 +83,11 @@ def fold(events: list[dict]) -> Progress:
             p.rejected += 1
         elif kind == "exhausted":
             p.stage = str(event.get("stage", "")) or p.stage
-        elif kind == "preview":
-            p.screen = str(event.get("screen", ""))
         elif kind == "finished":
             p.finished = True
             p.ok = bool(event.get("ok"))
             p.attempts = int(event.get("attempts", 0))
             p.project_dir = str(event.get("project_dir", ""))
-            p.run_hint = str(event.get("run_hint", ""))
     return p
 
 
@@ -142,12 +119,8 @@ MARKS = {PENDING: "·", RUNNING: "▸", DONE: "✓", FAILED: "✗"}
 
 
 def lines(p: Progress) -> list[str]:
-    """The progress region as text. One place, so both a widget and a plain
-    terminal fallback render the same thing."""
+    """The progress region as text. One place, so every view renders the same thing."""
     out: list[str] = []
-    if p.name:
-        shape = " / ".join(x for x in (p.target, p.archetype) if x)
-        out.append(f"{p.name}  ({shape})" if shape else p.name)
     if p.passes:
         out.append(f"passes  {p.done_passes}/{len(p.passes)}")
         for state in p.passes:
@@ -163,13 +136,7 @@ def lines(p: Progress) -> list[str]:
         out.append("")
         out.append(f"green in {p.attempts} attempt(s)" if p.ok else f"red at {p.stage or 'unknown'} — see RUNBOOK.md")
         if p.project_dir:
-            # The directory on its own line, always, and the command under it.
-            # These used to be one line -- `cd <path> && make run` -- which is
-            # the thing you type and NOT the thing you look for on disk, and it
-            # wraps at exactly the point where the path becomes unreadable.
-            # Somebody who had just generated a prototype could not find it.
+            # On a line of its own, so a long path is found by eye and copied whole.
             out.append("")
             out.append(p.project_dir)
-            if p.run_hint:
-                out.append(p.run_hint.format(directory=p.project_dir))
     return out

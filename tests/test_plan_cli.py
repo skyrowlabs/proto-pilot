@@ -649,6 +649,7 @@ def test_an_add_that_cannot_land_is_refused_before_asking_why(tmp_path, at_a_ter
     assert result.output.count("Why does it matter?") == why_asked
 
 
-def test_first_contact_leads_with_planning_and_new_stays_about_prototypes():
+def test_first_contact_leads_with_planning_and_new_is_not_a_command():
     assert "into a plan you can work from" in CliRunner().invoke(cli.main, ["--help"]).output
-    assert "prototype" in CliRunner().invoke(cli.main, ["new", "--help"]).output.lower()
+    assert "new" not in cli.main.commands
+    assert CliRunner().invoke(cli.main, ["new", "an idea"]).exit_code == 2

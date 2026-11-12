@@ -190,34 +190,34 @@ One commit. Lists below were produced by `git rm` in the rehearsal clone.
 
 ### Product code deleted
 
-- [ ] Directories, whole: `skeleton/` (43 files), `protopilot/passes/` (18),
+- [x] Directories, whole: `skeleton/` (43 files), `protopilot/passes/` (18),
       `protopilot/archetypes/` (3), `protopilot/targets/` (3),
       `protopilot/console/` (the 6 files left after Phase 1), `protopilot/web/` (8)
-- [ ] Files: `protopilot/baseline.py`, `baseline_tui.py`, `browser.py`,
+- [x] Files: `protopilot/baseline.py`, `baseline_tui.py`, `browser.py`,
       `build.py`, `containers.py`, `files.py`, `generation.py`, `render.py`,
       `spec.py`, `tui_probe.py`, `tui_stream.py`, `verify.py`, `verify_tui.py`
-- [ ] Not deleted, and why: `runner.py` (the `claude-code` backend runs through
+- [x] Not deleted, and why: `runner.py` (the `claude-code` backend runs through
       it), `jobs.py` (`proto plan` runs on a job), `progress.py` (see *Approach*)
 
 ### Product code changed
 
-- [ ] `protopilot/cli.py`: remove `new`, `add`, `spec`, `up`, `down`, `reset`,
+- [x] `protopilot/cli.py`: remove `new`, `add`, `spec`, `up`, `down`, `reset`,
       `logs`, `test`, `export`, `gc`, `console`, `serve`, `archetypes`, `targets`
       and what only they used: `free_port`, `PORT_RANGE`, `_classify`,
       `_parse_answers`, `PLAN_INSTEAD`, `_project`, `_verifier`, `_port_is_ours`,
       `PORT_LINE`, `set_port`, `_down_all`, `_compose`, `_finish`, `_git_init`,
       `_preflight_backend`. Module docstring lists the survivors
-- [ ] `proto ls`: no Docker call, no port column, no `up`/`down` state. The empty
+- [x] `proto ls`: no Docker call, no port column, no `up`/`down` state. The empty
       message names `proto plan` only
-- [ ] `proto rm`: a plan is deleted as today. Anything else is refused. A folder
+- [x] `proto rm`: a plan is deleted as today. Anything else is refused. A folder
       holding `.protopilot/spec.json` gets its own sentence: it is a prototype
       from an older proto.pilot, this version removes plans only, run
       `docker compose down -v` there if it was a web prototype and delete the
       folder by hand
-- [ ] `proto doctor`: the SDK check and the two backend checks stay and decide
+- [x] `proto doctor`: the SDK check and the two backend checks stay and decide
       the exit code as now. The per-target loop, the browser check and the port
       check go. The last line's hint is `--offline`, without `--no-verify`
-- [ ] `protopilot/registry.py`, *old registries* — a user's `projects.json` may
+- [x] `protopilot/registry.py`, *old registries* — a user's `projects.json` may
       hold `app` rows, and every `plan` row holds `"port": null`:
       - `Entry` keeps a `port` field, default `None`, read and written back
         unchanged. **Dropping the field would make `Entry(**item)` raise on every
@@ -235,14 +235,14 @@ One commit. Lists below were produced by `git rm` in the rehearsal clone.
       - `delete()` loses its `runner` parameter and its Docker call
       - `load()` ignores keys it does not know rather than dropping the row, so
         the next field added does not repeat the trap from the other side
-- [ ] `protopilot/runner.py`: delete `docker_available`; the docstring stops
+- [x] `protopilot/runner.py`: delete `docker_available`; the docstring stops
       saying every Docker call goes through here
-- [ ] `protopilot/progress.py`: drop what only an app emitted (`spec`, `preview`,
+- [x] `protopilot/progress.py`: drop what only an app emitted (`spec`, `preview`,
       `target`, `archetype`, `run_hint`) and the tests of them in
       `tests/test_progress.py`; `pipeline.py:515` stops sending `run_hint=""`
-- [ ] `protopilot/plan/verify.py`: `VerifyResult.logs` and the "container logs"
+- [x] `protopilot/plan/verify.py`: `VerifyResult.logs` and the "container logs"
       block go if `grep -rn "logs=" protopilot/plan` is empty
-- [ ] Reading pass over what is left, for comments that lean on the removed
+- [x] Reading pass over what is left, for comments that lean on the removed
       layer: `grep -rnE "proto new|prototype|Docker|docker|console|web front" protopilot cli scripts/*.py`.
       Known: `jobs.py` docstring, `pipeline.py:18`, `plan/passes/repair.py:29`,
       `cli.py`'s `_review_outline` docstring and the `sys.exit(1)` comment,
@@ -252,17 +252,17 @@ One commit. Lists below were produced by `git rm` in the rehearsal clone.
 
 ### Packaging, in the same commit because the install needs it
 
-- [ ] `pyproject.toml`: `packages = ["protopilot", "protopilot.plan", "protopilot.plan.passes"]`;
+- [x] `pyproject.toml`: `packages = ["protopilot", "protopilot.plan", "protopilot.plan.passes"]`;
       delete `[tool.setuptools.package-data]`; `description` loses "and a running
       prototype when you want one"; `norecursedirs` loses `skeleton` here **and**
       in `tests/pytest.ini` (`tests/test_marker_coverage.py` compares the two)
-- [ ] Verify the wheel, since the editable install cannot: build one into a
+- [x] Verify the wheel, since the editable install cannot: build one into a
       scratch directory, install it into a fresh venv, and run
       `proto plan "x" --offline -y` from outside the checkout
 
 ### Tests deleted whole (31)
 
-- [ ] `tests/test_archetypes.py`, `test_baseline.py`, `test_browser.py`,
+- [x] `tests/test_archetypes.py`, `test_baseline.py`, `test_browser.py`,
       `test_clarify.py`, `test_console.py`, `test_console_iterate.py`,
       `test_console_layout.py`, `test_containers.py`,
       `test_crud_characterisation.py`, `test_files.py`, `test_generate.py`,
@@ -274,7 +274,7 @@ One commit. Lists below were produced by `git rm` in the rehearsal clone.
       `test_tui_skeleton.py`, `test_tui_target.py`, `test_tui_verify.py`,
       `test_turn_based_game.py`, `test_verifier_wiring.py`, `test_verify.py`,
       `test_web.py`, `test_web_asks_the_tree.py`
-- [ ] Also: `tests/tui_probe_base_screen.py`, `tests/artifacts/` (one
+- [x] Also: `tests/tui_probe_base_screen.py`, `tests/artifacts/` (one
       `kitten_chess/.protopilot/spec.json`), and
       `tests/golden/{crud_offline,tui_offline,web_skeleton}_manifest.json`.
       `tests/golden/plan_offline_manifest.json` is not touched
@@ -283,51 +283,51 @@ One commit. Lists below were produced by `git rm` in the rehearsal clone.
 
 Each line is what the rehearsal showed failing or failing to import.
 
-- [ ] `tests/conftest.py`: delete the `spec` fixture (line 120) and the `helper`
+- [x] `tests/conftest.py`: delete the `spec` fixture (line 120) and the `helper`
       fixture (line 163). It is a skeletor-recorded file; this only removes our
       additions
-- [ ] `tests/test_lifecycle.py`: keep the five `ls` and `prune` tests (lines
+- [x] `tests/test_lifecycle.py`: keep the five `ls` and `prune` tests (lines
       45, 56, 78, 88, 95) on plan trees; delete `test_ls_marks_a_running_prototype`
       and every `gc`, `set_port`, `up` and `down` test
-- [ ] `tests/test_proto_doctor.py`: keep the three backend tests (lines 222,
+- [x] `tests/test_proto_doctor.py`: keep the three backend tests (lines 222,
       235, 249); delete the seven target and Docker tests; the fixture stops
       patching `cli.free_port`
-- [ ] `tests/test_job_events.py`: keep the three `Job`/`JobStore` tests (lines
+- [x] `tests/test_job_events.py`: keep the three `Job`/`JobStore` tests (lines
       89, 102, 113); delete the five that run a generation
-- [ ] `tests/test_llm.py`: drop the `passes` and `clarify` imports;
+- [x] `tests/test_llm.py`: drop the `passes` and `clarify` imports;
       `test_every_schema_proto_new_sends_reaches_the_api_unchanged` becomes the
       same assertion over every schema under `protopilot.plan.passes`, if
       `tests/test_plan_model_output.py` does not already hold it
-- [ ] `tests/test_registry.py`: drop `is_test_path`; `test_prune_drops_…` and
+- [x] `tests/test_registry.py`: drop `is_test_path`; `test_prune_drops_…` and
       `test_delete_removes_…` build plan trees
-- [ ] `tests/test_registry_hardening.py`: delete the `client` fixture and
+- [x] `tests/test_registry_hardening.py`: delete the `client` fixture and
       `test_the_web_deletes_the_app_that_shares_an_idea_with_a_plan`
-- [ ] `tests/test_plan_surfaces.py`: delete
+- [x] `tests/test_plan_surfaces.py`: delete
       `test_every_app_verb_refuses_a_plan_…`, `test_ls_shows_both_kinds_side_by_side`,
       `test_down_all_never_reaches_a_plan` and the three web tests
-- [ ] `tests/test_plan_kind_guards.py`: the two `app` cases of
+- [x] `tests/test_plan_kind_guards.py`: the two `app` cases of
       `test_tree_kind_reads_only_our_own_files` now expect `None`; delete
       `test_delete_asks_the_tree_…stops_a_stack_that_appeared`,
       `test_an_app_verb_run_inside_a_plan_tree_refuses_it`,
       `test_down_all_with_only_plans_has_nothing_to_stop` and the seven web
       tests; `test_an_entry_with_an_unknown_kind_…` loses its Docker recorder
-- [ ] `tests/test_plan_registry.py`: `test_an_entry_written_before_kinds_existed_reads_as_an_app`
+- [x] `tests/test_plan_registry.py`: `test_an_entry_written_before_kinds_existed_reads_as_an_app`
       keeps its name and asserts the row is listed `old`;
       `test_delete_still_calls_an_apps_stack_down` becomes a refusal test
-- [ ] `tests/test_plan_cli.py:652`: the first-contact test asserts `new` is not a
+- [x] `tests/test_plan_cli.py:652`: the first-contact test asserts `new` is not a
       command
-- [ ] New, in `tests/test_registry_hardening.py`: a registry file written by
+- [x] New, in `tests/test_registry_hardening.py`: a registry file written by
       0.3.0 (one `app` row with a port, one row with no `kind`, one `plan` row
       with `"port": null`, one row with an unknown key) survives
       `ls` → `record` → `load` with all four rows present, and `prune` forgets
       exactly the first two
-- [ ] New, in `tests/test_plan_surfaces.py`: `proto rm` on a folder holding
+- [x] New, in `tests/test_plan_surfaces.py`: `proto rm` on a folder holding
       `.protopilot/spec.json` exits non-zero, deletes nothing, and names
       `docker compose down -v`
-- [ ] `tests/cli_smoke_allowlist.yaml`: the `check health` reason loses "docker
+- [x] `tests/cli_smoke_allowlist.yaml`: the `check health` reason loses "docker
       daemon" and "a free port"
-- [ ] `./pp check lint && ./pp check docs && ./pp test unit`
-- [ ] Commit: `feat(cli)!: remove the prototyping layer`, with a
+- [x] `./pp check lint && ./pp check docs && ./pp test unit`
+- [x] Commit: `feat(cli)!: remove the prototyping layer`, with a
       `BREAKING CHANGE:` paragraph naming the removed verbs and the tag
 
 ## Phase 4 — Dependencies and CI
