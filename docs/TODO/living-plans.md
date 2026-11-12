@@ -105,12 +105,13 @@ maturing, no code).
 five lines, and the phase order below carries a sentence saying which run put
 each phase where it is.
 
+**Ruled by Jeston, 2026-11-11:** house.fly's and Node Zero's ideas may go
+through the model, and the resulting plans may be committed to those repos. Each
+commit is a change in that repo, under its own rules.
+
 **Open questions for Jeston**
 
-1. Is it acceptable to put house.fly's and Node Zero's ideas through a model on
-   the `claude-code` backend, and may the resulting plans be committed to those
-   repos, or do they stay local?
-2. Three runs or five? Each is 10–20 minutes of research at `standard`.
+1. Three runs or five? Each is 10–20 minutes of research at `standard`.
 
 ### Dogfood record
 
@@ -207,8 +208,9 @@ nothing else.
 **Open questions for Jeston**
 
 1. `proto answer` and `proto topic` and `proto research` as top-level verbs, or
-   one group (`proto revise …`)? Top-level is shorter and matches `proto dream`;
-   it also puts three more words in a `--help` that was just cut to six.
+   one group (`proto revise …`)? **Recommended, not yet ruled: top-level.** Each
+   is a noun a plan already has, it matches `proto dream`, and a group makes
+   `proto revise topic add` three words deep. The cost is a longer `--help`.
 2. When an answer plainly changes a topic, should the tool say "this answer
    touches *Audience*; run `proto research audience`", or stay silent? The
    first needs a model call to judge.
@@ -226,25 +228,27 @@ both in `protopilot/plan/render.py` beside `render()`:
 - `proto export --single [--dir] [--to FILE]`: the tree as one markdown file.
   Dreams stay in their own section under their own heading, so the medium still
   enforces the label (`verify.dreams_apart` is the rule it must not break).
-- `proto export --brief [--dir] [--to FILE]`: a `BRIEF.md` an agent can start
-  from. Goal, audience, horizon, constraints; the first steps in order with
+- `proto export --brief [--dir] [--to FILE]`: a `BRIEF.md` with two readers in
+  order (ruled 2026-11-11): **a person, who understands, directs and approves
+  it, and then an agent, which implements it.** It opens with what a person
+  needs to rule on in one screen, and the agent's section follows. Goal, audience, horizon, constraints; the first steps in order with
   their reasons; per topic, the decisions somebody must make and the risks;
   open questions; and a plain statement of what is an assumption. **It carries
   no finding as a fact unless it is cited**, and it says how many are not. A
   red plan is refused: a handoff of something known to be incoherent is worse
   than none.
 
-The seam with skeletor is a published artifact, and the workspace rule applies:
-*run the actual consumer against the actual producer before believing either.*
-What proto.pilot may know about skeletor is nothing. So:
+**skeletor is not a reader of the brief** (ruled 2026-11-11). It carries no
+front matter shaped for `skeletor-new` and nothing here is reported to skeletor.
 
-- The brief has a small front-matter block of neutral facts: `name`, `slug`,
-  `tagline` (one sentence, from `goal`). Those happen to be what
-  `skeletor-new --name --slug --tagline` takes. No flag names, no tier, no
-  language, no command line for skeletor is written by proto.pilot. If skeletor
-  wants to read a brief, that reader is skeletor's.
-- The format is written down once, in `docs/ARCHITECTURE.md`, as a contract
-  with a version field, because a second repo will hold an assumption about it.
+- The person's part comes first: the goal, what was assumed and not checked,
+  the decisions the plan leaves to them, and the first step. They direct by
+  revising the plan (Phase 2) and exporting again, never by editing the brief.
+- Approval is recorded in `plan.json` (who is not stored; the date and the
+  plan's state at that moment are), and the brief says whether the plan it was
+  drawn from is the approved one. A plan changed after approval says so.
+- The format is written down once, in `docs/ARCHITECTURE.md`, with a version
+  field, because an agent prompt somewhere will hold an assumption about it.
 
 Tasks:
 
@@ -252,24 +256,22 @@ Tasks:
       golden manifest beside `tests/golden/plan_offline_manifest.json`
 - [ ] `proto export`, refusing a red plan and a tree that is not a plan
 - [ ] A test that no dream text reaches the brief, reusing `verify.leaks`
-- [ ] Run the real consumers, and record what happened here:
-      hand `BRIEF.md` to a coding agent in an empty directory and read what it
-      does first (~operator); scaffold with `../skeletor/bin/skeletor-new` using
-      the three front-matter values and confirm the tree's gates pass (~operator)
-- [ ] Report to skeletor, in its repo, that the brief exists and what its three
-      fields are. Whether skeletor grows a reader is skeletor's decision
-      (~operator)
-- [ ] Add the brief's contract to `skyrow-workspace/strategy/seams/` once a
-      second repo reads it (~operator, and a separate change in that repo)
+- [ ] The approval record, written by a verb that calls no model and lands
+      through `_land`; a test that a plan changed after approval exports a brief
+      saying so
+- [ ] Run the real readers, and record what happened here: Jeston reads a
+      `BRIEF.md` from a Phase 1 plan and says whether he could approve from it
+      alone (~operator); the approved brief is handed to a coding agent in an
+      empty directory, and what it does first is read (~operator)
 
 **Done is checked by:** both goldens stable across two runs; `proto export
 --brief` on a red plan exits 1 and writes nothing; and the two operator runs
-are recorded with what the consumer got wrong.
+are recorded with what each reader got wrong.
 
 **Open questions for Jeston**
 
-1. Is the brief for an agent, for skeletor, or for a person forwarding it? One
-   file cannot be tuned for all three; the sketch above picks the agent.
+1. Does approving need its own verb (`proto approve`), or is it a flag on
+   `proto export --brief`? A verb keeps "I read it" apart from "I made a file".
 2. Should `BRIEF.md` be written by every `proto plan`, as an eleventh file, or
    only on request? An eleventh file moves the offline golden.
 
@@ -325,79 +327,58 @@ exits 0 if its structure holds; and the operator's one real probe is in the
 
 **Open questions for Jeston**
 
-1. One probe per plan, or one per first step? One keeps it a decision; several
-   make it a checklist nobody finishes.
+1. One probe per plan, or one per first step? **Recommended, not yet ruled:
+   one open probe at a time.** One keeps it a decision; several make a
+   checklist nobody finishes. Once an outcome is recorded the plan may name the
+   next, and recorded probes are kept as history.
 2. After `--broke`, should the plan go red until the topic is re-researched?
    The sketch says no: a broken assumption is knowledge, and red means
    incoherent.
 3. Is the operator's note enough, or should `record` take a `--evidence` path or
    URL? A URL invites treating it as a fetched source, which it is not.
 
-## Phase 5 — Wider research
+## Phase 5 — Research stays on the subscription
 
-**Problem.** Research runs on `claude-code` only. A user with API credit and no
-subscription gets `API_RESEARCH` and a plan stamped *Not researched*. And the
+**Ruled by Jeston, 2026-11-11:** no API credit is bought. Research is done from
+subscription usage, which is the `claude-code` backend, and the API backend's
+research is not built or measured.
+
+**Problem.** `ClaudeLLM.research_refusal` (`API_RESEARCH`) still reads as a
+deferral: the API backend's web search "has never been run here". And the
 offline baseline writes the same six topics for every idea
 (`plan/baseline.py::TOPICS`), which is what the README's first run shows.
 
 **Design sketch.**
 
-*API backend.* `ClaudeLLM.research` exists as a refusal. Building it means the
-API's server-side web search and web fetch tools on one call per topic, and the
-ledger reading that response instead of a CLI transcript. The honest part:
-
-- **The ledger is the hard half.** `ledger.fetches` reads `claude --print`'s
-  `stream-json`. The API returns tool-result blocks of a different shape, and
-  whether a failed or empty fetch is distinguishable there is not known. It was
-  not obvious on the CLI either (plan-prototypes, Phase 1: "a failed fetch does
-  not look failed"). **Measure first, as that phase did, before designing.**
-- **Cost is real money on this path.** The CLI's reported price for one topic
-  was $0.37–$0.53 on a subscription that did not charge it. On the API that is
-  billed, plus the search tool's own per-use fee, so a `standard` plan is on the
-  order of a few dollars and `deep` more. The checkpoint already prints a call
-  estimate (`pipeline.call_estimate`); on this backend it must print a price
-  range before the first call, and the measurement has to supply it.
-- **This repo's own account has no API balance** (the owner's note, 2026-11).
-  The measurement needs credit bought for it, which is why it is an operator
-  task and why this phase is last.
-- **Isolation is a different mechanism.** `RESEARCH_ISOLATION` is CLI flags
-  checked against the stream. On the API the guarantee is the tools list sent,
-  which is easier to hold and needs its own test.
-
-*Offline baseline.* It cannot research and must not pretend to. What it can do
-without a model is stop being identical: pick its topics from a few fixed sets
-by cheap signals in the idea (a place, a product, an event, a piece of
-software), still deterministic, still stamped *Not researched*, every finding
-still an assumption.
+- The refusal becomes final and says what to do: research needs the
+  `claude-code` backend and a Claude subscription. The two deferrals carried in
+  plan-prototypes (Phases 1 and 6) are closed by pointing here.
+- *Offline baseline.* It cannot research and must not pretend to. What it can do
+  without a model is stop being identical: pick its topics from a few fixed sets
+  by cheap signals in the idea (a place, a product, an event, a piece of
+  software), still deterministic, still stamped *Not researched*, every finding
+  still an assumption.
 
 Tasks:
 
-- [ ] Measure one topic on the API backend with web search and fetch: time,
-      billed cost, whether the schema holds with tools on, and whether each
-      fetch and its failure can be read from the response. Record it here as
-      plan-prototypes Phase 1 did (~operator: needs API credit)
-- [ ] Decide from the measurement: build, or write the refusal's reason down as
-      final and delete the "so far" from `API_RESEARCH`
-- [ ] If built: `ClaudeLLM.research`, a second reader in `ledger` behind the
-      same `Fetch` record, the price line at the checkpoint, and an isolation
-      test over the request's tool list
-- [ ] Baseline: two or three topic sets and the chooser, each with its own
-      golden; the existing six stay the fallback so today's golden does not move
-- [ ] `README.md`, *What a plan does not know yet*, says what each backend can
-      and cannot show
+- [ ] Reword `API_RESEARCH` as a final refusal that names the backend to use,
+      and update the test that pins its text
+- [ ] `README.md`, *What a plan does not know yet*, says research runs on a
+      subscription only and why
+- [ ] Baseline, if question 1 below is answered yes: two or three topic sets and
+      the chooser, each with its own golden; the existing six stay the fallback
+      so today's golden does not move
 
-**Done is checked by:** the measurement table is in this file whatever the
-decision; if built, a scripted API response with one failed fetch yields a
-finding labelled an assumption, as the CLI path's test does; and
+**Done is checked by:** `proto plan --backend api` without `--no-research` says
+in one sentence which backend researches; and, if the baseline is built,
 `proto plan --offline` on a software idea and on a place idea give different
 topic lists, each byte-stable.
 
 **Open questions for Jeston**
 
-1. Is API research worth buying credit to measure, given nobody but the owner
-   runs this yet? If not, cut it here and keep the refusal.
-2. A less generic baseline is more code that no real plan uses. Is the offline
+1. A less generic baseline is more code that no real plan uses. Is the offline
    run a demo worth improving, or only the test suite's fixture?
+   **Recommended, not yet ruled: fixture only, cut it.**
 
 ## Acceptance
 
@@ -430,14 +411,15 @@ topic lists, each byte-stable.
 - **Handing the plan to the Improvement Loop for repeat research rounds.** Also
   deferred there. That design is filed as dropped; `proto research SLUG` is the
   one-topic version a person asks for.
-- **Writing `skeletor-new`'s command line into the brief.** It would put
-  another repo's flag names in this one and break silently when they change.
-  The brief states neutral facts; the reader belongs to whoever reads.
 - **Having the model judge whether its own findings are true.** A second call
   with the same blind spot. Phase 4 puts the judgement where the evidence is:
   a person who tried it.
 - **Counting a recorded outcome as a source.** It was not fetched and no
   transcript vouches for it. It is rendered as the operator's word, apart.
+- **Research on the API backend.** Ruled out 2026-11-11: it needs API credit
+  bought to measure it, and research is to come from subscription usage.
+- **A brief shaped for `skeletor-new`.** Ruled out 2026-11-11: the brief's
+  readers are a person and then an agent.
 - **Running research on several topics in parallel.** It would cut wall time,
   and plan-prototypes measured two minutes a topic in series. Left out: no
   Phase 1 run has yet said the wait is the problem, and parallel subscription
