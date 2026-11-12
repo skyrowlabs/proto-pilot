@@ -151,18 +151,32 @@ the next time `proto plan` redraws it.
 | Command | On a plan |
 | ------- | --------- |
 | `proto ls` | Listed with its kind, and `gone` once its `plan.json` is |
-| `proto rm` | Deletes the folder and forgets it |
-| `proto prune` | Forgets it once its `plan.json` is gone |
+| `proto rm` | Deletes the folder and forgets it. `--dir` names the folder, which defaults to the current one, and `--yes` skips the confirmation |
+| `proto prune` | Forgets it once its `plan.json` is gone. `--yes` skips the confirmation |
+
+`proto ls` prints one row per entry: its state, kind, slug and path. The state is `-`
+for a plan on disk, `gone` or `old`. It ends on `N plan(s)`, then a line counting the
+`gone` rows and a line counting the `old` ones, each only when there are any. It reads
+the list and never changes it. `proto prune` lists what it will forget, asks, and then
+reports `forgot N: G gone, O old`. It changes the list only, never a folder.
 
 What a folder is comes from its own files, never from the list: a `plan.json` there
 makes it a plan. A folder without one, including one whose research stopped before
 `plan.json` was written, is refused by `proto rm`, and so are `/` and any folder that
 is or holds your home or the list itself.
 
-**A prototype made by an older proto.pilot is not a plan.** Its row is listed as `old`,
-`proto prune` forgets the row and leaves the folder alone, and `proto rm` refuses the
-folder, saying what to run there instead. Two folders
+**A prototype made by an older proto.pilot is not a plan.** Its row, of kind `app` or
+with no kind, is listed as `old`, and `proto prune` forgets the row and leaves the
+folder alone. `proto rm` refuses a folder holding the `spec.json` such a prototype
+kept, even when a `plan.json` sits beside it, and says what to run
+there instead: `docker compose down -v` for a web prototype, then delete the folder by
+hand. Two folders
 never share a slug in the list: one whose slug is taken is listed as `_2`, `_3`.
+
+`proto doctor` takes no flag. It reports whether the `anthropic` SDK is installed and
+whether each backend, API credit and a Claude subscription, is reachable. It exits 0
+when the SDK is there and at least one backend answers, and 1 otherwise; `--offline`
+works either way.
 
 ## `proto dream`
 

@@ -12,9 +12,9 @@ summary: "Let a plan be revised, tested and handed off after it is made: answer 
 
 > **Status**: 🔴 Planned
 > **Shelf-Status**: planned
-> **Priority**: Medium — the product after [remove-prototyping](remove-prototyping.md) is one command and a pool of dreams
+> **Priority**: Medium — the product after [remove-prototyping](../implementations/spec/remove-prototyping.md) is one command and a pool of dreams
 > **Updated**: 2026-11-11
-> **Depends on**: [`remove-prototyping.md`](remove-prototyping.md) — every phase here edits `protopilot/cli.py` and `registry.py`, which that plan rewrites
+> **Depends on**: [`remove-prototyping.md`](../implementations/spec/remove-prototyping.md) — every phase here edits `protopilot/cli.py` and `registry.py`, which that plan rewrites
 
 Not `ready`: Phase 1 is a person's reading, and its findings may reorder or cut
 the rest. Each later phase also lists questions only Jeston can answer.

@@ -33,9 +33,10 @@ is the last commit that holds it.
 - ~~**Archetypes and Theme is the next real piece of work.**~~ **Shipped
   2026-09-01**, all six phases, and filed at
   [docs/implementations/spec/](implementations/spec/archetypes-and-theme.md).
-  `Spec` now has two orthogonal axes — `archetype` (shape) and `theme` (look) —
+  `Spec` had two orthogonal axes — `archetype` (shape) and `theme` (look) —
   with the archetype owning its questions, screens, prompt fragments and
-  offline baseline, and the theme reaching the UI pass and nothing else.
+  offline baseline, and the theme reaching the UI pass and nothing else. All of
+  it left the tree on 2026-11-11 with the prototyping layer.
 
   Read the landed-notes rather than this paragraph. Each phase spent one live
   call on the half the offline baseline cannot reach, and **every one of them
@@ -488,7 +489,11 @@ is the last commit that holds it.
 ## Ideas — not scheduled
 
 - **[Sketches, not scaffolds](ideas/sketches-not-scaffolds.md)** — the
-  direction as of 2026-09-03. proto.pilot emits a *terminal* app you look at and
+  direction from 2026-09-03 until [plans-first](ideas/plans-first.md) superseded
+  its first decision on 2026-11-06; the terminal target it led to left the tree
+  on 2026-11-11. The paragraphs below are as written then.
+
+  proto.pilot emits a *terminal* app you look at and
   throw away, not a web app you could build on, and ships as a tool other
   developers run rather than a service we host. The request was never "make me a
   camping app" — it is "iterate to this idea and show me a prototype", and the
@@ -532,12 +537,14 @@ is the last commit that holds it.
   local model only matches that if the serving runtime does constrained decoding
   (vLLM guided decoding, llama.cpp GBNF, Ollama structured outputs). Pick the runtime
   for that property first; a backend that returns *almost* valid JSON is worse than
-  no backend, because the repair loop will spend real attempts on it.
+  no backend, because a pass whose output a plan cannot hold fails the run.
 
-  Two smaller things to check when it happens: the stack brief is byte-identical
-  across passes specifically to stay a cache prefix — that still pays off locally,
-  but as a serving-side prefix cache rather than as Anthropic's, so confirm the
-  runtime actually has one. And `ClaudeLLM` carries streaming and a refusal fallback
+  **Research is the part this does not reach.** It is a second Protocol,
+  `Researcher`, that only the `claude-code` backend implements, so a plan made on a
+  local backend is stamped *Not researched* until that backend has a web-reading call
+  of its own.
+
+  One smaller thing to check when it happens: `ClaudeLLM` carries streaming and a refusal fallback
   that a local backend has no equivalent of and probably does not need; do not port
   the shape, port the interface.
 
@@ -545,8 +552,8 @@ is the last commit that holds it.
   what corpus, at what cost crossover, aimed at a public skyrow.ai — is
   R1 in the research queue (`skyrow-workspace/strategy/research.md`).
 
-  Expectation-setting: the five passes each read the previous pass's real source, so
-  context is long and quality-sensitive. Treat the first local backend as a way to
+  Expectation-setting: each plan pass reads the plan the passes before it built, so
+  context grows and is quality-sensitive. Treat the first local backend as a way to
   *measure* how far a smaller model is from usable — the offline baseline already
   gives a floor and Claude gives a ceiling, so the corpus of green/red verdicts is
   the natural scoreboard. It is an experiment with a built-in grader, not a swap.

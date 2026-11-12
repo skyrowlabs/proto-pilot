@@ -1,7 +1,7 @@
 {
   "_generated_by": "scripts/docs/gen_impl_index.py",
   "_note": "Generated — never hand-edit. Edit the doc's frontmatter and rerun.",
-  "count": 6,
+  "count": 7,
   "by_category": {
     "dropped": [
       "drawing-freedom",
@@ -11,6 +11,7 @@
       "archetypes-and-theme",
       "plan-prototypes",
       "proto-console",
+      "remove-prototyping",
       "terminal-target"
     ]
   },
@@ -112,6 +113,27 @@
       "category": "spec",
       "completed": "2026-09-04",
       "agent_value": 3
+    },
+    {
+      "slug": "remove-prototyping",
+      "title": "Remove Prototyping",
+      "path": "docs/implementations/spec/remove-prototyping.md",
+      "priority": "high",
+      "updated": "2026-11-11",
+      "tags": [
+        "cli",
+        "plan",
+        "registry",
+        "tests",
+        "ci",
+        "docs"
+      ],
+      "summary": "Delete everything that generates, runs or verifies an app, both front ends included, so that the surviving CLI is plan, dream, ls, rm, prune and doctor.",
+      "open_tasks": 0,
+      "auto_generated": false,
+      "category": "spec",
+      "completed": "2026-11-11",
+      "agent_value": 2
     },
     {
       "slug": "terminal-target",

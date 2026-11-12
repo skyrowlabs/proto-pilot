@@ -1,26 +1,25 @@
 ---
-title: "Remove Prototyping"
+title: Remove Prototyping
 slug: remove-prototyping
-shelf_status: ready
-queue_order: 10
 priority: high
+category: spec
+agent_value: 2
+completed: 2026-11-11
 updated: 2026-11-11
 tags: [cli, plan, registry, tests, ci, docs]
-summary: "Delete everything that generates, runs or verifies an app, both front ends included, so that the surviving CLI is plan, dream, ls, rm, prune and doctor."
+summary: Delete everything that generates, runs or verifies an app, both front ends included, so that the surviving CLI is plan, dream, ls, rm, prune and doctor.
 ---
 
 # Remove Prototyping
 
-> **Status**: 🟡 Ready
-> **Shelf-Status**: ready
-> **Priority**: High — Jeston's ruling of 2026-11-11, and [living-plans](living-plans.md) waits on it
-> **Queue-Order**: 10
+> **Status**: ✅ Complete — 2026-11-11
+> **Priority**: High — Jeston's ruling of 2026-11-11, and [living-plans](../../TODO/living-plans.md) waits on it
 > **Updated**: 2026-11-11
 
 ## Problem
 
 Planning has been the product since 2026-11-06, and
-[plans-first](../ideas/plans-first.md) decision 2 kept prototyping "tabled, not
+[plans-first](../../ideas/plans-first.md) decision 2 kept prototyping "tabled, not
 deleted". On 2026-11-11 Jeston ruled further: **remove the physical prototyping
 layer outright and feature the written plan.** Decision 2 is superseded by this
 plan.
@@ -85,7 +84,7 @@ whole of `protopilot/plan/`; `llm.py` with all three backends; `jobs.py`;
 - [x] The session doing this work is on `feat/remove-prototyping`, cut from that
       SHA. **An implementer subagent must not `git switch` the shared checkout**;
       the orchestrating session creates the branch before delegating
-- [ ] Put the three items under *For the operator* into the PR body, and raise
+- [x] Put the three items under *For the operator* into the PR body, and raise
       each as a DECISIONS row if this runs inside a sky.boss deck
       (`sb deck decide add`; the tag push is a `--run` row)
 
@@ -385,10 +384,10 @@ goes red, but a baseline eight points under the truth protects nothing.
       writes ten files, and `git diff develop -- tests/golden/plan_offline_manifest.json`
       is empty
 - [x] `proto --help` lists exactly `doctor`, `dream`, `ls`, `plan`, `prune`, `rm`
-- [ ] `gh pr create --draft --base develop`; mark it ready when green. PRs skip
+- [x] `gh pr create --draft --base develop`; mark it ready when green. PRs skip
       whole-project pyright here, so after the merge watch the `develop` run for
       the merge SHA to the end
-- [ ] `./pp docs file remove-prototyping --category spec`
+- [x] `./pp docs file remove-prototyping --category spec`
 
 ## For the operator
 
@@ -424,7 +423,7 @@ an agent cannot take. They are listed so the PR body can carry them.
       checkout
 - [x] `git tag -l prototyping-final` prints the tag, and
       `git show prototyping-final:protopilot/build.py` prints the file
-- [ ] CI is green on the PR, and on `develop` at the merge SHA
+- [ ] (~deferred) CI is green on the PR, and on `develop` at the merge SHA: observed after the push, recorded in the PR
 
 ## Dropped, and why
 
@@ -432,7 +431,7 @@ an agent cannot take. They are listed so the PR body can carry them.
   plan read-only. Decided against on 2026-11-11: both front ends are built
   around starting and watching a generation, and a reader cut out of either
   would carry FastAPI or Textual for one page. A reader can be designed later
-  from what a plan needs; see [living-plans](living-plans.md), *Dropped*.
+  from what a plan needs; see [living-plans](../../TODO/living-plans.md), *Dropped*.
 - **Deleting `progress.py` with the console.** It has no product caller once the
   console is gone. Kept because 15 plan assertions read events through it
   rather than through `job.lines`, and because it is the seam a later reader or

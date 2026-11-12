@@ -252,11 +252,15 @@ one model value in a file name is a topic slug, which `model.py` checks, and
   comes from the tree's own files (`registry.tree_kind`), never from the index:
   `plan.json` is a plan and anything else is not ours, so a tree with only research
   in progress is not, and neither is a tree holding a prototype an older version
-  generated, even beside a plan. The index's kind is only displayed: `proto ls`
-  prints it in a column, reads an `app` entry as `old`, and reads any other entry
-  that is not a plan on disk as `gone`. `proto rm` deletes a plan and refuses everything else, and
-  `proto prune` forgets `old` and `gone` entries and never touches a folder. A slug
-  another path holds is recorded with `_2`, `_3`, so a slug names one entry.
+  generated, even beside a plan. The index's kind never decides what happens to a
+  folder; it decides how a row is listed and whether `proto prune` forgets it. A
+  row is here (`-`) only when it is of kind `plan` and its path holds a plan.
+  `proto ls` prints that state and the kind in columns, reads an `app` entry, or one
+  with no kind, as `old`, and reads any other entry that is not a plan on disk as
+  `gone`; it ends on a count of plans, and a line for each of the other two when there are any. `proto rm`
+  deletes a plan and refuses everything else, and `proto prune` forgets `old` and
+  `gone` entries and never touches a folder. A slug another path holds is recorded
+  with `_2`, `_3`, so a slug names one entry.
 
 ## Critical Patterns
 
@@ -292,6 +296,8 @@ your home or the registry file.
 not know, and `save` writes back what `load` returned. A loader that skipped
 such a row would erase it on the next save, with nothing going red: the list
 would just be shorter. Only `proto prune`, run by a person, forgets a row.
+`Entry.port` is the same rule for one field: nothing here sets or reads it, and an
+older row's port is written back as it was read.
 
 ## Decisions and Their Reasons
 

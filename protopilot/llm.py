@@ -338,9 +338,8 @@ class ClaudeCodeLLM:
     README.
 
     The trade is real. Every invocation carries Claude Code's own system
-    prompt and tool definitions (~26k tokens), so the STACK_BRIEF-as-cache-
-    prefix design that makes `ClaudeLLM` cheap does not apply here. This
-    backend is slower per pass and noisier in tokens; it is also the one that
+    prompt and tool definitions (~26k tokens), which no cache prefix of ours
+    can absorb. This backend is slower per pass and noisier in tokens; it is also the one that
     works when the balance is zero.
     """
 

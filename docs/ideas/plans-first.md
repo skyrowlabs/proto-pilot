@@ -15,7 +15,7 @@
    written plan is featured: the generator, both targets and both front ends left
    the tree, and the CLI is `plan`, `dream`, `ls`, `rm`, `prune` and `doctor`.
    The plan that did it is
-   [remove-prototyping](../TODO/remove-prototyping.md), and the last commit that
+   [remove-prototyping](../implementations/spec/remove-prototyping.md), and the last commit that
    holds both layers is the tag `prototyping-final`.
 3. **A physical prototype comes later in an idea's life, if at all.** It belongs
    after the idea is concrete and agents have more to work with. Since
