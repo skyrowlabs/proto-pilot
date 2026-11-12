@@ -189,7 +189,7 @@ Tasks:
 - [x] The dropped-topics list on `Plan`, with a test that an old `plan.json`
       without it loads and saves byte-identical
 - [x] `proto research SLUG`, resumable as the first run's research is
-- [ ] The held-topic guard on repair, with a planted repair that rewrites
+- [x] The held-topic guard on repair, with a planted repair that rewrites
       another topic
 - [ ] The partly-researched stamp, with a planted-failure test per check it
       touches, as `test_every_check_has_a_planted_failure` requires

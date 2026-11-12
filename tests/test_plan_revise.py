@@ -14,8 +14,8 @@ from protopilot import cli
 from protopilot.jobs import Job
 from protopilot.llm import LLMError
 from protopilot.plan import baseline, ledger, pipeline, render, revising, verify
-from protopilot.plan.model import MAX_TOPICS, MIN_TOPICS, Plan
-from protopilot.plan.passes import connect, consider, outline, research
+from protopilot.plan.model import MAX_TOPICS, MIN_TOPICS, Edge, Plan
+from protopilot.plan.passes import connect, consider, outline, repair, research
 
 pytestmark = [pytest.mark.unit]
 
@@ -900,3 +900,76 @@ def test_the_twins_of_a_narrowed_pass_return_that_topic_alone():
     assert consider.schema(plan, only="scope")["properties"]["topics"]["items"]["properties"]["slug"]["enum"] == [
         "scope"
     ]
+
+
+# -- the held-topic guard on repair ---------------------------------------
+
+WAITS = edge("members", "tools")
+#: The plan's links once `members` is fitted to wait on `tools`, which its one step then jumps.
+REFITTED = [edge("lending", "members"), edge("money", "space", "informs"), WAITS]
+MENDED = repair_of(REFITTED, ["tools", "members"])
+#: A repair that mends the step and also links two topics the change never touched.
+STRAYS = repair_of([*REFITTED, edge("money", "safety")], ["tools", "members"])
+
+
+def test_a_planted_repair_that_rewrites_another_topics_links_is_thrown_away(tmp_path):
+    tree = researched_plan(tmp_path / "tree")
+    llm = ResearchingLLM([*refit(edge("lending", "members"), WAITS), STRAYS, MENDED], {"members": AGAIN})
+    job = job_for()
+    assert pipeline.research_topic(job, tree, "members", llm).ok
+    rejected = [e["reason"] for e in job.events if e["kind"] == "repair_rejected"]
+    assert rejected == ["it added links between settled topics: money depends-on safety"]
+    plan = Plan.load(tree)
+    assert [e.model_dump() for e in plan.edges] == REFITTED and [s.topic for s in plan.steps] == ["tools", "members"]
+
+
+def test_a_repair_after_a_change_is_told_which_topic_changed(tmp_path):
+    tree = researched_plan(tmp_path / "tree")
+    llm = ResearchingLLM([*refit(edge("lending", "members"), WAITS), MENDED], {"members": AGAIN})
+    assert again(tree, llm).ok
+    asked = llm.calls[-1]["user"]
+    assert "A person has just changed one part of this plan: members." in asked
+    assert repair.SETTLED_RULE not in asked
+
+
+def test_a_repair_that_only_ever_strays_changes_nothing(tmp_path):
+    tree = researched_plan(tmp_path / "tree")
+    before = snapshot(tree)
+    llm = ResearchingLLM([*refit(edge("lending", "members"), WAITS), STRAYS, STRAYS, STRAYS], {"members": AGAIN})
+    with pytest.raises(pipeline.PlanRefused, match="Nothing was changed, because the result failed its checks"):
+        again(tree, llm)
+    assert changed(before, snapshot(tree)) == [".protopilot/research/members.2.jsonl"]
+
+
+def held_and(change) -> tuple[Plan, Plan]:
+    held = baseline.build_plan(IDEA)
+    return held, change(held)
+
+
+def reworded(plan: Plan, slug: str) -> Plan:
+    topics = [t.model_copy(update={"risks": ["Rewritten."]}) if t.slug == slug else t for t in plan.topics]
+    return plan.revised(topics=topics)
+
+
+def test_a_repair_that_rewrites_another_topic_is_named_and_the_changed_one_is_free():
+    held, after = held_and(lambda plan: reworded(plan, "risks"))
+    assert repair.unsettled(held, after, frozenset({"scope"})) == "it rewrote settled topics: risks"
+    assert repair.unsettled(held, after, frozenset({"risks"})) == ""
+
+
+def test_only_the_changed_topics_links_and_steps_may_move():
+    held, after = held_and(lambda plan: plan.revised(edges=plan.edges[1:], steps=plan.steps[:2]))
+    lost = "scope depends-on audience"
+    assert repair.unsettled(held, after, frozenset({"risks"})) == f"it removed settled links: {lost}"
+    assert repair.unsettled(held, after, frozenset({"scope"})) == ""
+    assert repair.unsettled(held, held.revised(steps=held.steps[1:]), frozenset({"scope"})) == (
+        "it changed settled steps: audience"
+    )
+
+
+def test_with_no_topic_named_the_guard_still_opens_only_the_new_ones():
+    held = baseline.build_plan(IDEA)
+    grown = outline.add(held, "Insurance", "It matters.")
+    linked = grown.revised(edges=[*grown.edges, Edge(from_topic="insurance", to_topic="scope", kind="informs")])
+    assert repair.unsettled(held, linked) == ""
+    assert repair.unsettled(held, reworded(linked, "risks")) == "it rewrote settled topics: risks"
