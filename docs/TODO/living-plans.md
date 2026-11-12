@@ -242,6 +242,18 @@ otherwise.
 7. Adding a dropped title is told and then done, not refused. A research call that
    fails changes nothing, where a first run would record the topic as failed. `PLAN.md`
    lists dropped topics, which the sketch did not ask for.
+8. Only a transcript marked `<slug>.pending.json` is replayed, at the depth it was asked
+   at. A dropped topic's transcripts stay and are never replayed, and a drop of the only
+   researched topic leaves the plan *Not researched*.
+9. `proto topic rename` to a title another topic already has is refused in a sentence.
+   **Not yet ruled:** this is the coordinator's default.
+
+**Seen and left open**
+
+- Two open questions with the same text are one key to `proto answer`, so one answer
+  closes both.
+- `TopicResearch.topic` is not validated as a slug, though `ledger` builds a file name
+  from it.
 
 ## Phase 3 — A plan as a handoff
 

@@ -286,13 +286,16 @@ whose prompt holds the constraints. Enter at a prompt leaves that question open.
 with no open question says so and exits 0.
 
 **A slug is a topic's identity.** `rename` changes the title and nothing else, so the
-file name, the links, the steps, the dreams and the research stay with the topic.
+file name, the links, the steps, the dreams and the research stay with the topic. A
+title another topic already has is refused.
 
 **A drop removes what pointed at the topic, and says what it removed:** its links, its
 step, and any source no other topic cites. A dream that extended it is set aside with
 the reason "Its topic was dropped", never deleted, and a dream the topic was promoted
 from is dropped with your `--why`. The research transcript stays in
-`.protopilot/research/`. A plan keeps at least four topics. `start` runs again only when
+`.protopilot/research/`, and a later research of the same slug never replays it. If
+the topic was the only one researched, the plan is stamped *Not researched* again. A
+plan keeps at least four topics. `start` runs again only when
 the drop leaves no step to begin on, which is the one case a model is called; `--offline`
 takes the baseline's steps then.
 
@@ -313,8 +316,12 @@ written. If the call cites no page it fetched, the topic reads as not researched
 It runs on `--backend claude-code`, and is refused offline in a sentence.
 
 **A try that stopped after its research call is replayed.** The transcript is on disk
-before anything else runs, so if a later step fails the plan is left as it was and a
-rerun reads that transcript instead of paying for the call again.
+before anything else runs, beside a `<slug>.pending.json` that marks it as not landed, so
+if a later step fails the plan is left as it was and a rerun reads that transcript
+instead of paying for the call again. It is replayed at the depth it was asked at; a
+rerun with `--deeper` after a plain try asks again. Only a marked transcript is replayed:
+any other on disk, a dropped topic's included, is left alone, and a new call takes the
+next free number.
 
 **After any of these, repair may move only what touches the changed topic.** Links
 between other topics, their steps and their text are settled, and a repair that moves

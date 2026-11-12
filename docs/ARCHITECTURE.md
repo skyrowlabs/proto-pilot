@@ -205,13 +205,20 @@ one model value in a file name is a topic slug, which `model.py` checks, and
   pass. A slug is a topic's identity, so `rename_topic` changes the title alone.
   `revising.dropped` takes a topic with its links, its step, its ledger record and any
   source nothing else cites, sets aside a dream anchored to it, drops the dream it was
-  promoted from, and remembers it in `Plan.dropped_topics`, which `plan.json` omits when
+  promoted from, clears `researched` when no researched record is left, and remembers it
+  in `Plan.dropped_topics`, which `plan.json` omits when
   empty; `start` runs again only if no step is left. `dreams_shaped` lets a dream that is
   no longer on offer keep the anchor of a remembered topic. `add_topic` is
   `outline.add` then the promotion's own pass and guard.
 - **Re-research replaces one topic's record, never merges.** `research_topic` writes the
   new transcript under the next number before anything else, so a try that fails later
-  leaves the plan as it was and a rerun replays that transcript. Findings are replaced,
+  leaves the plan as it was and a rerun replays that transcript. What makes a transcript
+  replayable is its mark, `<slug>.pending.json` (`ledger.pending`): the number, the depth
+  asked, and the transcript the record named when the try began. A try is replayed at its
+  own depth unless the rerun asks for more, a mark from another state of the record is
+  ignored, and a landing or a drop removes it. Every other call is numbered past all the
+  topic's transcripts on disk (`ledger.next_number`), so a dropped topic added again is
+  researched afresh and no evidence is overwritten. Findings are replaced,
   a source only that topic cited is removed (`revising.without_orphans`), and
   `ledger.reconciled` settles `researched` from the records. `connect` and `consider` then
   run with `only=SLUG`: `connect.apply` refuses a link that does not touch the topic and
