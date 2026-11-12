@@ -365,17 +365,17 @@ statements of `protopilot/`, and the rehearsal read roughly 95% over them with
 four test files not yet repaired. The ratchet fails only on a drop, so nothing
 goes red, but a baseline eight points under the truth protects nothing.
 
-- [ ] Do not hand-edit the number. Record it from the nightly's own sequence on
+- [x] Do not hand-edit the number. Record it from the nightly's own sequence on
       `/usr/bin/python3.11`: a fresh venv, `scripts/requirements.txt`, the
       project through `scripts/install_project.py`, the unit run with `--cov`
       then the integration run with `--cov-append` as `coverage-nightly.yml`
       lines 80–110 spell them, `coverage xml -o tmp/coverage.xml`, then
       `python scripts/check_coverage_budget.py --suite scheduled --update --xml tmp/coverage.xml`
-- [ ] If the measurement is taken in a copy of the tree, clear `__pycache__`,
+- [x] If the measurement is taken in a copy of the tree, clear `__pycache__`,
       `.pytest_cache` and `.coverage` there first
-- [ ] `python scripts/check_coverage_budget.py --suite scheduled` passes against
+- [x] `python scripts/check_coverage_budget.py --suite scheduled` passes against
       the new number
-- [ ] Commit: `test(coverage): re-record the baseline over the planning code`,
+- [x] Commit: `test(coverage): re-record the baseline over the planning code`,
       with the old and new figures and the interpreter in the body
 
 ## Phase 6 — Prove it, and open the PR
