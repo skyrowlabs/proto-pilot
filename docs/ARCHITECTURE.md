@@ -213,12 +213,17 @@ one model value in a file name is a topic slug, which `model.py` checks, and
 - **Re-research replaces one topic's record, never merges.** `research_topic` writes the
   new transcript under the next number before anything else, so a try that fails later
   leaves the plan as it was and a rerun replays that transcript. What makes a transcript
-  replayable is its mark, `<slug>.pending.json` (`ledger.pending`): the number, the depth
-  asked, and the transcript the record named when the try began. A try is replayed at its
-  own depth unless the rerun asks for more, a mark from another state of the record is
-  ignored, and a landing or a drop removes it. Every other call is numbered past all the
-  topic's transcripts on disk (`ledger.next_number`), so a dropped topic added again is
-  researched afresh and no evidence is overwritten. Findings are replaced,
+  replayable is its mark, `<slug>.pending.json`: the number, the depth asked, the
+  transcript the record named when the try began, the transcript's sha256, and
+  `research.asked`, a hash of the call's user prompt, which holds the scope, the
+  constraints, the topic and the other topics' names and no depth. `ledger.stale` and
+  `_research_try` replay it only while all of those hold, at its own depth unless the
+  rerun asks for more, and the log says why a new call was made. A replay that raises
+  drops the mark, so a bad transcript cannot wedge the topic. A landing or a drop removes
+  the mark, and `add_topic` clears any mark for the slug it takes. Every other call is
+  numbered past all the topic's transcripts on disk (`ledger.next_number`), so a dropped
+  topic added again is researched afresh and no evidence is overwritten. The first run's
+  resume is another path: `_asked` at number 1, with no mark. Findings are replaced,
   a source only that topic cited is removed (`revising.without_orphans`), and
   `ledger.reconciled` settles `researched` from the records. `connect` and `consider` then
   run with `only=SLUG`: `connect.apply` refuses a link that does not touch the topic and

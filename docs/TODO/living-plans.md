@@ -242,9 +242,11 @@ otherwise.
 7. Adding a dropped title is told and then done, not refused. A research call that
    fails changes nothing, where a first run would record the topic as failed. `PLAN.md`
    lists dropped topics, which the sketch did not ask for.
-8. Only a transcript marked `<slug>.pending.json` is replayed, at the depth it was asked
-   at. A dropped topic's transcripts stay and are never replayed, and a drop of the only
-   researched topic leaves the plan *Not researched*.
+8. Only a transcript marked `<slug>.pending.json` is replayed. The mark holds its
+   hash, the depth asked and a fingerprint of the research prompt, so an answer, or a
+   change to any topic's name or to the topic list, makes the next research a new call.
+   A replay that fails drops the mark. A dropped topic's transcripts stay and are never
+   replayed, and a drop of the only researched topic leaves the plan *Not researched*.
 9. `proto topic rename` to a title another topic already has is refused in a sentence.
    **Not yet ruled:** this is the coordinator's default.
 

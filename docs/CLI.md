@@ -318,10 +318,14 @@ It runs on `--backend claude-code`, and is refused offline in a sentence.
 **A try that stopped after its research call is replayed.** The transcript is on disk
 before anything else runs, beside a `<slug>.pending.json` that marks it as not landed, so
 if a later step fails the plan is left as it was and a rerun reads that transcript
-instead of paying for the call again. It is replayed at the depth it was asked at; a
-rerun with `--deeper` after a plain try asks again. Only a marked transcript is replayed:
-any other on disk, a dropped topic's included, is left alone, and a new call takes the
-next free number.
+instead of paying for the call again. The mark holds the transcript's hash, the depth
+asked, and a fingerprint of what was asked: the idea and its scope, the constraints, the
+topic, and the names of the other topics. A rerun replays it only while all of that
+holds, at the depth it was asked at. It asks again, and the log says why, when the rerun
+adds `--deeper` to a plain try, when an answer, a rename, an addition or a drop has
+changed what would be asked, or when the transcript was altered. A replay that fails
+drops the mark, so the next run asks again. No transcript is ever deleted: one that is
+not replayed stays as it is, and a new call takes the next free number.
 
 **After any of these, repair may move only what touches the changed topic.** Links
 between other topics, their steps and their text are settled, and a repair that moves
