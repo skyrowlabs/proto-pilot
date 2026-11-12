@@ -15,6 +15,7 @@ from protopilot.jobs import Job
 from protopilot.llm import LLMError
 from protopilot.plan import ledger, pipeline, render, verify
 from protopilot.plan.model import Finding, Plan
+from protopilot.plan.passes import research
 
 pytestmark = [pytest.mark.unit]
 
@@ -461,3 +462,199 @@ def test_an_old_plan_gains_only_the_answer_when_its_question_is_answered(tmp_pat
     was, now = Plan.model_validate_json(BEFORE.read_bytes()), Plan.load(tree)
     assert now == was.revised(constraints=[*was.constraints, "Who runs it? Volunteers"], questions=[])
     assert b"dropped_topics" not in plan_json(tree)
+
+
+# -- the mark a stopped research try leaves --------------------------------
+
+
+def stopped(tree: Path, slug: str = "members", said_: str = AGAIN, deeper: bool = False) -> None:
+    """A research of `slug` whose call returned and whose next pass failed: a transcript and its mark stay."""
+    with pytest.raises(pipeline.PlanRefused, match="a rerun replays it"):
+        again(tree, slug, said_, [LLMError("out of credit")], deeper)
+
+
+def mark_of(tree: Path, slug: str = "members") -> Path:
+    return ledger.research_dir(tree) / f"{slug}.pending.json"
+
+
+def asked_again(tree: Path, slug: str = "members") -> tuple[list[str], str]:
+    """Research `slug` with a backend that would answer, and say whether it was asked and what its record names."""
+    llm = ResearchingLLM(refit(slug), {slug: THIRD})
+    assert pipeline.research_topic(job_for(), tree, slug, llm).ok
+    record = Plan.load(tree).research_of(slug)
+    assert record is not None
+    return llm.researched, record.transcript
+
+
+@pytest.mark.parametrize(
+    ("held", "slug", "after", "number"),
+    [
+        ([], "members", 0, 1),
+        (["members.jsonl"], "members", 0, 2),
+        (["members.jsonl"], "members", 5, 6),
+        (["members.jsonl", "members.9.jsonl", "members.10.jsonl"], "members", 1, 11),
+        (["members.jsonl", "members.4.jsonl"], "members", 0, 5),
+        (["members_2.jsonl", "members_2.30.jsonl"], "members", 0, 1),
+        (["members.7.jsonl"], "members_2", 0, 1),
+        (["members.7.jsonl"], "member", 0, 1),
+        (["members.x.jsonl", "members.07.jsonl", "members.pending.json"], "members", 0, 1),
+    ],
+)
+def test_a_new_call_is_numbered_past_every_transcript_of_its_own_topic_and_no_other(
+    tmp_path, held, slug, after, number
+):
+    folder = ledger.research_dir(tmp_path)
+    assert ledger.next_number(tmp_path, slug, after) == after + 1
+    folder.mkdir(parents=True)
+    for name in held:
+        (folder / name).write_text("{}\n", encoding="utf-8")
+    assert ledger.next_number(tmp_path, slug, after) == number
+
+
+def _unmarked(tree: Path) -> None:
+    ledger.write_transcript(tree, "members", AGAIN, 2)
+
+
+def _mark_alone(tree: Path) -> None:
+    ledger.save_pending(tree, "members", 2, "standard", "members.jsonl")
+
+
+def _mark_of_a_landed_try(tree: Path) -> None:
+    assert again(tree, "members", AGAIN).ok
+    ledger.save_pending(tree, "members", 2, "standard", "members.jsonl")
+
+
+def _mark_of_another_topic(tree: Path) -> None:
+    stopped(tree, "lending")
+    ledger.write_transcript(tree, "members", AGAIN, 2)
+    mark_of(tree).write_bytes(mark_of(tree, "lending").read_bytes())
+
+
+def _mark_past_the_folder(tree: Path) -> None:
+    ledger.write_transcript(tree, "members", AGAIN, 2)
+    mark_of(tree).write_text('{"number": 2, "depth": "standard", "since": "../research/members.jsonl"}', "utf-8")
+
+
+@pytest.mark.parametrize(
+    ("left", "named"),
+    [
+        (_unmarked, "members.3.jsonl"),
+        (_mark_alone, "members.2.jsonl"),
+        (_mark_of_a_landed_try, "members.3.jsonl"),
+        (_mark_of_another_topic, "members.3.jsonl"),
+        (_mark_past_the_folder, "members.3.jsonl"),
+    ],
+    ids=lambda value: getattr(value, "__name__", None),
+)
+def test_a_mark_and_a_transcript_that_do_not_agree_replay_nothing_and_wedge_nothing(tmp_path, left, named):
+    tree = researched_plan(tmp_path / "tree")
+    left(tree)
+    kept = {name: data for name, data in snapshot(tree).items() if name.endswith(".jsonl")}
+    assert asked_again(tree) == (["members"], named)
+    now = snapshot(tree)
+    assert all(now[name] == data for name, data in kept.items())
+    assert not mark_of(tree).exists()
+    assert [f.text for f in Plan.load(tree).topics[0].findings] == ["Third."]
+
+
+def test_a_mark_names_the_one_transcript_to_replay_when_a_later_one_lies_beside_it(tmp_path):
+    tree = researched_plan(tmp_path / "tree")
+    ledger.write_transcript(tree, "members", AGAIN, 9)
+    ledger.write_transcript(tree, "members", THIRD, 10)
+    ledger.save_pending(tree, "members", 9, "standard", "members.jsonl")
+    assert pipeline.research_topic(job_for(), tree, "members", NeverAsked(refit())).ok
+    plan = Plan.load(tree)
+    record = plan.research_of("members")
+    assert record is not None and (record.transcript, [f.url for f in record.fetches]) == ("members.9.jsonl", [OTHER])
+    assert asked_again(tree) == (["members"], "members.11.jsonl")
+
+
+def test_a_replay_that_stops_again_keeps_its_mark_and_the_next_rerun_still_asks_nothing(tmp_path):
+    tree = researched_plan(tmp_path / "tree")
+    stopped(tree)
+    marked = snapshot(tree)
+    with pytest.raises(pipeline.PlanRefused, match="a rerun replays it"):
+        pipeline.research_topic(job_for(), tree, "members", NeverAsked([LLMError("still out")]))
+    assert snapshot(tree) == marked
+    assert pipeline.research_topic(job_for(), tree, "members", NeverAsked(refit())).ok
+    assert not mark_of(tree).exists()
+    assert Plan.load(tree).research_of("members").transcript == "members.2.jsonl"  # type: ignore[union-attr]
+
+
+def test_a_deeper_try_that_stopped_is_replayed_by_a_deeper_rerun(tmp_path):
+    tree = researched_plan(tmp_path / "tree")
+    Plan.load(tree).revised(depth="shallow").save(tree)
+    most = research.EFFORT["standard"][1]
+    stopped(tree, said_=transcript([cited(), *(assumed(f"Guess {n}.") for n in range(most - 1))]), deeper=True)
+    assert pipeline.research_topic(job_for(), tree, "members", NeverAsked(refit()), True).ok
+    plan = Plan.load(tree)
+    assert (len(plan.topics[0].findings), plan.depth) == (most, "shallow")
+
+
+def test_the_verbs_that_revise_other_topics_leave_a_stopped_try_as_it_was(tmp_path):
+    tree = researched_plan(tmp_path / "tree")
+    Plan.load(tree).revised(questions=["Who runs it?"]).save(tree)
+    assert pipeline.rerender(job_for(), tree).ok
+    stopped(tree)
+    before = snapshot(tree)
+    assert pipeline.answer(job_for(), tree, {"Who runs it?": "Volunteers"}).ok
+    assert pipeline.rename_topic(job_for(), tree, "space", "Room").ok
+    assert pipeline.add_topic(job_for(), tree, "Insurance", "It matters.", FakeLLM([BARE])).ok
+    assert pipeline.drop_topic(job_for(), tree, "safety", "Later.", pipeline.OfflineLLM).ok
+    assert [name for name in changed(before, snapshot(tree)) if name.startswith(ledger.RESEARCH_DIR)] == []
+    assert pipeline.research_topic(job_for(), tree, "members", NeverAsked(refit())).ok
+
+
+def test_a_drop_that_is_put_back_keeps_the_topics_mark_and_one_that_lands_removes_it(tmp_path, monkeypatch):
+    tree = researched_plan(tmp_path / "tree")
+    stopped(tree, "tools")
+    before = snapshot(tree)
+    dying_write(monkeypatch, "PLAN.md")
+    with pytest.raises(pipeline.PlanRefused, match="the tree is back as it was"):
+        pipeline.drop_topic(job_for(), tree, "tools", "No.", pipeline.OfflineLLM)
+    assert snapshot(tree) == before and mark_of(tree, "tools").is_file()
+    monkeypatch.undo()
+    assert pipeline.drop_topic(job_for(), tree, "tools", "No.", pipeline.OfflineLLM).ok
+    assert changed(before, snapshot(tree)).count(".protopilot/research/tools.pending.json") == 1
+    assert not mark_of(tree, "tools").exists() and (ledger.research_dir(tree) / "tools.2.jsonl").is_file()
+
+
+def test_research_after_the_only_researched_topic_is_dropped_stamps_the_plan_again(tmp_path):
+    tree = unresearched_plan(tmp_path / "tree")
+    assert again(tree, "lending").ok
+    assert pipeline.drop_topic(job_for(), tree, "lending", "No.", pipeline.OfflineLLM).ok
+    assert stamp(tree).startswith(render.NOT_RESEARCHED) and not Plan.load(tree).researched
+    assert again(tree, "money").ok
+    assert stamp(tree).startswith("> **Partly researched.** 1 of 5 topics are researched.")
+    assert pipeline.add_topic(job_for(), tree, "Lending", "Again.", FakeLLM([BARE])).ok
+    llm = ResearchingLLM([{"edges": []}, refit("lending")[1]], {})
+    assert pipeline.research_topic(job_for(), tree, "lending", llm).ok
+    plan = Plan.load(tree)
+    assert llm.researched == ["lending"]
+    assert plan.research_of("lending").transcript == "lending.2.jsonl"  # type: ignore[union-attr]
+    assert stamp(tree).startswith("> **Partly researched.** 2 of 6 topics are researched.")
+
+
+# -- the first run's own resume, which reads no mark ------------------------
+
+
+@pytest.mark.parametrize("stray_mark", [False, True], ids=["no-mark", "a-stray-mark"])
+def test_a_first_run_stopped_mid_research_still_resumes_from_its_unmarked_transcripts(tmp_path, stray_mark):
+    tree = tmp_path / "tree"
+    with pytest.raises(RuntimeError):
+        pipeline.run_plan(job_for(), tree, ResearchingLLM(script(), {"space": RuntimeError("killed")}))
+    left = sorted(path.name for path in ledger.research_dir(tree).iterdir())
+    assert left == ["lending.jsonl", "members.jsonl", ledger.DRAFT_FILE]
+    if stray_mark:
+        mark_of(tree).write_text('{"number": 5, "depth": "deep", "since": "members.4.jsonl"}', encoding="utf-8")
+    kept = snapshot(tree)
+    resumed = ResearchingLLM(script()[2:], {})
+    assert pipeline.run_plan(job_for(), tree, resumed).ok
+    assert resumed.researched == SLUGS[2:]
+    now = snapshot(tree)
+    assert all(
+        now[f".protopilot/research/{slug}.jsonl"] == kept[f".protopilot/research/{slug}.jsonl"] for slug in SLUGS[:2]
+    )
+    plan = Plan.load(tree)
+    assert [(r.topic, r.transcript, r.state) for r in plan.research] == [(s, f"{s}.jsonl", "researched") for s in SLUGS]
+    assert stamp(tree) == render.RESEARCHED
