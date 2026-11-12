@@ -109,9 +109,7 @@ each phase where it is.
 through the model, and the resulting plans may be committed to those repos. Each
 commit is a change in that repo, under its own rules.
 
-**Open questions for Jeston**
-
-1. Three runs or five? Each is 10–20 minutes of research at `standard`.
+**Ruled by Jeston, 2026-11-11:** three runs first, then decide whether two more are worth it.
 
 ### Dogfood record
 
@@ -208,13 +206,14 @@ nothing else.
 **Open questions for Jeston**
 
 1. `proto answer` and `proto topic` and `proto research` as top-level verbs, or
-   one group (`proto revise …`)? **Recommended, not yet ruled: top-level.** Each
+   one group (`proto revise …`)? **Ruled 2026-11-11: top-level.** Each
    is a noun a plan already has, it matches `proto dream`, and a group makes
    `proto revise topic add` three words deep. The cost is a longer `--help`.
 2. When an answer plainly changes a topic, should the tool say "this answer
    touches *Audience*; run `proto research audience`", or stay silent? The
    first needs a model call to judge.
 3. Does a dropped topic's dream get set aside (proposed above) or dropped?
+   **Ruled 2026-11-11: set aside, with the reason.**
 
 ## Phase 3 — A plan as a handoff
 
@@ -272,8 +271,10 @@ are recorded with what each reader got wrong.
 
 1. Does approving need its own verb (`proto approve`), or is it a flag on
    `proto export --brief`? A verb keeps "I read it" apart from "I made a file".
+   **Ruled 2026-11-11: its own verb, and the approval is recorded in the plan.**
 2. Should `BRIEF.md` be written by every `proto plan`, as an eleventh file, or
-   only on request? An eleventh file moves the offline golden.
+   only on request? **Ruled 2026-11-11: only on request**, so the offline golden
+   does not move.
 
 ## Phase 4 — Earn back "verified by running"
 
@@ -327,13 +328,13 @@ exits 0 if its structure holds; and the operator's one real probe is in the
 
 **Open questions for Jeston**
 
-1. One probe per plan, or one per first step? **Recommended, not yet ruled:
-   one open probe at a time.** One keeps it a decision; several make a
+1. One probe per plan, or one per first step? **Ruled 2026-11-11: one open
+   probe at a time.** One keeps it a decision; several make a
    checklist nobody finishes. Once an outcome is recorded the plan may name the
    next, and recorded probes are kept as history.
 2. After `--broke`, should the plan go red until the topic is re-researched?
    The sketch says no: a broken assumption is knowledge, and red means
-   incoherent.
+   incoherent. **Ruled 2026-11-11: no, it stays green.**
 3. Is the operator's note enough, or should `record` take a `--evidence` path or
    URL? A URL invites treating it as a fetched source, which it is not.
 
@@ -365,20 +366,15 @@ Tasks:
       and update the test that pins its text
 - [ ] `README.md`, *What a plan does not know yet*, says research runs on a
       subscription only and why
-- [ ] Baseline, if question 1 below is answered yes: two or three topic sets and
-      the chooser, each with its own golden; the existing six stay the fallback
-      so today's golden does not move
 
 **Done is checked by:** `proto plan --backend api` without `--no-research` says
-in one sentence which backend researches; and, if the baseline is built,
-`proto plan --offline` on a software idea and on a place idea give different
-topic lists, each byte-stable.
+in one sentence which backend researches.
 
 **Open questions for Jeston**
 
 1. A less generic baseline is more code that no real plan uses. Is the offline
    run a demo worth improving, or only the test suite's fixture?
-   **Recommended, not yet ruled: fixture only, cut it.**
+   **Ruled 2026-11-11: fixture only. The baseline task above is cut.**
 
 ## Acceptance
 
@@ -416,6 +412,8 @@ topic lists, each byte-stable.
   a person who tried it.
 - **Counting a recorded outcome as a source.** It was not fetched and no
   transcript vouches for it. It is rendered as the operator's word, apart.
+- **A less generic offline baseline.** Ruled out 2026-11-11: the offline run is
+  the test suite's fixture, and no real plan is made with it.
 - **Research on the API backend.** Ruled out 2026-11-11: it needs API credit
   bought to measure it, and research is to come from subscription usage.
 - **A brief shaped for `skeletor-new`.** Ruled out 2026-11-11: the brief's
