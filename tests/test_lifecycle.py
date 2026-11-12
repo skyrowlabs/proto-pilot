@@ -152,4 +152,4 @@ def test_accepting_the_prune_confirmation_forgets_old_rows_and_keeps_their_folde
 
 
 def test_proto_is_exactly_the_planning_verbs():
-    assert sorted(cli.main.commands) == ["doctor", "dream", "ls", "plan", "prune", "rm"]
+    assert sorted(cli.main.commands) == ["answer", "doctor", "dream", "ls", "plan", "prune", "rm"]

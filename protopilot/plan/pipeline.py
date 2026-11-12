@@ -613,13 +613,18 @@ def _refuse_if_blocked(plan: Plan, tree: Path) -> None:
         raise PlanRefused(f"Nothing was changed, because a page needs this name: {blocked}. Move it, then rerun.")
 
 
-def _held(tree: Path) -> Plan:
-    """The plan in `tree`, refused unless green: a dream extends a plan that holds, so fix that first.
+#: What a verb that changes a plan says it lacks when `tree` holds none.
+DREAM_NEEDS = "a dream needs a plan to extend"
+REVISE_NEEDS = "there is nothing here to revise"
+
+
+def _held(tree: Path, needs: str = DREAM_NEEDS) -> Plan:
+    """The plan in `tree`, refused unless green: a change extends a plan that holds, so fix that first.
 
     It is the plan as its transcripts tell it, so a verb that saves never writes back a forged state.
     """
     if not plan_path(tree).exists():
-        raise PlanRefused(f"{tree} holds no plan. `proto plan` makes one; a dream needs a plan to extend.")
+        raise PlanRefused(f"{tree} holds no plan. `proto plan` makes one; {needs}.")
     try:
         plan = Plan.load(tree)
     except (OSError, ValueError) as exc:
@@ -731,6 +736,38 @@ def drop(job, tree: Path, dream_id: str, why: str) -> verify.PlanVerdict:
     except ValueError as exc:
         raise PlanRefused(str(exc)) from exc
     return _land(job, tree, plan, _once(job, ruled), [RENDER])
+
+
+def open_questions(tree: Path) -> list[str]:
+    """The questions the plan in `tree` still holds, in the order `PLAN.md` lists them. Refused as `_held` refuses."""
+    return list(_held(Path(tree), REVISE_NEEDS).questions)
+
+
+def answer(job, tree: Path, answers: dict[str, str]) -> verify.PlanVerdict:
+    """A person's answers, each made a constraint. Calls no model, and no topic is outlined or researched again."""
+    tree = Path(tree)
+    job.project_dir = str(tree)
+    plan = _held(tree, REVISE_NEEDS)
+    closed = [question for question in answers if question not in plan.questions]
+    if closed:
+        raise PlanRefused(f"Nothing was changed, because this is not an open question of the plan: {closed[0]!r}")
+    job.event("plan", passes=[RENDER])
+    settled = scope.answered(plan, answers)
+    given = len(plan.questions) - len(settled.questions)
+    if not given:
+        raise PlanRefused("No answer was given, so nothing was changed.")
+    verdict = _land(job, tree, plan, _once(job, settled), [RENDER])
+    if verdict.ok:
+        job.log(f"{given} answer(s) are constraints now, and {len(settled.questions)} question(s) stay open.")
+    return verdict
+
+
+def after_revise_failure(tree: Path) -> str:
+    """What an unexpected stop left, for the verbs that revise a plan."""
+    return (
+        f"Something unexpected stopped this, so {tree} may hold it in part. Read {render.PLAN_FILE} and "
+        f"{plan_path(tree)} before rerunning: a verb that landed will say so."
+    )
 
 
 def after_dream_failure(tree: Path) -> str:

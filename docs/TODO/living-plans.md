@@ -184,7 +184,7 @@ Tasks:
 
 - [x] Characterise first: tests that pin what `outline.rename`, `outline.drop`
       and `ledger.reconciled` do to a *finished* plan today, before changing any
-- [ ] `proto answer`, with its offline twin being the whole thing
+- [x] `proto answer`, with its offline twin being the whole thing
 - [ ] `proto topic rename`, then `drop`, then `add`, each landing through `_land`
 - [ ] The dropped-topics list on `Plan`, with a test that an old `plan.json`
       without it loads and saves byte-identical

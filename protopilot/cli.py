@@ -2,6 +2,7 @@
 
 proto plan "start a community tool library"
 proto dream | dream promote d1 | dream drop d2 --why "..."
+proto answer 1
 proto ls | rm | prune | doctor
 """
 
@@ -365,6 +366,49 @@ def dream_drop_command(dream_id: str, why: str, directory: str) -> None:
 
     target = Path(directory).resolve()
     _dream_step(target, lambda j: pipeline.drop(j, target, dream_id, why))
+
+
+def _revise_step(target: Path, work) -> None:
+    """Run one change to a finished plan as its own job, and exit as a red plan exits."""
+    from protopilot.jobs import STORE
+    from protopilot.plan import pipeline
+
+    if not _plan_step(STORE.create(str(target)), target, work, pipeline.after_revise_failure).ok:
+        sys.exit(1)
+
+
+@main.command(name="answer")
+@click.argument("number", required=False, type=click.IntRange(min=1), metavar="[N]")
+@click.option("--dir", "directory", default=".", help="Plan directory (default: cwd).")
+def answer_command(number: int | None, directory: str) -> None:
+    """Answer open question N of a plan, or each in turn. Calls no model.
+
+    An answer becomes a constraint and the question leaves the list. Enter leaves a
+    question open. Nothing else moves: no topic is outlined or researched again.
+    """
+    from protopilot.plan import baseline, pipeline
+
+    target = Path(directory).resolve()
+    try:
+        questions = pipeline.open_questions(target)
+    except pipeline.PlanRefused as exc:
+        raise click.ClickException(str(exc)) from exc
+    if not questions:
+        _echo("This plan has no open question, so there is nothing to answer.")
+        return
+    if number and number > len(questions):
+        raise click.ClickException(
+            f"This plan has {len(questions)} open question(s), so there is no question {number}."
+        )
+    asked = [number] if number else range(1, len(questions) + 1)
+    answers = {}
+    for n in asked:
+        prompt = f"{n}. {questions[n - 1]} (Enter leaves it open)"
+        answers[questions[n - 1]] = click.prompt(prompt, default="", show_default=False)
+    if not any(baseline.clean(said) for said in answers.values()):
+        _echo("No answer was given, so nothing was changed.")
+        return
+    _revise_step(target, lambda j: pipeline.answer(j, target, answers))
 
 
 @main.command(name="ls")
