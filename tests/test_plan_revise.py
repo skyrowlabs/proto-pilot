@@ -13,9 +13,9 @@ from research_script import OTHER, URL, ResearchingLLM, assumed, cited, fetched,
 from protopilot import cli
 from protopilot.jobs import Job
 from protopilot.llm import LLMError
-from protopilot.plan import ledger, pipeline, render, revising, verify
+from protopilot.plan import baseline, ledger, pipeline, render, revising, verify
 from protopilot.plan.model import MAX_TOPICS, MIN_TOPICS, Plan
-from protopilot.plan.passes import outline
+from protopilot.plan.passes import connect, consider, outline, research
 
 pytestmark = [pytest.mark.unit]
 
@@ -107,18 +107,41 @@ def test_a_record_that_names_another_topics_transcript_has_no_evidence(tmp_path)
     assert (record.state, record.failure, record.fetches) == ("failed", ledger.NO_EVIDENCE, [])
 
 
-def test_a_second_transcript_for_a_topic_is_not_one_the_ledger_reads_today(tmp_path):
+def renamed(plan: Plan, slug: str, name: str, said_: str | None = None) -> Plan:
+    """`plan` with `slug`'s record naming the transcript `name`, hashed as `said_` if that is given."""
+    update = {"transcript": name, **({"sha256": ledger.digest(said_)} if said_ is not None else {})}
+    return plan.revised(research=[r.model_copy(update=update) if r.topic == slug else r for r in plan.research])
+
+
+def test_with_two_transcripts_for_a_topic_the_ledger_reads_the_one_its_record_names(tmp_path):
     tree = researched_plan(tmp_path / "tree")
     plan = Plan.load(tree)
-    said_again = ledger.read_transcript(tree, "members")
-    assert said_again is not None
-    (ledger.research_dir(tree) / "members.2.jsonl").write_text(said_again, encoding="utf-8")
-    moved = [
-        r.model_copy(update={"transcript": "members.2.jsonl"}) if r.topic == "members" else r for r in plan.research
-    ]
-    record = ledger.reconciled(plan.revised(research=[r.model_dump() for r in moved]), tree).research_of("members")
-    assert record is not None
-    assert (record.state, record.failure) == ("failed", ledger.NO_EVIDENCE)
+    second = transcript([cited(url=OTHER)], [fetched(OTHER), fetched("https://x.test/403", code=403)])
+    ledger.write_transcript(tree, "members", second, 2)
+    first = ledger.reconciled(plan, tree).research_of("members")
+    current = ledger.reconciled(renamed(plan, "members", "members.2.jsonl", second), tree).research_of("members")
+    assert first is not None and current is not None
+    assert [f.url for f in first.fetches] == [URL]
+    assert [(f.url, f.usable) for f in current.fetches] == [(OTHER, True), ("https://x.test/403", False)]
+    # The plan's findings still cite the first page, so the second transcript backs none of them.
+    assert (first.state, current.state) == ("researched", "nothing cited")
+
+
+@pytest.mark.parametrize("name", ["lending.2.jsonl", "members.1.jsonl", "members.02.jsonl", "members.x.jsonl", ""])
+def test_a_record_may_name_only_its_own_topics_transcripts(tmp_path, name):
+    tree = researched_plan(tmp_path / "tree")
+    said_ = ledger.read_transcript(tree, "members") or ""
+    if name:
+        (ledger.research_dir(tree) / name).write_text(said_, encoding="utf-8")
+    record = ledger.reconciled(renamed(Plan.load(tree), "members", name, said_), tree).research_of("members")
+    assert record is not None and (record.state, record.failure) == ("failed", ledger.NO_EVIDENCE)
+
+
+def test_a_numbered_transcript_that_was_altered_is_no_evidence(tmp_path):
+    tree = researched_plan(tmp_path / "tree")
+    ledger.write_transcript(tree, "members", transcript(), 2)
+    record = ledger.reconciled(renamed(Plan.load(tree), "members", "members.2.jsonl", "other"), tree)
+    assert record.research_of("members").state == "failed"  # type: ignore[union-attr]
 
 
 # -- proto answer ---------------------------------------------------------
@@ -639,3 +662,241 @@ def test_drop_then_add_then_answer_each_land_and_touch_only_pages_that_name_the_
     assert snapshot(tree) == grown
     untouched = ["audience", "scope", "risks", "first_test"]
     assert all(grown[f"topics/{slug}.md"] == start[f"topics/{slug}.md"] for slug in untouched)
+
+
+# -- proto research SLUG --------------------------------------------------
+
+AGAIN = transcript([cited("Loans run a week.", url=OTHER, title="Cover"), assumed()], [fetched(OTHER)])
+
+
+def noted(slug: str = "members", word: str = "new") -> dict:
+    return {"topics": [{"slug": slug, "risks": [f"{word} r"], "unknowns": [f"{word} u?"], "decisions": [f"{word} d"]}]}
+
+
+def refit(*links: dict, slug: str = "members") -> list[dict]:
+    """The two answers a re-research asks for: the topic's links, kept unless given, and its notes."""
+    kept = [link for link in GOOD["connect"]["edges"] if slug in (link["from_topic"], link["to_topic"])]
+    return [{"edges": list(links) or kept}, noted(slug)]
+
+
+def again(tree: Path, llm: FakeLLM, slug: str = "members", deeper: bool = False) -> verify.PlanVerdict:
+    return pipeline.research_topic(job_for(), tree, slug, llm, deeper)
+
+
+class NeverAsked(FakeLLM):
+    """Answers the structured passes, and fails the test that makes a research call."""
+
+    def research(self, **_: object):
+        raise AssertionError("a research call was made, and a transcript was there to replay")
+
+
+def test_research_replaces_one_topics_findings_and_record_and_keeps_the_old_transcript(tmp_path):
+    tree = researched_plan(tmp_path / "tree")
+    before, first = Plan.load(tree), ledger.read_transcript(tree, "members")
+    llm = ResearchingLLM(refit(), {"members": AGAIN})
+    assert again(tree, llm).ok
+    after = Plan.load(tree)
+    record = after.research_of("members")
+    assert record is not None
+    assert (llm.researched, [call["label"] for call in llm.calls]) == (["members"], ["connect", "consider"])
+    assert [f.text for f in after.topics[0].findings] == ["Loans run a week.", "Volunteers will turn up every week."]
+    assert (record.transcript, record.sha256, record.state) == ("members.2.jsonl", ledger.digest(AGAIN), "researched")
+    assert ledger.read_transcript(tree, "members") == first and ledger.read_transcript(tree, "members", 2) == AGAIN
+    assert after.topics[0].risks == ["new r"] and after.topics[1:] == before.topics[1:]
+    assert [r for r in after.research if r.topic != "members"] == [r for r in before.research if r.topic != "members"]
+    assert verify.verdict(ledger.reconciled(after, tree), render.read(tree)).ok
+
+
+def test_research_changes_that_topics_page_and_the_sources_and_no_other_page(tmp_path):
+    tree = researched_plan(tmp_path / "tree")
+    before = snapshot(tree)
+    assert again(tree, ResearchingLLM(refit(), {"members": AGAIN})).ok
+    assert changed(before, snapshot(tree)) == [
+        ".protopilot/plan.json",
+        ".protopilot/research/members.2.jsonl",
+        "sources.md",
+        "topics/members.md",
+    ]
+
+
+def test_research_from_the_command_line_says_what_it_replaced(tmp_path, monkeypatch):
+    tree = researched_plan(tmp_path / "tree")
+    monkeypatch.setattr(cli, "build_llm", lambda **_: ResearchingLLM(refit(), {"members": AGAIN}))
+    result = invoke("research", "members", "--backend", "claude-code", "--dir", str(tree))
+    assert result.exit_code == 0, result.output
+    assert "members: 1 cited finding(s), 1 of 1 fetch(es) usable" in said(result)
+    assert "Members (members) is researched again, and its earlier transcript stays beside the new one." in said(result)
+
+
+def test_only_the_researched_topics_links_are_open_and_the_rest_stay(tmp_path):
+    tree = researched_plan(tmp_path / "tree")
+    llm = ResearchingLLM(refit(edge("members", "tools", "informs")), {"members": AGAIN})
+    assert again(tree, llm).ok
+    links = [e.model_dump() for e in Plan.load(tree).edges]
+    assert links == [edge("money", "space", "informs"), edge("members", "tools", "informs")]
+    assert "lending" not in (tree / "topics" / "members.md").read_text(encoding="utf-8").lower()
+    asked = llm.calls[0]["user"]
+    assert "Only the links of `members` are open" in asked and "- money informs space" in asked
+    assert "Return one entry, for `members` alone" in llm.calls[1]["user"]
+
+
+@pytest.mark.parametrize(
+    ("answers", "reason"),
+    [
+        ([{"edges": [edge("money", "safety")]}], "an edge leaves out members"),
+        ([refit()[0], noted("lending")], "wanted one entry for each of members; got lending"),
+        ([LLMError("out of credit")], "out of credit"),
+    ],
+    ids=["a-link-between-others", "notes-for-another-topic", "backend"],
+)
+def test_a_fit_that_reaches_another_topic_changes_nothing_and_the_rerun_replays(tmp_path, answers, reason):
+    tree = researched_plan(tmp_path / "tree")
+    before = snapshot(tree)
+    with pytest.raises(pipeline.PlanRefused, match=reason) as refused:
+        again(tree, ResearchingLLM(answers, {"members": AGAIN}))
+    assert "Its transcript is kept, and a rerun replays it" in str(refused.value)
+    assert changed(before, snapshot(tree)) == [".protopilot/research/members.2.jsonl"]
+    job = job_for()
+    assert pipeline.research_topic(job, tree, "members", NeverAsked(refit())).ok
+    assert any("replayed from the transcript an earlier try left" in line for line in job.lines)
+    assert Plan.load(tree).research_of("members").transcript == "members.2.jsonl"  # type: ignore[union-attr]
+
+
+def test_a_research_call_that_fails_changes_nothing_and_leaves_no_transcript(tmp_path):
+    tree = researched_plan(tmp_path / "tree")
+    before = snapshot(tree)
+    with pytest.raises(pipeline.PlanRefused, match="members was not researched, and nothing was changed: timed out"):
+        again(tree, ResearchingLLM([], {"members": LLMError("timed out")}))
+    assert snapshot(tree) == before
+
+
+def test_a_research_that_cannot_be_drawn_puts_the_tree_back_and_keeps_only_the_transcript(tmp_path, monkeypatch):
+    tree = researched_plan(tmp_path / "tree")
+    before = snapshot(tree)
+    dying_write(monkeypatch, "sources.md")
+    with pytest.raises(pipeline.PlanRefused, match="the tree is back as it was: disk full"):
+        again(tree, ResearchingLLM(refit(), {"members": AGAIN}))
+    assert changed(before, snapshot(tree)) == [".protopilot/research/members.2.jsonl"]
+
+
+def test_a_topic_whose_first_research_failed_can_be_researched_alone(tmp_path):
+    tree = tmp_path / "tree"
+    assert pipeline.run_plan(job_for(), tree, ResearchingLLM(script(), {"tools": LLMError("timed out")})).ok
+    assert Plan.load(tree).research_of("tools").state == "failed"  # type: ignore[union-attr]
+    job = job_for()
+    assert pipeline.research_topic(job, tree, "tools", ResearchingLLM([{"edges": []}, noted("tools")], {})).ok
+    record = Plan.load(tree).research_of("tools")
+    assert record is not None and (record.state, record.transcript) == ("researched", "tools.jsonl")
+    assert "Tools (tools) is researched. Its findings and its record are replaced, not merged." in job.lines
+
+
+def test_a_source_only_the_researched_topic_cited_leaves_when_it_stops_citing_it(tmp_path):
+    tree = cites_apart(tmp_path / "tree")
+    assert [s.id for s in Plan.load(tree).sources] == ["s1", "s2"]
+    assert again(tree, ResearchingLLM(refit(slug="lending"), {}), "lending").ok
+    plan = Plan.load(tree)
+    assert [(s.id, s.url) for s in plan.sources] == [("s1", URL)]
+    assert OTHER not in (tree / "sources.md").read_text(encoding="utf-8")
+
+
+def test_research_that_cites_nothing_this_time_leaves_the_topic_not_researched(tmp_path):
+    tree = researched_plan(tmp_path / "tree")
+    nothing = transcript([assumed()], [fetched(OTHER, code=403)])
+    assert again(tree, ResearchingLLM(refit(), {"members": nothing})).ok
+    plan = Plan.load(tree)
+    assert plan.research_of("members").state == "nothing cited" and plan.researched  # type: ignore[union-attr]
+    assert "Research ran and cited no page it fetched." in (tree / "topics" / "members.md").read_text(encoding="utf-8")
+
+
+def at_depth(tree: Path, depth: str) -> Path:
+    """A researched plan recorded at `depth`: the depth is what research reads, whatever the topic count."""
+    Plan.load(researched_plan(tree)).revised(depth=depth).save(tree)
+    return tree
+
+
+def test_deeper_gives_one_call_the_next_depths_effort_and_stores_nothing(tmp_path):
+    tree = at_depth(tmp_path / "tree", "shallow")
+    seen: list[tuple[str, dict]] = []
+
+    class Watching(ResearchingLLM):
+        def research(self, *, system: str, user: str, schema: dict, label: str):
+            seen.append((system, schema))
+            return super().research(system=system, user=user, schema=schema, label=label)
+
+    lo, hi, pages = research.EFFORT["standard"]
+    five = transcript([cited(), *(assumed(f"Guess {n}.") for n in range(hi - 1))])
+    assert again(tree, Watching(refit(), {"members": five}), deeper=True).ok
+    system, schema = seen[0]
+    assert f"Read at most {pages} pages" in system
+    assert (schema["properties"]["findings"]["minItems"], schema["properties"]["findings"]["maxItems"]) == (lo, hi)
+    plan = Plan.load(tree)
+    assert plan.depth == "shallow" and len(plan.topics[0].findings) == hi > research.EFFORT["shallow"][1]
+
+
+def test_deeper_on_the_deepest_plan_is_refused_before_any_call(tmp_path):
+    tree = at_depth(tmp_path / "tree", "deep")
+    before = snapshot(tree)
+    with pytest.raises(pipeline.PlanRefused, match="at depth deep, the most research reads"):
+        again(tree, NeverAsked([]), deeper=True)
+    assert snapshot(tree) == before
+
+
+def test_an_offline_plan_has_no_depth_and_deeper_reads_as_one_past_the_default():
+    plan = Plan(slug="p", title="P", idea=IDEA)
+    assert (plan.depth, research.deeper(plan)) == (None, "deep")
+
+
+@pytest.mark.parametrize("flags", [("--offline",), ("--backend", "offline")])
+def test_research_offline_is_refused_in_a_sentence(tmp_path, flags):
+    tree = offline_plan(tmp_path / "tree")
+    before = snapshot(tree)
+    result = invoke("research", "scope", "--dir", str(tree), *flags)
+    assert result.exit_code == 1 and "reads the web, and offline reads nothing" in said(result)
+    assert snapshot(tree) == before
+
+
+def test_a_backend_that_says_it_cannot_research_is_refused_before_a_job(tmp_path, monkeypatch):
+    tree = offline_plan(tmp_path / "tree")
+
+    class Refuses(FakeLLM):
+        research_refusal = "Research runs only on another backend."
+
+    monkeypatch.setattr(cli, "build_llm", lambda **_: Refuses([]))
+    result = invoke("research", "scope", "--dir", str(tree))
+    assert result.exit_code == 1
+    assert "Research runs only on another backend. No model was called." in said(result)
+
+
+@pytest.mark.parametrize(
+    ("llm", "reason"),
+    [(pipeline.OfflineLLM(), "research does not run offline"), (FakeLLM([]), "this backend has no research call")],
+    ids=["offline", "no-research-call"],
+)
+def test_the_pipeline_refuses_a_backend_that_cannot_research(tmp_path, llm, reason):
+    tree = offline_plan(tmp_path / "tree")
+    before = snapshot(tree)
+    with pytest.raises(pipeline.PlanRefused, match=reason):
+        again(tree, llm, "scope")
+    assert snapshot(tree) == before
+
+
+def test_research_refuses_a_topic_the_plan_does_not_hold(tmp_path):
+    tree = researched_plan(tmp_path / "tree")
+    with pytest.raises(pipeline.PlanRefused, match="no topic 'ghost'; it holds: members, lending"):
+        again(tree, NeverAsked([]), "ghost")
+
+
+# -- the passes, narrowed to one topic ------------------------------------
+
+
+def test_the_twins_of_a_narrowed_pass_return_that_topic_alone():
+    plan = baseline.build_plan(IDEA)
+    assert consider.offline(plan, only="scope") == {
+        "topics": [{"slug": "scope", **{f: getattr(plan.topics[1], f) for f in consider.FIELDS}}]
+    }
+    links = connect.offline(plan, only="operations")["edges"]
+    assert links == [edge("operations", "resources")]
+    assert connect.apply(plan, {"edges": links}, only="operations").edges == plan.edges
+    assert consider.schema(plan, only="scope")["properties"]["topics"]["items"]["properties"]["slug"]["enum"] == [
+        "scope"
+    ]

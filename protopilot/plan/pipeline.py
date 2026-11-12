@@ -224,22 +224,45 @@ def _short(exc: BaseException) -> str:
     return baseline.clean(str(exc))[:MOST_FAILURE_CHARS].rstrip(" .") or type(exc).__name__
 
 
+def _asked(plan: Plan, llm, tree: Path, topic: Topic, number: int = 1) -> tuple[Plan, TopicResearch, bool]:
+    """One topic's research folded into `plan`, its record, and whether it was replayed. A failure is raised.
+
+    The topic's transcript `number` is replayed if it is on disk, and written if not, so no call is paid for twice.
+    """
+    label = f"{research.NAME} {topic.slug}"
+    stored = ledger.read_transcript(tree, topic.slug, number)
+    if stored is None:
+        system, user = research.build(plan, topic)
+        got = llm.research(system=system, user=user, schema=research.schema(plan), label=label)
+        transcript, data = got.transcript, got.data
+    else:
+        transcript, data = stored, research_result(stored, label)
+    fault = misshapen(research.schema(plan), data)
+    if fault:
+        raise PlanPassError(f"pass {label!r} returned output that cannot be used: {fault}")
+    after, record = research.apply(plan, topic.slug, data, ledger.fetches(transcript))
+    name = ledger.transcript_name(topic.slug, number)
+    if stored is None:
+        ledger.write_transcript(tree, topic.slug, transcript, number)
+    return (
+        after,
+        record.model_copy(update={"transcript": name, "sha256": ledger.digest(transcript)}),
+        stored is not None,
+    )
+
+
+def _research_said(job, after: Plan, record: TopicResearch, how: str) -> None:
+    usable = sum(fetch.usable for fetch in record.fetches)
+    cited = sum(not finding.assumption for t in after.topics if t.slug == record.topic for finding in t.findings)
+    job.log(f"    {record.topic}: {cited} cited finding(s), {usable} of {len(record.fetches)} fetch(es) usable ({how})")
+    job.event("researched", topic=record.topic, state=record.state, cited=cited, fetched=usable)
+
+
 def _research_topic(job, plan: Plan, llm, tree: Path, topic: Topic) -> Plan:
     """One topic researched, or recorded as failed. A transcript already on disk is replayed, not paid for again."""
-    label = f"{research.NAME} {topic.slug}"
-    stored = ledger.read_transcript(tree, topic.slug)
     started = time.monotonic()
     try:
-        if stored is None:
-            system, user = research.build(plan, topic)
-            got = llm.research(system=system, user=user, schema=research.schema(plan), label=label)
-            transcript, data = got.transcript, got.data
-        else:
-            transcript, data = stored, research_result(stored, label)
-        fault = misshapen(research.schema(plan), data)
-        if fault:
-            raise PlanPassError(f"pass {label!r} returned output that cannot be used: {fault}")
-        after, record = research.apply(plan, topic.slug, data, ledger.fetches(transcript))
+        after, record, replayed = _asked(plan, llm, tree, topic)
     except ResearchUnavailable:
         raise
     except (LLMError, PlanPassError, ValueError) as exc:
@@ -248,15 +271,9 @@ def _research_topic(job, plan: Plan, llm, tree: Path, topic: Topic) -> Plan:
         job.event("research_failed", topic=topic.slug, error=failure)
         record = TopicResearch(topic=topic.slug, state="failed", failure=failure)
         return plan.revised(research=[*plan.research, record])
-    name = (
-        ledger.write_transcript(tree, topic.slug, transcript) if stored is None else ledger.transcript_name(topic.slug)
+    _research_said(
+        job, after, record, "replayed from its transcript" if replayed else f"{time.monotonic() - started:.0f}s"
     )
-    record = record.model_copy(update={"transcript": name, "sha256": ledger.digest(transcript)})
-    usable = sum(fetch.usable for fetch in record.fetches)
-    cited = sum(not finding.assumption for t in after.topics if t.slug == topic.slug for finding in t.findings)
-    how = "replayed from its transcript" if stored is not None else f"{time.monotonic() - started:.0f}s"
-    job.log(f"    {topic.slug}: {cited} cited finding(s), {usable} of {len(record.fetches)} fetch(es) usable ({how})")
-    job.event("researched", topic=topic.slug, state=record.state, cited=cited, fetched=usable)
     return after.revised(research=[*after.research, record])
 
 
@@ -854,6 +871,69 @@ def add_topic(job, tree: Path, title: str, why: str, llm: LLM) -> verify.PlanVer
     verdict = _land(job, tree, plan, repaired(job, fitted, llm, plan), names)
     if verdict.ok:
         job.log(f"{new.title} is now the topic {new.slug}, and it is not researched: a person chose it.")
+    return verdict
+
+
+def _next_transcript(plan: Plan, slug: str) -> int:
+    """The number of the transcript a new research call of `slug` writes: one past the one its record names."""
+    record = plan.research_of(slug)
+    return ledger.transcript_number(record.transcript, slug) + 1 if record else 1
+
+
+def _researched_again(job, plan: Plan, asking: Plan, llm: LLM, tree: Path, topic: Topic) -> tuple[Plan, list[str]]:
+    """`plan` with one topic's findings and record replaced by a new call's, and the transcript's file."""
+    started = time.monotonic()
+    after, record, replayed = _asked(asking, llm, tree, topic, _next_transcript(plan, topic.slug))
+    known = plan.research_of(topic.slug) is not None
+    records = [record if r.topic == topic.slug else r for r in plan.research] if known else [*plan.research, record]
+    after = revising.without_orphans(plan, after.revised(depth=plan.depth, research=records), topic.slug)
+    # `researched` follows the records, so a topic that cited nothing this time cannot keep the plan's stamp.
+    after = ledger.reconciled(after, tree)
+    how = "replayed from the transcript an earlier try left" if replayed else f"{time.monotonic() - started:.0f}s"
+    _research_said(job, after, after.research_of(topic.slug) or record, how)
+    return after, [f"{ledger.RESEARCH_DIR}/{record.transcript}"]
+
+
+def _fitted(job, module, plan: Plan, llm: LLM, names: list[str], slug: str) -> Plan:
+    return _pass(job, module.NAME, names, lambda: (run_pass(module, plan, llm, only=slug), []))
+
+
+def research_topic(job, tree: Path, slug: str, llm: LLM, deeper: bool = False) -> verify.PlanVerdict:
+    """One topic researched, its findings and record replaced and never merged, or nothing at all.
+
+    Its links and its notes are fitted again, and no other topic is written. `deeper` gives this
+    one call the next depth's effort and stores nothing. A try that stopped after its call left a
+    transcript, and a rerun replays it.
+    """
+    tree = Path(tree)
+    job.project_dir = str(tree)
+    plan = _held(tree, REVISE_NEEDS)
+    topic = _topic(plan, slug)
+    refusal = "research does not run offline" if llm.offline else research_refusal(llm)
+    if refusal:
+        raise PlanRefused(f"{slug} was not researched, and nothing was changed: {refusal}")
+    further = research.deeper(plan) if deeper else None
+    if deeper and further is None:
+        raise PlanRefused(
+            f"This plan is at depth {plan.depth}, the most research reads, so --deeper has nothing to add. "
+            "Rerun without it. No model was called."
+        )
+    asking = plan.revised(depth=further) if further else plan
+    number = _next_transcript(plan, slug)
+    names = [research.NAME, connect.NAME, consider.NAME, RENDER]
+    job.event("plan", passes=names)
+    try:
+        after = _pass(job, research.NAME, names, lambda: _researched_again(job, plan, asking, llm, tree, topic))
+        for module in (connect, consider):
+            after = _fitted(job, module, after, llm, names, slug)
+    except (LLMError, PlanPassError, ValueError) as exc:
+        kept = ledger.read_transcript(tree, slug, number) is not None
+        left = " Its transcript is kept, and a rerun replays it instead of asking again." if kept else ""
+        raise PlanRefused(f"{slug} was not researched, and nothing was changed: {_short(exc)}.{left}") from exc
+    verdict = _land(job, tree, plan, repaired(job, after, llm, plan, frozenset({slug})), names)
+    if verdict.ok:
+        again = " again, and its earlier transcript stays beside the new one" if number > 1 else ""
+        job.log(f"{topic.title} ({slug}) is researched{again}. Its findings and its record are replaced, not merged.")
     return verdict
 
 

@@ -15,9 +15,10 @@ from __future__ import annotations
 
 import json
 import re
+from typing import cast
 
 from protopilot.plan import ledger
-from protopilot.plan.model import DEFAULT_DEPTH, Fetch, Finding, Plan, Source, Topic, TopicResearch
+from protopilot.plan.model import DEFAULT_DEPTH, Depth, Fetch, Finding, Plan, Source, Topic, TopicResearch
 from protopilot.plan.passes import listed, scope_block, text
 
 NAME = "research"
@@ -46,6 +47,13 @@ You research one topic of a plan, with web search and web fetch and nothing else
 
 def effort(plan: Plan) -> tuple[int, int, int]:
     return EFFORT[plan.depth or DEFAULT_DEPTH]
+
+
+def deeper(plan: Plan) -> Depth | None:
+    """The depth one step past this plan's, for one call's effort, or None at the deepest."""
+    depths = list(EFFORT)
+    following = depths[depths.index(plan.depth or DEFAULT_DEPTH) + 1 :]
+    return cast(Depth, following[0]) if following else None
 
 
 def schema(plan: Plan) -> dict:

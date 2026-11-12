@@ -2,6 +2,9 @@
 
 One call for the whole plan, not one per topic: the topics are short, and seeing
 them together is what stops every topic reporting the same risk.
+
+`only` narrows it to one topic, for a plan already made: the others are shown and
+none of them is written.
 """
 
 from __future__ import annotations
@@ -25,7 +28,14 @@ Return one entry per topic, with its slug, and use only the slugs you are given.
 """
 
 
-def schema(plan: Plan) -> dict:
+ONLY = "Return one entry, for `{slug}` alone. The other topics are settled, and are here to be read."
+
+
+def _asked(plan: Plan, only: str) -> list[str]:
+    return [only] if only else [topic.slug for topic in plan.topics]
+
+
+def schema(plan: Plan, only: str = "") -> dict:
     strings = {"type": "array", "items": {"type": "string"}}
     return {
         "type": "object",
@@ -35,7 +45,7 @@ def schema(plan: Plan) -> dict:
                 "items": {
                     "type": "object",
                     "properties": {
-                        "slug": {"type": "string", "enum": [topic.slug for topic in plan.topics]},
+                        "slug": {"type": "string", "enum": _asked(plan, only)},
                         **dict.fromkeys(FIELDS, strings),
                     },
                     "required": ["slug", *FIELDS],
@@ -48,31 +58,34 @@ def schema(plan: Plan) -> dict:
     }
 
 
-def build(plan: Plan) -> tuple[str, str]:
+def build(plan: Plan, only: str = "") -> tuple[str, str]:
     connections = [f"- {e.from_topic} {e.kind} {e.to_topic}" for e in plan.edges]
     blocks = [scope_block(plan), topics_block(plan.topics), findings_block(plan)]
+    links = ["## How they connect", "\n".join(connections) or "No links."]
     return SYSTEM, "\n\n".join(
-        [*(block for block in blocks if block), "## How they connect", "\n".join(connections) or "No links."]
+        [*(block for block in blocks if block), *links, *([ONLY.format(slug=only)] if only else [])]
     )
 
 
-def offline(plan: Plan) -> dict:
+def offline(plan: Plan, only: str = "") -> dict:
     """The baseline's rows; a topic a person added has none, and stays empty."""
     rows = {topic.slug: topic for topic in baseline.build_plan(plan.idea, plan.direction).topics}
     empty = dict.fromkeys(FIELDS, [])
     return {
         "topics": [
-            {"slug": t.slug, **({f: getattr(rows[t.slug], f) for f in FIELDS} if t.slug in rows else empty)}
-            for t in plan.topics
+            {"slug": slug, **({f: getattr(rows[slug], f) for f in FIELDS} if slug in rows else empty)}
+            for slug in _asked(plan, only)
         ]
     }
 
 
-def apply(plan: Plan, data: dict) -> Plan:
+def apply(plan: Plan, data: dict, only: str = "") -> Plan:
     slugs = [row["slug"] for row in data["topics"]]
-    known = [topic.slug for topic in plan.topics]
+    known = _asked(plan, only)
     if sorted(slugs) != sorted(known):
         raise ValueError(f"wanted one entry for each of {', '.join(known)}; got {', '.join(slugs) or 'none'}")
     rows = {row["slug"]: row for row in data["topics"]}
-    topics = [t.model_copy(update={f: lines(rows[t.slug][f]) for f in FIELDS}) for t in plan.topics]
+    topics = [
+        t.model_copy(update={f: lines(rows[t.slug][f]) for f in FIELDS}) if t.slug in rows else t for t in plan.topics
+    ]
     return plan.revised(topics=topics)

@@ -188,7 +188,7 @@ Tasks:
 - [x] `proto topic rename`, then `drop`, then `add`, each landing through `_land`
 - [x] The dropped-topics list on `Plan`, with a test that an old `plan.json`
       without it loads and saves byte-identical
-- [ ] `proto research SLUG`, resumable as the first run's research is
+- [x] `proto research SLUG`, resumable as the first run's research is
 - [ ] The held-topic guard on repair, with a planted repair that rewrites
       another topic
 - [ ] The partly-researched stamp, with a planted-failure test per check it

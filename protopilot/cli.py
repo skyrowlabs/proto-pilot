@@ -3,6 +3,7 @@
 proto plan "start a community tool library"
 proto dream | dream promote d1 | dream drop d2 --why "..."
 proto answer 1
+proto research scope --deeper
 proto topic add "Insurance" --why "..." | topic drop scope --why "..." | topic rename scope "The boundary"
 proto ls | rm | prune | doctor
 """
@@ -468,6 +469,35 @@ def topic_add_command(title: str, why: str, directory: str, offline: bool, backe
     llm = _dream_llm(offline, backend)
     target = Path(directory).resolve()
     _revise_step(target, lambda j: pipeline.add_topic(j, target, title, why, llm))
+
+
+@main.command(name="research")
+@click.argument("slug", metavar="SLUG")
+@click.option(
+    "--deeper",
+    is_flag=True,
+    help="Give this one call the findings and pages of the next --depth up. The plan's depth is not changed.",
+)
+@click.option("--dir", "directory", default=".", help="Plan directory (default: cwd).")
+@_dream_options
+def research_command(slug: str, deeper: bool, directory: str, offline: bool, backend: str | None) -> None:
+    """Research topic SLUG of a plan again, on the web, and replace what it found.
+
+    One research call on the claude-code backend, then the topic's links and notes are
+    fitted again; no other topic is written. Its earlier transcript stays beside the new
+    one. It does not run offline, and a try that stopped after its call is replayed.
+    """
+    from protopilot.plan import pipeline
+
+    llm = _dream_llm(offline, backend)
+    if llm.offline:
+        raise click.ClickException(
+            "`proto research` reads the web, and offline reads nothing. Choose a backend that researches. "
+            "Nothing was changed."
+        )
+    _refuse_unresearchable(llm, True)
+    target = Path(directory).resolve()
+    _revise_step(target, lambda j: pipeline.research_topic(j, target, slug, llm, deeper))
 
 
 @main.command(name="ls")

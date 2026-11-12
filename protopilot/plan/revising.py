@@ -30,6 +30,19 @@ def _settled(dream: Dream, slug: str, reason: str) -> tuple[Dream, str]:
     return dream, ""
 
 
+def orphaned(before: Plan, after: Plan, slug: str) -> set[str]:
+    """The sources `slug` cited in `before` that no topic of `after` cites: the ones a change left behind."""
+    was = next((topic for topic in before.topics if topic.slug == slug), None)
+    cited = {i for topic in after.topics for finding in topic.findings for i in finding.source_ids}
+    return {i for finding in (was.findings if was else []) for i in finding.source_ids} - cited
+
+
+def without_orphans(before: Plan, after: Plan, slug: str) -> Plan:
+    """`after` without the sources only `slug` cited, so `sources.md` lists what a topic still rests on."""
+    gone = orphaned(before, after, slug)
+    return after.revised(sources=[source for source in after.sources if source.id not in gone]) if gone else after
+
+
 def dropped(plan: Plan, slug: str, why: str) -> tuple[Plan, list[str]]:
     """`plan` without the topic `slug` or anything that pointed at it, and a sentence for each thing removed."""
     reason = baseline.clean(why)
@@ -52,9 +65,8 @@ def dropped(plan: Plan, slug: str, why: str) -> tuple[Plan, list[str]]:
         settled, note = _settled(dream, slug, reason)
         dreams.append(settled)
         notes += [note] if note else []
-    cited = {i for topic in kept.topics for finding in topic.findings for i in finding.source_ids}
-    orphaned = {i for finding in gone.findings for i in finding.source_ids} - cited
-    notes += [f"removed source {s.id}, which no other topic cites" for s in plan.sources if s.id in orphaned]
+    lost = orphaned(plan, kept, slug)
+    notes += [f"removed source {s.id}, which no other topic cites" for s in plan.sources if s.id in lost]
     if plan.research_of(slug) is not None:
         notes.append("left its research transcript where it is, and took its record out of the ledger")
     return (
@@ -62,7 +74,7 @@ def dropped(plan: Plan, slug: str, why: str) -> tuple[Plan, list[str]]:
             edges=edges,
             steps=[step for step in plan.steps if step.topic != slug],
             dreams=dreams,
-            sources=[source for source in plan.sources if source.id not in orphaned],
+            sources=[source for source in plan.sources if source.id not in lost],
             research=[record for record in plan.research if record.topic != slug],
             dropped_topics=[*plan.dropped_topics, DroppedTopic(slug=slug, title=gone.title, why=reason)],
         ),

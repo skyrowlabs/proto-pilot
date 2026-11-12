@@ -9,8 +9,10 @@ What a usable fetch proves is narrow: `WebFetch` returns a model's summary of th
 not the page, so a citation shows that summary was read, never that a claim is in the source.
 
 The transcripts live in `.protopilot/research/`, beside the reviewed outline a resumed
-run starts from. `reconciled` redraws each record's fetches from its transcript, so a
-`fetched: true` typed into plan.json, or a fetch typed into the ledger, earns nothing.
+run starts from. A topic researched again gets a numbered transcript beside its first,
+and its record names the one that counts. `reconciled` redraws each record's fetches
+from that transcript, so a `fetched: true` typed into plan.json, or a fetch typed into
+the ledger, earns nothing, and a record cannot borrow another topic's transcript.
 A forged transcript is beyond any check here. `normal` keeps http/https, `www.`, `:443`
 and `%7E` apart, which errs toward calling a citation an assumption: a ruling, for now.
 """
@@ -114,27 +116,36 @@ def research_dir(tree: Path) -> Path:
     return Path(tree) / RESEARCH_DIR
 
 
-def transcript_name(slug: str) -> str:
-    return f"{slug}.jsonl"
+def transcript_name(slug: str, number: int = 1) -> str:
+    """A topic's first transcript is `<slug>.jsonl`, and each later one is numbered from 2. A slug holds no dot."""
+    return f"{slug}.jsonl" if number <= 1 else f"{slug}.{number}.jsonl"
+
+
+def transcript_number(name: str, slug: str) -> int:
+    """Which of `slug`'s own transcripts `name` is, counted from 1, or 0 if it is not one of them."""
+    if name == transcript_name(slug):
+        return 1
+    numbered = re.fullmatch(rf"{re.escape(slug)}\.([1-9]\d*)\.jsonl", name)
+    return int(numbered.group(1)) if numbered and int(numbered.group(1)) > 1 else 0
 
 
 def digest(transcript: str) -> str:
     return hashlib.sha256(transcript.encode("utf-8")).hexdigest()
 
 
-def write_transcript(tree: Path, slug: str, transcript: str) -> str:
+def write_transcript(tree: Path, slug: str, transcript: str, number: int = 1) -> str:
     """Land a topic's transcript whole, and return its file name."""
     folder = research_dir(tree)
     folder.mkdir(parents=True, exist_ok=True)
-    name = transcript_name(slug)
+    name = transcript_name(slug, number)
     temp = folder / f".{name}.tmp"
     temp.write_text(transcript, encoding="utf-8")
     temp.replace(folder / name)
     return name
 
 
-def read_transcript(tree: Path, slug: str) -> str | None:
-    path = research_dir(tree) / transcript_name(slug)
+def read_transcript(tree: Path, slug: str, number: int = 1) -> str | None:
+    path = research_dir(tree) / transcript_name(slug, number)
     if path.is_symlink() or not path.is_file():
         return None
     return path.read_text(encoding="utf-8", errors="replace")
@@ -164,8 +175,8 @@ def forget_draft(tree: Path) -> None:
 
 
 def _evidence(record: TopicResearch, tree: Path) -> list[Fetch] | None:
-    """The fetches in this topic's own transcript, or None if it is not there as written."""
-    if record.transcript != transcript_name(record.topic):
+    """The fetches in the transcript this record names, or None if it is not this topic's or not there as written."""
+    if not transcript_number(record.transcript, record.topic):
         return None
     path = research_dir(tree) / record.transcript
     if path.is_symlink() or not path.is_file():
