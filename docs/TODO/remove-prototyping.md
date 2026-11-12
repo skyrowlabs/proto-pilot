@@ -332,30 +332,30 @@ Each line is what the rehearsal showed failing or failing to import.
 
 ## Phase 4 — Dependencies and CI
 
-- [ ] `pyproject.toml`: core `dependencies` lose `sqlalchemy` and `textual`.
+- [x] `pyproject.toml`: core `dependencies` lose `sqlalchemy` and `textual`.
       `dev` loses `pytest-asyncio`, `sqlalchemy`, `textual`, `fastapi`, `jinja2`,
       `httpx`, `python-multipart` and the comments that explain them
       (`asyncio_mode` is mentioned at line 49). The `browser` and `web` extras
       go. Measured in the rehearsal: no surviving test is `async`, and the unit
       suite's failure set was identical with these lines removed
-- [ ] `.github/dependabot.yml` names none of these; nothing to change. Confirm
+- [x] `.github/dependabot.yml` names none of these; nothing to change. Confirm
       with `grep -nE "skeleton|textual|sqlalchemy" .github/dependabot.yml .github/pyright-deps.txt`
-- [ ] `.github/workflows/ci.yml` is skeletor's file with our text merged in.
+- [x] `.github/workflows/ci.yml` is skeletor's file with our text merged in.
       Change only comments that are ours and now false: lines 548–556 (the
       project "plus the generated app's stack", extras, Playwright), 646–658
       (the integration placeholder's "skeleton, five passes, write guard"), and
       684–689 (`tests/test_console*.py`). Leave 476–479: it records why the
       matrix was halved, which stays true as history. **No job, step, trigger or
       `if:` changes**
-- [ ] `scripts/template_divergence_allowlist.yaml`: the `.github/workflows/ci.yml`
+- [x] `scripts/template_divergence_allowlist.yaml`: the `.github/workflows/ci.yml`
       entry says "with this tree's extras". Reword it to what still differs. Do
       not delete it unless `tests/test_template_divergence_allowlist.py` says the
       file now matches skeletor's render
-- [ ] `cli/test_cmds.py:109`: the `ui` row's reason cited the console's pilot
+- [x] `cli/test_cmds.py:109`: the `ui` row's reason cited the console's pilot
       tests. The suite is still empty and still unscheduled; say why without them
-- [ ] Rebuild the venv from the Quick Start lines, so the gates run without the
+- [x] Rebuild the venv from the Quick Start lines, so the gates run without the
       removed packages installed, then `./pp check pre-push`
-- [ ] Commit: `build: drop the dependencies only generated apps needed`
+- [x] Commit: `build: drop the dependencies only generated apps needed`
 
 ## Phase 5 — Re-record the coverage baseline
 

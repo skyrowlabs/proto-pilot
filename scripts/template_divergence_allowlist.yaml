@@ -35,7 +35,7 @@
 # explanation above IS ordinary prose and does get rewritten, which is why the
 # rule sits at the bottom of it rather than at the top.
 
-.github/workflows/ci.yml: The unit job installs through unit-setup with this tree's extras and a pip cache over both dependency files.
+.github/workflows/ci.yml: The unit job installs through unit-setup, with a pip cache over both dependency files, and there is no ui job.
 README.md: The badge row follows the workspace's readme-badges seam. Keep it and advance with --ported.
 cli/check.py: health runs the product's host probe, which the template's stub cannot know.
 docs/DEVELOPMENT.md: First-Time Setup is this tree's own block. Port a template change into it, never take the template's.
