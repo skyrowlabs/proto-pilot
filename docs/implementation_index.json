@@ -1,8 +1,12 @@
 {
   "_generated_by": "scripts/docs/gen_impl_index.py",
   "_note": "Generated — never hand-edit. Edit the doc's frontmatter and rerun.",
-  "count": 4,
+  "count": 6,
   "by_category": {
+    "dropped": [
+      "drawing-freedom",
+      "improvement-loop"
+    ],
     "spec": [
       "archetypes-and-theme",
       "plan-prototypes",
@@ -28,6 +32,46 @@
       "auto_generated": false,
       "category": "spec",
       "completed": "2026-09-01",
+      "agent_value": 1
+    },
+    {
+      "slug": "drawing-freedom",
+      "title": "Drawing Freedom",
+      "path": "docs/implementations/dropped/drawing-freedom.md",
+      "priority": "low",
+      "updated": "2026-11-06",
+      "tags": [
+        "ui",
+        "verify",
+        "skeleton",
+        "archetypes",
+        "prompts"
+      ],
+      "summary": "Raise the visual ceiling of a generated app by ranking display options on whether the verifier can tell they worked — not on what Docker permits.",
+      "open_tasks": 29,
+      "auto_generated": false,
+      "category": "dropped",
+      "completed": "2026-11-06",
+      "agent_value": 1
+    },
+    {
+      "slug": "improvement-loop",
+      "title": "The Improvement Loop",
+      "path": "docs/implementations/dropped/improvement-loop.md",
+      "priority": "low",
+      "updated": "2026-11-06",
+      "tags": [
+        "loop",
+        "verify",
+        "docker",
+        "agent",
+        "safety"
+      ],
+      "summary": "Let a prototype be told to keep getting better, with a ratchet that reverts any iteration leaving it less green than it found it.",
+      "open_tasks": 28,
+      "auto_generated": false,
+      "category": "dropped",
+      "completed": "2026-11-06",
       "agent_value": 1
     },
     {

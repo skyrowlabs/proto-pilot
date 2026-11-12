@@ -54,7 +54,7 @@ readable at the tag `prototyping-final` and nowhere on a branch.
 ## What changes when
 
 The two plans that were parked on this direction
-([Improvement Loop](../TODO/improvement-loop.md),
-[Drawing Freedom](../TODO/drawing-freedom.md)) were dropped on
+([Improvement Loop](../implementations/dropped/improvement-loop.md),
+[Drawing Freedom](../implementations/dropped/drawing-freedom.md)) were dropped on
 2026-11-11, never built: the layer they extend was removed. The README leads with
 `proto plan`, says what it does not do yet, and describes no other product.

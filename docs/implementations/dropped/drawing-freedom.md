@@ -1,26 +1,24 @@
 ---
-title: "Drawing Freedom"
+title: Drawing Freedom
 slug: drawing-freedom
-shelf_status: blocked
-blocked_on: product-decision
 priority: low
+category: dropped
+agent_value: 1
+completed: 2026-11-06
 updated: 2026-11-06
 tags: [ui, verify, skeleton, archetypes, prompts]
-summary: "Raise the visual ceiling of a generated app by ranking display options on whether the verifier can tell they worked — not on what Docker permits."
+summary: Raise the visual ceiling of a generated app by ranking display options on whether the verifier can tell they worked — not on what Docker permits.
 ---
 
 # Drawing Freedom
 
-> **Status**: ⛔ Blocked — designed and unreviewed, and now **target-scoped**
-> **Shelf-Status**: blocked
-> **Blocked-On**: product-decision
+> **Status**: Dropped 2026-11-11 — never built; the layer it extends was removed
 > **Priority**: Low — tabled 2026-11-06 with physical prototyping; see
-> [plans-first](../ideas/plans-first.md)
-> **Queue-Order**: unset until it is `ready`
+> [plans-first](../../ideas/plans-first.md)
 
 ## Blocked 2026-09-03 — every rung below is a *web* rung
 
-[`sketches-not-scaffolds`](../ideas/sketches-not-scaffolds.md) points the tool at
+[`sketches-not-scaffolds`](../../ideas/sketches-not-scaffolds.md) points the tool at
 a terminal target and makes the web one legacy. **This plan is not wrong; it is
 now scoped to a target that may stop being the default.** Every rung in the table
 below — SVG, scoped CSS, Pillow, canvas, p5, WebGL — is a browser capability, and
@@ -55,7 +53,7 @@ apart from a change regression. So "web stays a supported target" is true and
 "web is the default" is not, and which of the three answers above that makes
 this plan is a product call that is still open. **Blocked-On stays
 `product-decision`**; what changed is that the input it was waiting on is in.
-[The numbers](../reports/occasional/2026-09-04-terminal-target-go-no-go.md).
+[The numbers](../../reports/occasional/2026-09-04-terminal-target-go-no-go.md).
 
 ## What transfers to any target, and is the reason to keep this doc
 

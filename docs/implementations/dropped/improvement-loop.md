@@ -1,26 +1,23 @@
 ---
-title: "The Improvement Loop"
+title: The Improvement Loop
 slug: improvement-loop
-shelf_status: blocked
-blocked_on: product-decision
 priority: low
+category: dropped
+agent_value: 1
+completed: 2026-11-06
 updated: 2026-11-06
 tags: [loop, verify, docker, agent, safety]
-summary: "Let a prototype be told to keep getting better, with a ratchet that reverts any iteration leaving it less green than it found it."
+summary: Let a prototype be told to keep getting better, with a ratchet that reverts any iteration leaving it less green than it found it.
 ---
 
 # The Improvement Loop
 
-> **Status**: ⛔ Blocked — tabled 2026-11-06 with physical prototyping; see
-> [plans-first](../ideas/plans-first.md)
-> **Shelf-Status**: blocked
-> **Blocked-On**: product-decision
+> **Status**: Dropped 2026-11-11 — never built; the layer it extends was removed
 > **Priority**: Low — it improves generated apps, which are no longer the product
-> **Queue-Order**: unset until it is `ready`
 
 ## The pivot barely touches this, and that is worth stating
 
-[`sketches-not-scaffolds`](../ideas/sketches-not-scaffolds.md) changes the output
+[`sketches-not-scaffolds`](../../ideas/sketches-not-scaffolds.md) changes the output
 medium. **This plan is almost entirely medium-independent** and stays `planned`
 rather than blocked, unlike [drawing-freedom](drawing-freedom.md), whose every
 rung was a browser capability.

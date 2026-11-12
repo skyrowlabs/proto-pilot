@@ -16,9 +16,16 @@ that were dropped, and the constraints that shaped what landed.
 
 **Machine-readable index**: [`../implementation_index.json`](../implementation_index.json).
 
-**4 archived plans** across 1 categories.
+**6 archived plans** across 2 categories.
 
 ---
+
+## Dropped
+
+| Value | Plan | Completed | Summary |
+| ----- | ---- | --------- | ------- |
+| ⭐ | [Drawing Freedom](dropped/drawing-freedom.md) | 2026-11-06 | Raise the visual ceiling of a generated app by ranking display options on whether the verifier can tell they worked — not on what Docker permits. |
+| ⭐ | [The Improvement Loop](dropped/improvement-loop.md) | 2026-11-06 | Let a prototype be told to keep getting better, with a ratchet that reverts any iteration leaving it less green than it found it. |
 
 ## Spec
 

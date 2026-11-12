@@ -160,7 +160,7 @@ and `scripts/spikes/README.md`; two callables in `docs/ARCHITECTURE.md`
       console, the web front end, Docker or `gc` to *Resolved* with "removed
       2026-11-11". It is narrative, so no gate asks; this is the reading pass
       Rule 16 says no test can do
-- [ ] File the two parked designs as dropped. The lifecycle has no dropped
+- [x] File the two parked designs as dropped. The lifecycle has no dropped
       state, so use the archive with a category that says it:
       `./pp docs file improvement-loop --category dropped --force` and
       `./pp docs file drawing-freedom --category dropped --force`
@@ -168,7 +168,7 @@ and `scripts/spikes/README.md`; two callables in `docs/ARCHITECTURE.md`
       set each `> **Status**:` line to `Dropped 2026-11-11 — never built; the
       layer it extends was removed` so the archive's "completed" heading cannot
       be read as a claim about them
-- [ ] Repoint what cited them: `docs/ideas/plans-first.md:46-47` and
+- [x] Repoint what cited them: `docs/ideas/plans-first.md:46-47` and
       `docs/reports/regular/repository-report.md:119,121`. The frozen
       `docs/reports/releases/v0.3.0/repository-report.md:143,145` is never
       edited: add two entries to `scripts/doc_refs_allowlist.yaml` beside the
@@ -177,11 +177,11 @@ and `scripts/spikes/README.md`; two callables in `docs/ARCHITECTURE.md`
       are untouched. Measured: no doc holds a markdown link into `protopilot/`,
       `skeleton/` or `tests/`, and `./pp check docs` was green in the rehearsal
       with the code gone
-- [ ] `./pp docs index`, then `./pp check docs` and `./pp test unit`. **If a gate
+- [x] `./pp docs index`, then `./pp check docs` and `./pp test unit`. **If a gate
       here demands that a doc name something still live, move that one edit into
       Phase 3's commit and say so in its body** — none was found, but this state
       (docs changed, code not) is the one the rehearsal did not run
-- [ ] Commits: `docs: describe planning as the whole product`, then
+- [x] Commits: `docs: describe planning as the whole product`, then
       `chore(docs): file the two prototype designs as dropped`
 
 ## Phase 3 — Remove the layer
