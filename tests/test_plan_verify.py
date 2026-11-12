@@ -35,6 +35,14 @@ def with_finding(plan: Plan, finding: Finding) -> Plan:
     return plan.revised(topics=[first, *plan.topics[1:]])
 
 
+def cited_by(slug: str) -> Plan:
+    """`full()`, partly researched, with a topic research never reached citing the researched topic's source."""
+    plan = full()
+    borrowed = Finding(text="Borrowed.", assumption=False, source_ids=["s1"])
+    topics = [t.model_copy(update={"findings": [*t.findings, borrowed]}) if t.slug == slug else t for t in plan.topics]
+    return plan.revised(topics=topics)
+
+
 def full() -> Plan:
     """A plan every check has a subject in, so a planted failure has a pass to turn red."""
     sourced = Finding(text="Lending works.", assumption=False, source_ids=["s1"])
@@ -118,6 +126,10 @@ PLANTS = {
         "researched-with-no-source": lambda: baseline.build_plan(IDEA).revised(researched=True),
         "fetched-typed-with-no-ledger": lambda: full().revised(research=[]),
         "ledger-fetch-was-a-403": lambda: full().revised(research=[fetched_record(usable=False)]),
+        "partly-and-no-topic-is-researched": lambda: full().revised(
+            research=[{**fetched_record(), "state": "nothing cited"}]
+        ),
+        "partly-and-an-unresearched-topic-cites": lambda: cited_by("scope"),
     },
     "start_order": {
         "first-step-waits": lambda: steps("scope", "audience"),

@@ -973,3 +973,72 @@ def test_with_no_topic_named_the_guard_still_opens_only_the_new_ones():
     linked = grown.revised(edges=[*grown.edges, Edge(from_topic="insurance", to_topic="scope", kind="informs")])
     assert repair.unsettled(held, linked) == ""
     assert repair.unsettled(held, reworded(linked, "risks")) == "it rewrote settled topics: risks"
+
+
+# -- the partly-researched stamp ------------------------------------------
+
+
+def unresearched_plan(tree: Path) -> Path:
+    """A model plan made with research off, as `--no-research` makes one."""
+    assert pipeline.run_plan(job_for(), tree, FakeLLM(script()), researching=False).ok
+    return tree
+
+
+def entry(tree: Path, name: str = "PLAN.md") -> str:
+    return (tree / name).read_text(encoding="utf-8")
+
+
+def test_researching_one_topic_of_an_unresearched_plan_stamps_it_partly(tmp_path):
+    tree = unresearched_plan(tmp_path / "tree")
+    assert render.NOT_RESEARCHED in entry(tree)
+    assert again(tree, ResearchingLLM(refit(), {})).ok
+    plan = Plan.load(tree)
+    assert plan.researched and [r.topic for r in plan.research] == ["members"]
+    for page in (entry(tree), entry(tree, "sources.md")):
+        assert "> **Partly researched.** 1 of 6 topics are researched." in page
+        assert render.RESEARCHED not in page and render.NOT_RESEARCHED not in page
+        assert "> - Lending: Research did not run for it." in page and "> - Members:" not in page
+    assert render.TOPIC_RESEARCHED in entry(tree, "topics/members.md")
+
+
+def test_the_first_research_of_an_unresearched_plan_redraws_no_other_topics_page(tmp_path):
+    tree = unresearched_plan(tmp_path / "tree")
+    before = snapshot(tree)
+    assert again(tree, ResearchingLLM(refit(), {})).ok
+    assert changed(before, snapshot(tree)) == [
+        ".protopilot/plan.json",
+        ".protopilot/research/members.jsonl",
+        "PLAN.md",
+        "sources.md",
+        "topics/members.md",
+    ]
+    assert render.NOT_RESEARCHED in entry(tree, "topics/lending.md")
+
+
+def test_a_plan_is_stamped_whole_only_when_every_topic_is_researched(tmp_path):
+    whole = researched_plan(tmp_path / "whole")
+    assert render.RESEARCHED in entry(whole) and "Partly researched" not in entry(whole)
+    part = tmp_path / "part"
+    assert pipeline.run_plan(job_for(), part, ResearchingLLM(script(), {"money": LLMError("timed out")})).ok
+    assert "> **Partly researched.** 5 of 6 topics are researched." in entry(part)
+    assert render.RESEARCHED not in entry(part)
+
+
+def test_a_topic_added_to_a_researched_plan_makes_it_partly_and_is_stamped_as_never_reached(tmp_path):
+    tree = researched_plan(tmp_path / "tree")
+    fitted = {"edges": [], "risks": [], "unknowns": [], "decisions": []}
+    assert pipeline.add_topic(job_for(), tree, "Insurance", "It matters.", FakeLLM([fitted])).ok
+    assert "> **Partly researched.** 6 of 7 topics are researched." in entry(tree)
+    assert "> - Insurance: Research did not run for it." in entry(tree)
+    assert render.NOT_RESEARCHED in entry(tree, "topics/insurance.md")
+
+
+def test_when_the_only_researched_topic_cites_nothing_again_the_plan_is_stamped_not_researched(tmp_path):
+    tree = unresearched_plan(tmp_path / "tree")
+    assert again(tree, ResearchingLLM(refit(), {})).ok
+    nothing = transcript([assumed()], [fetched(OTHER, code=403)])
+    assert again(tree, ResearchingLLM(refit(), {"members": nothing})).ok
+    plan = Plan.load(tree)
+    assert (plan.researched, plan.sources) == (False, [])
+    assert render.NOT_RESEARCHED in entry(tree) and "Partly researched" not in entry(tree)
+    assert f"{render.NOT_RESEARCHED} Research ran and cited no page it fetched." in entry(tree, "topics/members.md")

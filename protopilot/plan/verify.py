@@ -242,6 +242,8 @@ def sources_fetched(plan: Plan, pages: Pages) -> CheckResult:
             problems.append(f"source {source.id} ({source.url}) has no usable fetch in this run's ledger{typed}")
     if plan.researched and not plan.sources:
         problems.append("the plan says it was researched, and it holds no source")
+    elif plan.researched and plan.research and not any(record.state == "researched" for record in plan.research):
+        problems.append("the plan says it was researched, and no topic's research cites a page it fetched")
     problems += _borrowed(plan)
     advice = "Only a research run can record a fetch, so remove the source or research it."
     return _judged("sources_fetched", plan.sources, problems, advice, "The plan has no sources to check.")

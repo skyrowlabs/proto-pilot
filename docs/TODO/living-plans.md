@@ -191,7 +191,7 @@ Tasks:
 - [x] `proto research SLUG`, resumable as the first run's research is
 - [x] The held-topic guard on repair, with a planted repair that rewrites
       another topic
-- [ ] The partly-researched stamp, with a planted-failure test per check it
+- [x] The partly-researched stamp, with a planted-failure test per check it
       touches, as `test_every_check_has_a_planted_failure` requires
 - [ ] `docs/CLI.md`, `README.md` commands, and `ARCHITECTURE.md`'s plan pipeline
       section, in the same change
