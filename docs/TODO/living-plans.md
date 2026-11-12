@@ -193,7 +193,7 @@ Tasks:
       another topic
 - [x] The partly-researched stamp, with a planted-failure test per check it
       touches, as `test_every_check_has_a_planted_failure` requires
-- [ ] `docs/CLI.md`, `README.md` commands, and `ARCHITECTURE.md`'s plan pipeline
+- [x] `docs/CLI.md`, `README.md` commands, and `ARCHITECTURE.md`'s plan pipeline
       section, in the same change
 
 **Done is checked by:** on the offline tool-library plan, `proto topic drop`

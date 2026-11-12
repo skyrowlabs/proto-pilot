@@ -117,6 +117,9 @@ run `docker compose down -v` in its folder, then delete the folder by hand.
 |---|---|
 | `proto plan IDEA` | scope it, outline it with you, connect the topics, weigh the risks, pick first steps, dream a little, check the structure, write the folder |
 | `proto dream [DIR]` / `dream promote ID` / `dream drop ID --why WHY` | run another round of dreams; turn one into a topic; rule one out, with the reason kept |
+| `proto answer [N]` | answer an open question of a plan; the answer becomes a constraint |
+| `proto topic add TITLE --why WHY` / `topic drop SLUG --why WHY` / `topic rename SLUG TITLE` | add a topic to a plan already made; rule one out, with the reason kept; retitle one |
+| `proto research SLUG` | research one topic on the web, or research it again, and replace what it found |
 | `proto ls` | every plan on this machine |
 | `proto rm` | delete a plan's folder |
 | `proto prune` | forget entries whose folder is gone, and prototypes an older version made |
@@ -152,7 +155,8 @@ page is drawn from it, and a re-render overwrites them.
 
 **The review sits at the outline** because that is the last cheap place to fix a
 misreading. A topic list can be read in thirty seconds and a finished document cannot.
-Add, drop or rename topics there before the rest is written.
+Add, drop or rename topics there before the rest is written; afterwards,
+[`proto topic`](#revising-a-plan) does the same to the finished plan.
 
 **Where to start is checked, not just written.** The first step must have no unmet
 dependency, each later step must follow what it depends on, and `depends-on` links may
@@ -210,6 +214,29 @@ call, because a dream extends a plan that holds.
 Two limits. The check that keeps dreams out of topic files catches copies and misses
 paraphrase. And the API backend has never been run for these passes.
 
+### Revising a plan
+
+A plan is not finished the moment it is written. Each of these changes one thing on a
+green plan, leaves the rest as it was, and either lands the plan green or changes nothing.
+
+- **`proto answer`** takes a question the plan left open and makes the answer a
+  constraint. It calls no model and moves no topic.
+- **`proto topic rename`** changes a title. The slug is the topic's identity, so its file,
+  links, steps and research stay.
+- **`proto topic drop`** removes a topic with its links, its step and any source nothing
+  else cites, and says what it removed. A dream that extended it is set aside, not deleted,
+  and `PLAN.md` keeps the topic and your reason under *Dropped topics*.
+- **`proto topic add`** adds one, connected and checked as a promoted dream is, and not
+  researched.
+- **`proto research SLUG`** researches one topic and replaces what it had found, never
+  merges. The old transcript stays beside the new one, only that topic's links and notes
+  are fitted again, and no other topic's text is written. `--deeper` gives that one call
+  the next depth's effort.
+
+A plan with some topics researched and some not is stamped *Partly researched*, and
+`PLAN.md` names each topic left out. [`docs/CLI.md`](docs/CLI.md#revising-a-plan) has
+every flag.
+
 ### What a plan does not know yet
 
 **Research reads the web through a summary.** Each topic gets one call on the
@@ -223,7 +250,8 @@ text, never as a link.
 **Some plans are not researched at all.** `--no-research` and `--offline` stamp the plan
 *Not researched*. The API backend's web search has never been run here, so with
 `--backend api` the command refuses before any call unless `--no-research` is given. A
-topic whose research fails says so on its page, and a promoted dream is never researched.
+topic whose research fails says so on its page, and a promoted dream or an added topic is
+not researched until `proto research` is run on it.
 Treat an unresearched topic as a well-organised set of questions and reasoning, not as
 facts: only the prompt stops a model stating a fact inside a risk or a reason.
 
