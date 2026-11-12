@@ -119,7 +119,7 @@ run `docker compose down -v` in its folder, then delete the folder by hand.
 | `proto dream [DIR]` / `dream promote ID` / `dream drop ID --why WHY` | run another round of dreams; turn one into a topic; rule one out, with the reason kept |
 | `proto answer [N]` | answer an open question of a plan; the answer becomes a constraint |
 | `proto topic add TITLE --why WHY` / `topic drop SLUG --why WHY` / `topic rename SLUG TITLE` | add a topic to a plan already made; rule one out, with the reason kept; retitle one |
-| `proto research SLUG` | research one topic on the web, or research it again, and replace what it found |
+| `proto research SLUG [--deeper]` | research one topic on the web, or research it again, and replace what it found |
 | `proto ls` | every plan on this machine |
 | `proto rm` | delete a plan's folder |
 | `proto prune` | forget entries whose folder is gone, and prototypes an older version made |
@@ -225,13 +225,16 @@ green plan, leaves the rest as it was, and either lands the plan green or change
   links, steps and research stay.
 - **`proto topic drop`** removes a topic with its links, its step and any source nothing
   else cites, and says what it removed. A dream that extended it is set aside, not deleted,
-  and `PLAN.md` keeps the topic and your reason under *Dropped topics*.
+  and `PLAN.md` keeps the topic and your reason under *Dropped topics*. If it was the
+  only topic researched, the plan is stamped *Not researched* again.
 - **`proto topic add`** adds one, connected and checked as a promoted dream is, and not
   researched.
 - **`proto research SLUG`** researches one topic and replaces what it had found, never
   merges. The old transcript stays beside the new one, only that topic's links and notes
   are fitted again, and no other topic's text is written. `--deeper` gives that one call
-  the next depth's effort.
+  the next depth's effort. Like a plan's research it runs on `claude-code` only. A try
+  that stops after its call is replayed on a rerun, not paid for twice, unless the plan
+  has changed what would be asked.
 
 A plan with some topics researched and some not is stamped *Partly researched*, and
 `PLAN.md` names each topic left out. [`docs/CLI.md`](docs/CLI.md#revising-a-plan) has

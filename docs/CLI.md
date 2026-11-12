@@ -231,8 +231,9 @@ why, and costs only itself. Offline, a dream is a template that says so, its rat
 included, and no pass can do it. The links and notes come from one call, and every link
 must touch the new topic. Offline it depends on the dream's anchor and has no risks,
 unknowns or decisions. Repair may mend only what touches the new topic, because what the
-plan held before is settled. The topic is not researched, and on a researched plan its
-page and `PLAN.md` say it was promoted from a dream.
+plan held before is settled. The topic is not researched until
+[`proto research`](#revising-a-plan) is run on it, and until then, on a researched plan,
+its page and `PLAN.md` say it was promoted from a dream.
 
 **Exit codes.** Each command changes nothing and exits 1 when:
 
@@ -253,8 +254,8 @@ run for these passes, and it asks for the word limits in a schema description wh
 
 What changes a plan after it is made, apart from its dreams. Each command works on a
 green plan already on disk, does one job, and either lands the plan green or leaves the
-folder as it was and exits 1. `--dir` names the plan's folder and defaults to the
-current one.
+plan as it was and exits 1. `--dir` names the plan's folder and defaults to the
+current one. Only `proto answer` prompts, and none takes `--yes`.
 
 ```bash
 proto answer 2                                   # answer open question 2; it becomes a constraint
@@ -270,62 +271,82 @@ proto research insurance --backend claude-code   # research one topic, or resear
 | `proto topic rename SLUG TITLE` | Changes a topic's title and keeps its slug | None |
 | `proto topic drop SLUG --why WHY` | Removes a topic and what pointed at it, and keeps the reason | None, or `start` and 0 to 3 repair calls if no step is left |
 | `proto topic add TITLE --why WHY` | Adds a topic as the plan's last, connected and verified | 1, plus 0 to 3 repair calls |
-| `proto research SLUG` | Researches one topic on the web and replaces what it had found | 1 research call, `connect` and `consider` for that topic, plus 0 to 3 repair calls |
+| `proto research SLUG [--deeper]` | Researches one topic on the web and replaces what it had found | 1 research call, `connect` and `consider` for that topic, plus 0 to 3 repair calls |
 
 | Flag | On | What it does |
 | ---- | -- | ------------ |
 | `--dir` | all five | The plan's directory |
 | `--why` | `topic drop`, `topic add` | Required. Why the topic is ruled out, or why it matters |
-| `--offline`, `--backend` | `topic drop`, `topic add`, `research` | As on `proto plan`. `answer` and `topic rename` call no model and take neither |
-| `--deeper` | `research` | Gives this one call the findings and pages of the next `--depth` up. The plan's depth is not changed |
+| `--offline`, `--backend` | `topic drop`, `topic add`, `research` | As on `proto plan`, except that `research` refuses `--offline` and `--backend offline`. `answer` and `topic rename` call no model and take neither |
+| `--deeper` | `research` | Gives this one call the findings and pages of the next `--depth` up. The plan's depth is not changed. Refused on a `deep` plan, which has no depth above it |
 
 **An answer changes nothing else.** The question leaves *Open questions*, the answer joins
 the constraints as `question answer`, and `PLAN.md` is redrawn. No topic is outlined or
 researched again: to have an answer move a topic, run `proto research` on that topic,
-whose prompt holds the constraints. Enter at a prompt leaves that question open. A plan
-with no open question says so and exits 0.
+whose prompt holds the constraints. `N` counts the questions as `PLAN.md` lists them, from
+1. The answer is read at a prompt, so it can be piped in, and with no input at all the
+command aborts and exits 1. Enter at a prompt leaves that question open, and when no
+answer is given nothing is changed and the command exits 0. A plan with no open question
+says so and exits 0.
 
 **A slug is a topic's identity.** `rename` changes the title and nothing else, so the
 file name, the links, the steps, the dreams and the research stay with the topic. A
-title another topic already has is refused.
+title another topic already has is refused, whatever its capitals, and so are an empty
+title and the title the topic already has.
 
 **A drop removes what pointed at the topic, and says what it removed:** its links, its
 step, and any source no other topic cites. A dream that extended it is set aside with
 the reason "Its topic was dropped", never deleted, and a dream the topic was promoted
 from is dropped with your `--why`. The research transcript stays in
-`.protopilot/research/`, and a later research of the same slug never replays it. If
-the topic was the only one researched, the plan is stamped *Not researched* again. A
-plan keeps at least four topics. `start` runs again only when
+`.protopilot/research/`, and a later research of the same slug never replays it: the
+drop removes the topic's record from `plan.json` and any `<slug>.pending.json`. The stamp
+follows the records that are left. If the topic was the only one researched, the plan is
+stamped *Not researched* again, and if it was the only one left out, *Partly researched*
+becomes *Researched*. A plan keeps at least four topics, so a drop from four is refused.
+`start` runs again only when
 the drop leaves no step to begin on, which is the one case a model is called; `--offline`
 takes the baseline's steps then.
 
 **The dropped topic is remembered.** `PLAN.md` lists it under *Dropped topics* with the
-reason, and adding the same title or slug later says it was dropped and why, then adds
-it: that is a person's call to make again.
+reason, and `dreams.md` marks a dream that extended it as extending a dropped topic.
+Adding the same title or slug later says it was dropped and why, then adds it: that is a
+person's call to make again. It leaves *Dropped topics* only if it comes back under its
+old slug. A title whose slug comes out different is a new topic, and the old entry stays.
 
 **An added topic lands as a promoted dream does.** One call supplies its links and
 notes, every link must touch it, and repair may mend only what touches it. Offline it
 is linked to nothing and has no risks, unknowns or decisions. Either way it is not
-researched until `proto research` is run on it. A plan holds at most eight topics.
+researched until `proto research` is run on it. A plan holds at most eight topics, and a
+title whose slug a topic already has is refused.
 
 **Research replaces one topic's record and never merges.** The new transcript is written
 beside the old one under a numbered name, the topic's findings are replaced, and a source
 only that topic cited leaves `sources.md`. `connect` then reopens the links of that topic
 alone, `consider` rewrites its risks, unknowns and decisions, and no other topic's text is
 written. If the call cites no page it fetched, the topic reads as not researched again.
-It runs on `--backend claude-code`, and is refused offline in a sentence.
+It runs on `--backend claude-code` only. Offline and `--backend api` are each refused in
+a sentence before any call, and so is `--deeper` on a `deep` plan.
 
 **A try that stopped after its research call is replayed.** The transcript is on disk
 before anything else runs, beside a `<slug>.pending.json` that marks it as not landed, so
 if a later step fails the plan is left as it was and a rerun reads that transcript
-instead of paying for the call again. The mark holds the transcript's hash, the depth
-asked, and a fingerprint of what was asked: the idea and its scope, the constraints, the
-topic, and the names of the other topics. A rerun replays it only while all of that
-holds, at the depth it was asked at. It asks again, and the log says why, when the rerun
-adds `--deeper` to a plain try, when an answer, a rename, an addition or a drop has
-changed what would be asked, or when the transcript was altered. A replay that fails
-drops the mark, so the next run asks again. No transcript is ever deleted: one that is
-not replayed stays as it is, and a new call takes the next free number.
+instead of paying for the call again. The mark holds the transcript's number and sha256,
+the depth asked, the transcript the topic's record named when the try began, and a
+fingerprint of what was asked. The fingerprint is a hash of the whole research prompt:
+the idea and its scope, the constraints, the topic's slug, title and reason, and the slug
+and title of every other topic. A rerun replays the transcript only while all of that
+holds, at the depth it was asked at. It makes a new call, and the log says why, when:
+
+- the rerun adds `--deeper` to a plain try. A plain rerun of a `--deeper` try replays it;
+- the prompt has changed: an answer was given, or any topic was renamed, added or
+  dropped, this one or another, because the prompt names them all;
+- the transcript is missing or its bytes no longer match the hash;
+- the mark was written before marks held a hash and a fingerprint.
+
+A replay that fails drops the mark, so the next run asks again. Landing the research
+removes the mark, and a mark that cannot be read replays nothing. No transcript is ever
+deleted: one that is not replayed stays as it is, and a new call takes the next free
+number.
 
 **After any of these, repair may move only what touches the changed topic.** Links
 between other topics, their steps and their text are settled, and a repair that moves
@@ -335,6 +356,18 @@ one is thrown away.
 `--no-research` stamps `PLAN.md` and `sources.md` *Partly researched*, with every topic
 left out named, and redraws no other topic's page.
 
-**Exit codes.** Each command changes nothing and exits 1 when the plan is red, when
-there is no such topic or question, when a pass fails, when the result stays red after
-repair, or when `plan.json` changed while the command ran.
+**Exit codes.** Each command exits 0 when the plan lands green, and changes nothing and
+exits 1 when:
+
+- The folder holds no plan, or the plan is red. All five refuse it with no model call.
+- There is no such topic or question. The refusal lists the slugs the plan holds, or
+  counts its open questions.
+- The change is one the plan cannot hold: a title already taken, a drop that would leave
+  three topics, an addition that would make nine, a `--why` that is blank.
+- `proto research` is given a backend that cannot research, or `--deeper` on a `deep` plan.
+- A pass fails, or the result stays red after repair. The report says what failed and
+  what repair tried.
+- `plan.json` changed while the command ran.
+
+`proto answer` exits 0 with nothing changed when the plan has no open question or no
+answer was given. A missing `--why`, or an `N` below 1, is a usage error and exits 2.
