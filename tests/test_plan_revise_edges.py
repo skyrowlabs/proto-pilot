@@ -231,7 +231,10 @@ def test_a_research_whose_write_dies_on_any_page_keeps_only_its_transcript(tmp_p
     armed = dying_write(monkeypatch, page)
     with pytest.raises(pipeline.PlanRefused, match="the tree is back as it was: disk full"):
         again(tree, "members", AGAIN)
-    assert not armed and changed(before, snapshot(tree)) == [".protopilot/research/members.2.jsonl"]
+    assert not armed and changed(before, snapshot(tree)) == [
+        ".protopilot/research/members.2.jsonl",
+        ".protopilot/research/members.pending.json",
+    ]
     monkeypatch.undo()
     assert pipeline.research_topic(job_for(), tree, "members", NeverAsked(refit())).ok
 

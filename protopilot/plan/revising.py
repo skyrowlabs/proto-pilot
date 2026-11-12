@@ -69,13 +69,16 @@ def dropped(plan: Plan, slug: str, why: str) -> tuple[Plan, list[str]]:
     notes += [f"removed source {s.id}, which no other topic cites" for s in plan.sources if s.id in lost]
     if plan.research_of(slug) is not None:
         notes.append("left its research transcript where it is, and took its record out of the ledger")
+    records = [record for record in plan.research if record.topic != slug]
     return (
         kept.revised(
             edges=edges,
             steps=[step for step in plan.steps if step.topic != slug],
             dreams=dreams,
             sources=[source for source in plan.sources if source.id not in lost],
-            research=[record for record in plan.research if record.topic != slug],
+            research=records,
+            # With the ledger's last researched record gone, the plan is not researched: the stamp follows the records.
+            researched=any(r.state == "researched" for r in records) if plan.research else plan.researched,
             dropped_topics=[*plan.dropped_topics, DroppedTopic(slug=slug, title=gone.title, why=reason)],
         ),
         notes,

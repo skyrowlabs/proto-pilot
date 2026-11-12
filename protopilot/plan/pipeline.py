@@ -807,6 +807,11 @@ def rename_topic(job, tree: Path, slug: str, title: str) -> verify.PlanVerdict:
     plan = _held(tree, REVISE_NEEDS)
     was = _topic(plan, slug).title
     job.event("plan", passes=[RENDER])
+    twin = next(
+        (t for t in plan.topics if t.slug != slug and t.title.casefold() == baseline.clean(title).casefold()), None
+    )
+    if twin is not None:
+        raise PlanRefused(f"Nothing was changed: the topic {twin.slug} is already called {twin.title!r}.")
     try:
         renamed = outline.rename(plan, slug, title)
     except ValueError as exc:
@@ -849,6 +854,7 @@ def drop_topic(job, tree: Path, slug: str, why: str, backend: Callable[[], LLM])
     else:
         checked = _once(job, after)
     verdict = _land(job, tree, plan, checked, names)
+    ledger.forget_pending(tree, slug)  # a stopped try was for the topic as it was, and its transcript stays
     if verdict.ok:
         job.log(f"{title} ({slug}) is dropped, and {render.PLAN_FILE} keeps the reason.")
     return verdict
@@ -878,23 +884,39 @@ def add_topic(job, tree: Path, title: str, why: str, llm: LLM) -> verify.PlanVer
     return verdict
 
 
-def _next_transcript(plan: Plan, slug: str) -> int:
-    """The number of the transcript a new research call of `slug` writes: one past the one its record names."""
+def _research_try(plan: Plan, asking: Plan, tree: Path, slug: str) -> tuple[int, Plan, bool]:
+    """The transcript number a research of `slug` uses, the plan to ask with, and whether it replays a stopped try.
+
+    A stopped try is replayed at the depth it was asked at, unless this one asks for more than it
+    read. Anything else is a new call, numbered past every transcript the topic has on disk.
+    """
     record = plan.research_of(slug)
-    return ledger.transcript_number(record.transcript, slug) + 1 if record else 1
+    since = record.transcript if record else ""
+    left = ledger.pending(tree, slug, since)
+    depths = list(research.EFFORT)
+    if left and left[1] in depths and depths.index(left[1]) >= depths.index(asking.depth or DEFAULT_DEPTH):
+        return left[0], plan.revised(depth=left[1]), True
+    return ledger.next_number(tree, slug, ledger.transcript_number(since, slug)), asking, False
 
 
-def _researched_again(job, plan: Plan, asking: Plan, llm: LLM, tree: Path, topic: Topic) -> tuple[Plan, list[str]]:
+def _researched_again(
+    job, plan: Plan, asking: Plan, llm: LLM, tree: Path, topic: Topic, number: int
+) -> tuple[Plan, list[str]]:
     """`plan` with one topic's findings and record replaced by a new call's, and the transcript's file."""
     started = time.monotonic()
-    after, record, replayed = _asked(asking, llm, tree, topic, _next_transcript(plan, topic.slug))
-    known = plan.research_of(topic.slug) is not None
-    records = [record if r.topic == topic.slug else r for r in plan.research] if known else [*plan.research, record]
+    current = plan.research_of(topic.slug)
+    after, record, replayed = _asked(asking, llm, tree, topic, number)
+    if not replayed:
+        since = current.transcript if current else ""
+        ledger.save_pending(tree, topic.slug, number, asking.depth or DEFAULT_DEPTH, since)
+    records = [record if r.topic == topic.slug else r for r in plan.research] if current else [*plan.research, record]
     after = revising.without_orphans(plan, after.revised(depth=plan.depth, research=records), topic.slug)
     # `researched` follows the records, so a topic that cited nothing this time cannot keep the plan's stamp.
     after = ledger.reconciled(after, tree)
-    how = "replayed from the transcript an earlier try left" if replayed else f"{time.monotonic() - started:.0f}s"
-    _research_said(job, after, after.research_of(topic.slug) or record, how)
+    left = f"replayed from the transcript an earlier try left, asked at depth {asking.depth or DEFAULT_DEPTH}"
+    _research_said(
+        job, after, after.research_of(topic.slug) or record, left if replayed else f"{time.monotonic() - started:.0f}s"
+    )
     return after, [f"{ledger.RESEARCH_DIR}/{record.transcript}"]
 
 
@@ -922,19 +944,20 @@ def research_topic(job, tree: Path, slug: str, llm: LLM, deeper: bool = False) -
             f"This plan is at depth {plan.depth}, the most research reads, so --deeper has nothing to add. "
             "Rerun without it. No model was called."
         )
-    asking = plan.revised(depth=further) if further else plan
-    number = _next_transcript(plan, slug)
+    number, asking, _ = _research_try(plan, plan.revised(depth=further) if further else plan, tree, slug)
     names = [research.NAME, connect.NAME, consider.NAME, RENDER]
     job.event("plan", passes=names)
     try:
-        after = _pass(job, research.NAME, names, lambda: _researched_again(job, plan, asking, llm, tree, topic))
+        after = _pass(job, research.NAME, names, lambda: _researched_again(job, plan, asking, llm, tree, topic, number))
         for module in (connect, consider):
             after = _fitted(job, module, after, llm, names, slug)
     except (LLMError, PlanPassError, ValueError) as exc:
-        kept = ledger.read_transcript(tree, slug, number) is not None
+        record = plan.research_of(slug)
+        kept = ledger.pending(tree, slug, record.transcript if record else "") is not None
         left = " Its transcript is kept, and a rerun replays it instead of asking again." if kept else ""
         raise PlanRefused(f"{slug} was not researched, and nothing was changed: {_short(exc)}.{left}") from exc
     verdict = _land(job, tree, plan, repaired(job, after, llm, plan, frozenset({slug})), names)
+    ledger.forget_pending(tree, slug)
     if verdict.ok:
         again = " again, and its earlier transcript stays beside the new one" if number > 1 else ""
         job.log(f"{topic.title} ({slug}) is researched{again}. Its findings and its record are replaced, not merged.")

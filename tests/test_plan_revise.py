@@ -755,7 +755,10 @@ def test_a_fit_that_reaches_another_topic_changes_nothing_and_the_rerun_replays(
     with pytest.raises(pipeline.PlanRefused, match=reason) as refused:
         again(tree, ResearchingLLM(answers, {"members": AGAIN}))
     assert "Its transcript is kept, and a rerun replays it" in str(refused.value)
-    assert changed(before, snapshot(tree)) == [".protopilot/research/members.2.jsonl"]
+    assert changed(before, snapshot(tree)) == [
+        ".protopilot/research/members.2.jsonl",
+        ".protopilot/research/members.pending.json",
+    ]
     job = job_for()
     assert pipeline.research_topic(job, tree, "members", NeverAsked(refit())).ok
     assert any("replayed from the transcript an earlier try left" in line for line in job.lines)
@@ -776,7 +779,10 @@ def test_a_research_that_cannot_be_drawn_puts_the_tree_back_and_keeps_only_the_t
     dying_write(monkeypatch, "sources.md")
     with pytest.raises(pipeline.PlanRefused, match="the tree is back as it was: disk full"):
         again(tree, ResearchingLLM(refit(), {"members": AGAIN}))
-    assert changed(before, snapshot(tree)) == [".protopilot/research/members.2.jsonl"]
+    assert changed(before, snapshot(tree)) == [
+        ".protopilot/research/members.2.jsonl",
+        ".protopilot/research/members.pending.json",
+    ]
 
 
 def test_a_topic_whose_first_research_failed_can_be_researched_alone(tmp_path):
@@ -938,7 +944,10 @@ def test_a_repair_that_only_ever_strays_changes_nothing(tmp_path):
     llm = ResearchingLLM([*refit(edge("lending", "members"), WAITS), STRAYS, STRAYS, STRAYS], {"members": AGAIN})
     with pytest.raises(pipeline.PlanRefused, match="Nothing was changed, because the result failed its checks"):
         again(tree, llm)
-    assert changed(before, snapshot(tree)) == [".protopilot/research/members.2.jsonl"]
+    assert changed(before, snapshot(tree)) == [
+        ".protopilot/research/members.2.jsonl",
+        ".protopilot/research/members.pending.json",
+    ]
 
 
 def held_and(change) -> tuple[Plan, Plan]:

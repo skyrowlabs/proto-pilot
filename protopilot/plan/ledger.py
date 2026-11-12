@@ -10,7 +10,8 @@ not the page, so a citation shows that summary was read, never that a claim is i
 
 The transcripts live in `.protopilot/research/`, beside the reviewed outline a resumed
 run starts from. A topic researched again gets a numbered transcript beside its first,
-and its record names the one that counts. `reconciled` redraws each record's fetches
+and its record names the one that counts. A try that has not landed is marked
+`<slug>.pending.json`, and only a marked transcript is replayed. `reconciled` redraws each record's fetches
 from that transcript, so a `fetched: true` typed into plan.json, or a fetch typed into
 the ledger, earns nothing, and a record cannot borrow another topic's transcript.
 A forged transcript is beyond any check here. `normal` keeps http/https, `www.`, `:443`
@@ -20,6 +21,7 @@ and `%7E` apart, which errs toward calling a citation an assumption: a ruling, f
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from contextlib import suppress
 from pathlib import Path
@@ -149,6 +151,48 @@ def read_transcript(tree: Path, slug: str, number: int = 1) -> str | None:
     if path.is_symlink() or not path.is_file():
         return None
     return path.read_text(encoding="utf-8", errors="replace")
+
+
+def next_number(tree: Path, slug: str, after: int = 0) -> int:
+    """A number past `after` that none of `slug`'s transcripts on disk holds, so a new call overwrites no evidence."""
+    folder = research_dir(tree)
+    held = [transcript_number(path.name, slug) for path in folder.glob(f"{slug}*.jsonl")] if folder.is_dir() else []
+    return max([after, *held]) + 1
+
+
+def _pending_path(tree: Path, slug: str) -> Path:
+    return research_dir(tree) / f"{slug}.pending.json"
+
+
+def save_pending(tree: Path, slug: str, number: int, depth: str, since: str) -> None:
+    """Mark transcript `number` as a try not yet landed: the depth it was asked at, and the transcript it would replace."""
+    path = _pending_path(tree, slug)
+    temp = path.with_name(f".{path.name}.tmp")
+    temp.write_text(json.dumps({"number": number, "depth": depth, "since": since}) + "\n", encoding="utf-8")
+    temp.replace(path)
+
+
+def pending(tree: Path, slug: str, since: str) -> tuple[int, str] | None:
+    """The number and depth of the try `slug` left unlanded, if its transcript is there and it began from `since`.
+
+    Only a marked transcript is one to replay: any other on disk is evidence of an earlier
+    state, a dropped topic's included, and a new call is numbered past it.
+    """
+    path = _pending_path(tree, slug)
+    if path.is_symlink() or not path.is_file():
+        return None
+    try:
+        said = json.loads(path.read_text(encoding="utf-8"))
+        number, depth = int(said["number"]), str(said["depth"])
+        fresh = said["since"] == since and number > transcript_number(since, slug)
+    except (ValueError, KeyError, TypeError):
+        return None
+    return (number, depth) if fresh and read_transcript(tree, slug, number) is not None else None
+
+
+def forget_pending(tree: Path, slug: str) -> None:
+    with suppress(OSError):
+        _pending_path(tree, slug).unlink(missing_ok=True)
 
 
 def save_draft(tree: Path, plan: Plan) -> None:
