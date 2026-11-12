@@ -26,7 +26,7 @@ from protopilot.plan.model import Edge, Plan, Step
 from protopilot.plan.passes import BRIEF, connect, start, topics_block
 
 NAME = "repair"
-#: As `proto new`'s loop: three repairs, then the floor.
+#: Three repairs, then the floor.
 ATTEMPTS = 3
 #: The checks whose subject repair owns.
 FIXES = ("no_cycles", "start_order")

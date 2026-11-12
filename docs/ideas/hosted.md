@@ -1,5 +1,8 @@
 # Hosted proto.pilot
 
+> **`proto new`, which this would have hosted, left the tree on 2026-11-11**; it
+> is readable at the tag `prototyping-final`. The argument below stays as written.
+>
 > **Status: TABLED 2026-09-03.** Superseded by
 > [sketches-not-scaffolds.md](sketches-not-scaffolds.md), which takes the
 > opposite route: proto.pilot ships as a tool other developers run, not as a

@@ -117,90 +117,6 @@ def _never_the_network(request: pytest.FixtureRequest, monkeypatch: pytest.Monke
 # ── proto.pilot's own fixtures ──────────────────────────────────────────
 
 
-@pytest.fixture()
-def spec():
-    """Two entities, a parent/child relationship, and every field type.
-
-    Every type is present on purpose: the column mapping, the form input, the
-    coercion helper and the seed literal are four separate tables in
-    baseline.py, and a type missing from any one of them produces a tree that
-    fails at a different stage each time.
-    """
-    from protopilot.spec import Entity, Field_, Spec
-
-    return Spec(
-        name="Gear List",
-        slug="gearlist",
-        purpose="Track camping gear across trips.",
-        port=8099,
-        entities=[
-            Entity(
-                name="Trip",
-                fields=[
-                    Field_(name="title", type="str"),
-                    Field_(name="starts_on", type="date"),
-                    Field_(name="notes", type="text", required=False),
-                    Field_(name="nights", type="int", required=False),
-                ],
-            ),
-            Entity(
-                name="Item",
-                belongs_to="Trip",
-                fields=[
-                    Field_(name="name", type="str"),
-                    Field_(name="packed", type="bool", required=False),
-                    Field_(name="weight_kg", type="float", required=False),
-                    Field_(name="checked_at", type="datetime", required=False),
-                ],
-            ),
-        ],
-    )
-
-
-# ── reading what a Textual app is actually showing ───────────────────────
-
-
-@pytest.fixture(scope="module")
-def helper():
-    """`tests/screen.py`, loaded from the skeleton rather than copied here.
-
-    Lives here because two suites need it: the skeleton's own tests, and the
-    console's. `Static.renderable` does not exist on the Textual installed
-    here — a harness reading only that sees an empty screen and reports a
-    working app as broken — so this is the repository's one answer to how a
-    widget's text is read, and a second copy is how one of them goes stale.
-
-    Loaded, not copied: a copy would be tested against itself and would stay
-    green while the shipped one rotted, which is the shape of defect
-    `tests/test_tui_skeleton.py` exists to prevent one level up.
-
-    `sys.dont_write_bytecode` rather than `PYTHONDONTWRITEBYTECODE`, and the
-    distinction is the whole of why this works: the environment variable is
-    read once, at interpreter start, into that attribute — so setting it from
-    inside a running test does nothing at all. Without it, `exec_module` writes
-    a `__pycache__` into `skeleton/tui/tests/`, which is source data copied
-    byte-for-byte into every generated prototype. It is gitignored, so the cost
-    today is cosmetic; `test_tui_skeleton.py` already excludes `__pycache__`
-    by name when it walks the skeleton, because a `.pyc` read as text is a
-    `UnicodeDecodeError` in a test whose failure message is then about nothing.
-    """
-    import importlib.util
-
-    from protopilot import targets
-
-    path = targets.SKELETON_ROOT / "tui" / "tests" / "screen.py"
-    spec_ = importlib.util.spec_from_file_location("skeleton_tui_screen", path)
-    assert spec_ and spec_.loader
-    module = importlib.util.module_from_spec(spec_)
-    previous = sys.dont_write_bytecode
-    sys.dont_write_bytecode = True
-    try:
-        spec_.loader.exec_module(module)
-    finally:
-        sys.dont_write_bytecode = previous
-    return module
-
-
 # ── nothing here touches the operator's real state ───────────────────────
 
 
@@ -208,21 +124,9 @@ def helper():
 def isolated_registry(tmp_path, monkeypatch):
     """Point `PROTOPILOT_REGISTRY` at a throwaway file for **every** test.
 
-    Any test that runs a real generation calls `registry.record`, which writes
-    to the operator's own registry unless told otherwise. `proto ls` on this
-    machine had 129 entries pointing at `/tmp/pytest-of-*/...` before this
-    existed — one per generation any suite had ever run, each one a directory
-    pytest deleted seconds later.
-
-    **Autouse and here, rather than per-file.** `test_verifier_wiring.py` had
-    exactly this fixture already and it worked, which is precisely the problem:
-    a protection that each new test file has to remember is one that the next
-    file forgets, and the failure is invisible from inside the suite — every
-    test passes, and the damage is to a file outside the repository that
-    nothing checks.
-
-    The same shape as the scan guards in `tests/scanning.py`: put it where it
-    cannot be omitted rather than where it has to be repeated.
+    Any test that runs a real plan calls `registry.record`, which would write
+    to the operator's own registry. Autouse and here, so no test file can
+    forget it: the damage is to a file outside the repository nothing checks.
     """
     monkeypatch.setenv("PROTOPILOT_REGISTRY", str(tmp_path / "registry" / "projects.json"))
 

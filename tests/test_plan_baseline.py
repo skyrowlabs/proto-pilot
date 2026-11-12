@@ -7,8 +7,7 @@ from graphlib import TopologicalSorter
 import pytest
 
 from protopilot.plan import baseline, render
-from protopilot.plan.model import MAX_SLUG_LENGTH, Plan
-from protopilot.spec import SLUG_RE
+from protopilot.plan.model import MAX_SLUG_LENGTH, SLUG_RE, Plan
 
 pytestmark = [pytest.mark.unit]
 

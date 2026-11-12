@@ -1,16 +1,13 @@
-"""The registry once plans are a second writer: odd kinds, shared slugs, unsafe roots, and racing writers."""
+"""The registry against what it did not write: odd kinds, older rows, shared slugs, unsafe roots, racing writers."""
 
 from __future__ import annotations
 
-import importlib.util
 import json
-import subprocess
 import threading
 from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
-from conftest import require_or_skip
 
 from protopilot import cli, registry
 
@@ -37,24 +34,6 @@ def write_raw(entries: list[dict]) -> None:
     registry.registry_path().write_text(json.dumps(entries))
 
 
-@pytest.fixture
-def calls(monkeypatch) -> list:
-    seen: list = []
-    monkeypatch.setattr(subprocess, "call", lambda argv, **kw: seen.append(argv) or 0)
-    return seen
-
-
-@pytest.fixture
-def client(tmp_path, monkeypatch):
-    require_or_skip(importlib.util.find_spec("fastapi") is not None, "fastapi is not installed", requires="dev extras")
-    from fastapi.testclient import TestClient
-
-    from protopilot.web import app as web
-
-    monkeypatch.setattr(web, "docker_available", lambda runner: (False, "not asked in a test"))
-    return TestClient(web.create_app(tmp_path / "workspace", backend="offline"))
-
-
 # ── B1: a kind that is not one of ours ───────────────────────────────
 
 
@@ -75,29 +54,58 @@ def test_prune_forgets_an_entry_whose_kind_is_not_ours(tmp_path):
     assert registry.prune() == []
 
 
-# ── B3: one idea, an app and a plan ──────────────────────────────────
+# ── B3: one idea, an older prototype's row and a plan ────────────────
 
 
-def test_an_app_and_a_plan_from_one_idea_get_different_slugs(tmp_path):
-    registry.record(slug=SLUG, name="App", path=app_at(tmp_path / "app"), port=8080)
+def test_an_old_row_and_a_plan_from_one_idea_get_different_slugs(tmp_path):
+    registry.record(slug=SLUG, name="App", path=app_at(tmp_path / "app"), kind=registry.APP)
     make_plan(tmp_path / "plan")
     slugs = [e.slug for e in registry.load()]
     assert len(set(slugs)) == 2 and SLUG in slugs
 
 
 def test_rerecording_one_path_keeps_its_slug(tmp_path):
-    registry.record(slug="gear", name="A", path=app_at(tmp_path / "a"), port=8080)
-    registry.record(slug="gear", name="B", path=app_at(tmp_path / "b"), port=8081)
-    registry.record(slug="gear", name="B", path=tmp_path / "b", port=8082)
+    registry.record(slug="gear", name="A", path=tmp_path / "a")
+    registry.record(slug="gear", name="B", path=tmp_path / "b")
+    registry.record(slug="gear", name="B", path=tmp_path / "b")
     assert sorted(e.slug for e in registry.load()) == ["gear", "gear_2"]
 
 
-def test_the_web_deletes_the_app_that_shares_an_idea_with_a_plan(client, tmp_path, calls):
-    app = app_at(tmp_path / "app")
-    registry.record(slug=SLUG, name="App", path=app, port=8080)
-    plan = make_plan(tmp_path / "plan")
-    client.post(f"/projects/{SLUG}/delete", follow_redirects=False)
-    assert not app.exists() and plan.exists()
+# ── a registry file an older version wrote ───────────────────────────
+
+
+def test_a_registry_written_by_0_3_0_loses_no_row_until_a_person_prunes(tmp_path):
+    plan, odd = make_plan(tmp_path / "plan"), make_plan(tmp_path / "odd")
+    web, bare = app_at(tmp_path / "web"), app_at(tmp_path / "bare")
+    write_raw(
+        [
+            {
+                "slug": "web",
+                "name": "Web",
+                "path": str(web),
+                "port": 8080,
+                "created_at": "x",
+                "idea": "",
+                "kind": "app",
+            },
+            {"slug": "bare", "name": "Bare", "path": str(bare), "port": 8081, "created_at": "x"},
+            {"slug": "plan", "name": "Plan", "path": str(plan), "port": None, "created_at": "x", "kind": "plan"},
+            {"slug": "odd", "name": "Odd", "path": str(odd), "created_at": "x", "kind": "plan", "later": 1},
+        ]
+    )
+
+    listed = CliRunner().invoke(cli.main, ["ls"])
+    assert listed.exit_code == 0 and listed.output.count("  old ") == 2, listed.output
+    assert "no longer runs prototypes" in listed.output and "proto prune" in listed.output
+    registry.record(slug="new", name="New", path=make_plan(tmp_path / "new"))
+    rows = {e.slug: e for e in registry.load()}
+    assert {"web", "bare", "plan", "odd"} <= set(rows)
+    assert rows["web"].port == 8080 and rows["bare"].kind == registry.APP and rows["plan"].port is None
+
+    pruned = CliRunner().invoke(cli.main, ["prune", "--yes"])
+    assert pruned.exit_code == 0 and "0 gone, 2 old" in pruned.output
+    assert {e.slug for e in registry.load()} == {"plan", "odd", "new"}
+    assert web.exists() and bare.exists(), "prune forgets rows and never touches a folder"
 
 
 # ── B4: a root that holds home, or the registry itself ───────────────
@@ -109,16 +117,16 @@ def test_delete_refuses_a_parent_of_home(tmp_path, monkeypatch):
     (tmp_path / ".protopilot" / "plan.json").write_text("{}")
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     with pytest.raises(registry.NotAProject, match="not a safe path"):
-        registry.delete(tmp_path, runner=lambda argv, cwd: None)
+        registry.delete(tmp_path)
     assert (tmp_path / "home").exists()
 
 
 def test_delete_refuses_a_tree_that_holds_the_registry(tmp_path, monkeypatch):
     tree = make_plan(tmp_path / "t")
     monkeypatch.setenv("PROTOPILOT_REGISTRY", str(tree / "inside" / "projects.json"))
-    registry.record(slug="x", name="X", path=tree, port=None, kind=registry.PLAN)
+    registry.record(slug="x", name="X", path=tree)
     with pytest.raises(registry.NotAProject, match="not a safe path"):
-        registry.delete(tree, runner=lambda argv, cwd: None)
+        registry.delete(tree)
     assert registry.registry_path().exists()
 
 
@@ -128,7 +136,7 @@ def test_delete_refuses_a_tree_that_holds_the_registry(tmp_path, monkeypatch):
 def test_concurrent_records_lose_no_entry(tmp_path):
     def write(n: int) -> None:
         for i in range(25):
-            registry.record(slug=f"s{n}_{i}", name="S", path=tmp_path / f"t{n}_{i}", port=None, kind=registry.PLAN)
+            registry.record(slug=f"s{n}_{i}", name="S", path=tmp_path / f"t{n}_{i}")
 
     threads = [threading.Thread(target=write, args=(n,)) for n in range(6)]
     for thread in threads:
@@ -139,6 +147,37 @@ def test_concurrent_records_lose_no_entry(tmp_path):
 
 
 def test_save_leaves_no_partial_file_behind(tmp_path):
-    registry.record(slug="a", name="A", path=tmp_path / "a", port=None, kind=registry.PLAN)
+    registry.record(slug="a", name="A", path=tmp_path / "a")
     folder = registry.registry_path().parent
     assert sorted(p.name for p in folder.iterdir() if not p.name.endswith(".lock")) == ["projects.json"]
+
+
+# ── rows that are not rows ───────────────────────────────────────────
+
+
+def test_load_skips_what_is_not_a_row_and_keeps_the_rows_around_it(tmp_path):
+    plan = make_plan(tmp_path / "plan")
+    good = {"slug": "plan", "name": "Plan", "path": str(plan), "created_at": "x", "kind": "plan"}
+    rows = ["a string", 7, None, {"slug": "no_path", "name": "N", "created_at": "x"}, good]
+    registry.registry_path().write_text(json.dumps(rows))
+    assert [(e.slug, e.port, e.exists) for e in registry.load()] == [("plan", None, True)]
+    listed = CliRunner().invoke(cli.main, ["ls"])
+    assert listed.exit_code == 0 and "1 plan(s)" in listed.output
+
+
+@pytest.mark.parametrize("content", ['{"slug": "s"}', '"projects"', "null", "3"])
+def test_a_registry_that_is_not_a_list_reads_as_empty_and_the_next_plan_still_registers(tmp_path, content: str):
+    registry.registry_path().parent.mkdir(parents=True, exist_ok=True)
+    registry.registry_path().write_text(content)
+    assert registry.load() == []
+    make_plan(tmp_path / "plan")
+    assert [e.kind for e in registry.load()] == ["plan"]
+
+
+def test_a_key_this_version_does_not_know_is_dropped_on_save_and_its_row_is_kept(tmp_path):
+    odd = make_plan(tmp_path / "odd")
+    write_raw([{"slug": "odd", "name": "Odd", "path": str(odd), "created_at": "x", "kind": "plan", "later": 1}])
+    registry.record(slug="other", name="Other", path=tmp_path / "other")
+    saved = {row["slug"]: row for row in json.loads(registry.registry_path().read_text())}
+    assert set(saved) == {"odd", "other"}
+    assert "later" not in saved["odd"] and saved["odd"]["port"] is None

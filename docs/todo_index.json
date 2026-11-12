@@ -1,52 +1,31 @@
 {
   "_generated_by": "scripts/docs/gen_todo_index.py",
   "_note": "Generated — never hand-edit. Edit the plan's frontmatter or header lines and rerun.",
-  "count": 2,
+  "count": 1,
   "by_status": {
-    "blocked": [
-      "drawing-freedom",
-      "improvement-loop"
+    "planned": [
+      "living-plans"
     ]
   },
   "ready_queue": [],
   "plans": [
     {
-      "slug": "drawing-freedom",
-      "title": "Drawing Freedom",
-      "path": "docs/TODO/drawing-freedom.md",
-      "shelf_status": "blocked",
-      "priority": "low",
+      "slug": "living-plans",
+      "title": "Living Plans",
+      "path": "docs/TODO/living-plans.md",
+      "shelf_status": "planned",
+      "priority": "medium",
       "queue_order": null,
-      "blocked_on": "product-decision",
-      "updated": "2026-11-06",
+      "blocked_on": null,
+      "updated": "2026-11-11",
       "tags": [
-        "ui",
+        "plan",
+        "cli",
+        "research",
         "verify",
-        "skeleton",
-        "archetypes",
-        "prompts"
+        "handoff"
       ],
-      "summary": "Raise the visual ceiling of a generated app by ranking display options on whether the verifier can tell they worked — not on what Docker permits.",
-      "open_tasks": 29,
-      "auto_generated": false
-    },
-    {
-      "slug": "improvement-loop",
-      "title": "The Improvement Loop",
-      "path": "docs/TODO/improvement-loop.md",
-      "shelf_status": "blocked",
-      "priority": "low",
-      "queue_order": null,
-      "blocked_on": "product-decision",
-      "updated": "2026-11-06",
-      "tags": [
-        "loop",
-        "verify",
-        "docker",
-        "agent",
-        "safety"
-      ],
-      "summary": "Let a prototype be told to keep getting better, with a ratchet that reverts any iteration leaving it less green than it found it.",
+      "summary": "Let a plan be revised, tested and handed off after it is made: answer its questions, change or re-research one topic, record what a real test showed, and emit a brief another tool can start from.",
       "open_tasks": 28,
       "auto_generated": false
     }

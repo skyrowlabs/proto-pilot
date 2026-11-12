@@ -16,9 +16,16 @@ that were dropped, and the constraints that shaped what landed.
 
 **Machine-readable index**: [`../implementation_index.json`](../implementation_index.json).
 
-**4 archived plans** across 1 categories.
+**7 archived plans** across 2 categories.
 
 ---
+
+## Dropped
+
+| Value | Plan | Completed | Summary |
+| ----- | ---- | --------- | ------- |
+| ⭐ | [Drawing Freedom](dropped/drawing-freedom.md) | 2026-11-06 | Raise the visual ceiling of a generated app by ranking display options on whether the verifier can tell they worked — not on what Docker permits. |
+| ⭐ | [The Improvement Loop](dropped/improvement-loop.md) | 2026-11-06 | Let a prototype be told to keep getting better, with a ratchet that reverts any iteration leaving it less green than it found it. |
 
 ## Spec
 
@@ -27,6 +34,7 @@ that were dropped, and the constraints that shaped what landed.
 | ⭐⭐⭐ | [The proto Console](spec/proto-console.md) | 2026-09-04 | A terminal front end for the tool itself — type the idea in one pane, watch generation in another — built as a second view over the job seam `proto serve` already paid for. |
 | ⭐⭐⭐ | [The Terminal Target](spec/terminal-target.md) | 2026-09-04 | Make the output medium an axis and build a terminal target beside the web one — gated on a measurement, because the model has seen far less Textual than FastAPI. |
 | ⭐⭐⭐ | [Plan Prototypes and Dreaming](spec/plan-prototypes.md) | 2026-11-07 | Add `proto plan`, which turns an idea into a researched, connected, organised set of text plans, plus a dreaming step that collects, evaluates and proposes lighter extensions of the idea. |
+| ⭐⭐ | [Remove Prototyping](spec/remove-prototyping.md) | 2026-11-11 | Delete everything that generates, runs or verifies an app, both front ends included, so that the surviving CLI is plan, dream, ls, rm, prune and doctor. |
 | ⭐ | [Archetypes and Theme](spec/archetypes-and-theme.md) | 2026-09-01 | Give the spec a shape axis and a look axis, so a chess app and a gear tracker stop being the same CRUD app with a different adjective. |
 
 ---

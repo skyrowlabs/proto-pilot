@@ -12,8 +12,7 @@ from click.testing import CliRunner
 from fakes import FakeLLM
 from plan_script import GOOD, IDEA, NO_REPAIR, edge, repair_of, script, step
 
-from protopilot import cli
-from protopilot.console import progress
+from protopilot import cli, progress
 from protopilot.jobs import Job
 from protopilot.llm import LLMError
 from protopilot.plan import baseline, pipeline, render, verify

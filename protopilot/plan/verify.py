@@ -26,7 +26,6 @@ from typing import NamedTuple
 
 from protopilot.plan import ledger, render
 from protopilot.plan.model import DREAM_WORD_CAP, UNSPACED, Dream, Edge, Plan, dream_words
-from protopilot.verify import VerifyResult
 
 PASSED = "passed"
 FAILED = "failed"
@@ -69,6 +68,22 @@ These neither failed nor held: they had nothing to look at.
 there. Rerunning the same command verifies it again and redraws it, with no model call.
 To have the model try again, remove this directory and rerun from the start.
 """
+
+
+@dataclass(frozen=True)
+class VerifyResult:
+    """One verdict: whether it held, the stage that decided it, and what to show a person."""
+
+    ok: bool
+    stage: str
+    summary: str
+    output: str = ""
+
+    def report(self) -> str:
+        parts = [f"[{self.stage}] {self.summary}"]
+        if self.output.strip():
+            parts.append("--- command output ---\n" + self.output.strip())
+        return "\n\n".join(parts)
 
 
 @dataclass(frozen=True)

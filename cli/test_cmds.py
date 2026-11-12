@@ -105,10 +105,8 @@ SUITES = {
     # a disagreement with it. Upstream ships `scheduled=True` and a CI job,
     # because a `ui` marker with no job deletes tests from CI — we reported that.
     # But the obligation is that this row and `.github/workflows/` agree, and
-    # there are two honest ways. Nothing here is marked `ui`: the 36 Textual
-    # pilot tests in `tests/test_console*.py` are headless, need no display, and
-    # belong on `unit`, where CI runs them today. A job for them would collect
-    # nothing, one day after the Python matrix was halved to cut that same cost.
+    # there are two honest ways. Nothing here is marked `ui`, and this tree has
+    # no user interface to drive, so a job for the suite would collect nothing.
     #
     # `unscheduled="empty"` is load-bearing rather than descriptive: it is the
     # difference between an exemption that stays true and one that expires when

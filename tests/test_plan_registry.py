@@ -1,4 +1,4 @@
-"""A plan tree in the registry: listed by `proto plan`, read back by kind, deleted with no Docker call."""
+"""A plan tree in the registry: listed by `proto plan`, read back by kind, and the only thing deleted."""
 
 from __future__ import annotations
 
@@ -29,7 +29,6 @@ def app_tree(tmp_path: Path, slug: str = "gearlist") -> Path:
     root = tmp_path / slug
     (root / ".protopilot").mkdir(parents=True)
     (root / ".protopilot" / "spec.json").write_text("{}")
-    registry.record(slug=slug, name=slug.title(), path=root, port=8080)
     return root
 
 
@@ -54,9 +53,12 @@ def test_a_plan_made_before_plans_were_listed_joins_the_list_on_rerender(plan_tr
 def test_an_entry_written_before_kinds_existed_reads_as_an_app(tmp_path):
     root = app_tree(tmp_path)
     old = {"slug": "gearlist", "name": "Gearlist", "path": str(root), "port": 8080, "created_at": "2026-09-01"}
+    registry.registry_path().parent.mkdir(parents=True, exist_ok=True)
     registry.registry_path().write_text(json.dumps([old]))
     [entry] = registry.load()
-    assert (entry.kind, entry.exists) == ("app", True)
+    assert (entry.kind, entry.exists, entry.state) == ("app", False, "old")
+    listed = CliRunner().invoke(cli.main, ["ls"]).output
+    assert listed.splitlines()[0].split()[:2] == ["old", "app"]
 
 
 def test_a_plan_entry_is_gone_once_its_plan_json_is(plan_tree):
@@ -64,24 +66,23 @@ def test_a_plan_entry_is_gone_once_its_plan_json_is(plan_tree):
     assert [e.exists for e in registry.load()] == [False]
 
 
-def test_delete_removes_a_plan_without_calling_docker(plan_tree):
-    calls: list = []
-    registry.delete(plan_tree, runner=lambda argv, cwd: calls.append(argv))
-    assert (calls, plan_tree.exists(), registry.load()) == ([], False, [])
+def test_delete_removes_a_plan_and_its_entry(plan_tree):
+    registry.delete(plan_tree)
+    assert (plan_tree.exists(), registry.load()) == (False, [])
 
 
-def test_delete_still_calls_an_apps_stack_down(tmp_path):
+def test_delete_refuses_an_older_prototype_and_leaves_it_whole(tmp_path):
     root = app_tree(tmp_path)
-    calls: list = []
-    registry.delete(root, runner=lambda argv, cwd: calls.append(argv))
-    assert calls == [["docker", "compose", "down", "-v"]]
+    with pytest.raises(registry.NotAProject):
+        registry.delete(root)
+    assert (root / ".protopilot" / "spec.json").exists()
 
 
 def test_delete_refuses_a_tree_with_research_in_progress_but_no_plan(tmp_path):
     stopped = tmp_path / "stopped"
     (stopped / ".protopilot" / "research").mkdir(parents=True)
     with pytest.raises(registry.NotAProject):
-        registry.delete(stopped, runner=lambda argv, cwd: None)
+        registry.delete(stopped)
     assert stopped.exists()
 
 

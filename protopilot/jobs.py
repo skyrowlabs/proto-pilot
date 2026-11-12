@@ -1,13 +1,11 @@
-"""Generations, as background jobs.
+"""A plan run, as a job.
 
-A generation takes minutes, which is fine at a terminal where you watch it
-scroll and unbearable over HTTP where something is waiting on a response. So
-the web front end never calls `generate` directly: it starts a job, gets an
-id back immediately, and polls.
+A run takes minutes and stops for a person twice, so its halves share one job:
+a log a person reads, and a list of typed events a view folds. The work runs
+on a thread while the caller follows the log.
 
-In-process and in-memory on purpose. This is a single-user tool driving a
-local Docker daemon; a job queue with a broker would be more machinery than
-the thing it schedules.
+In-process and in-memory on purpose. This is a single-user tool; a job queue
+with a broker would be more machinery than the thing it schedules.
 """
 
 from __future__ import annotations
@@ -28,12 +26,9 @@ class Job:
     status: str = "pending"  # pending | running | done | failed
     lines: list[str] = field(default_factory=list)
     #: The structured half of the transcript, **beside `lines` and never
-    #: instead of it**. `lines` is what a person reads and is what the web
-    #: front end renders today; `events` is what a view derives a progress
-    #: region from. Two channels because the alternative is a view that parses
-    #: human-formatted text to recover structure the producer already had --
-    #: which is the anti-pattern the workspace guide names as *sky.boss never
-    #: parses human output*, and the reason a log line is free to be reworded.
+    #: instead of it**. `lines` is what a person reads; `events` is what a view
+    #: derives a progress region from. Two channels so no view parses
+    #: human-formatted text, which leaves a log line free to be reworded.
     #:
     #: Append-only and untyped on purpose. A consumer folds the list to get
     #: current state, so a new event kind is additive and an old reader that
@@ -41,19 +36,8 @@ class Job:
     events: list[dict] = field(default_factory=list)
     error: str = ""
     project_dir: str = ""
-    port: int | None = None
-    url: str = ""
     started_at: str = ""
     finished_at: str = ""
-    # Whatever this job produced, for jobs that answer rather than build
-    # (the clarify pass). Kept generic so a new job kind needs no new field.
-    result: dict = field(default_factory=dict)
-    # What the journey collected between clarify and generate. Named fields
-    # rather than more of `result`, because these three are read by the
-    # generation step by name and a typo in a dict key would be silent.
-    archetype: str = ""
-    answers: dict = field(default_factory=dict)
-    theme: dict = field(default_factory=dict)
 
     def log(self, message: str) -> None:
         for line in str(message).splitlines() or [""]:
@@ -78,25 +62,16 @@ class Job:
             "events": list(self.events),
             "error": self.error,
             "project_dir": self.project_dir,
-            "port": self.port,
-            "url": self.url,
             "started_at": self.started_at,
             "finished_at": self.finished_at,
-            "result": self.result,
         }
 
 
 class _JobWriter:
     """A file-like that turns writes into `job.log` calls, a line at a time.
 
-    Not a buffer. The version this replaced collected everything a job printed
-    into a `StringIO` and appended it in `JobStore.run`'s `finally`, which means
-    anything reaching the log via `print` rather than `job.log` arrived **when
-    the job ended** -- twenty-one minutes late on a real generation, and in one
-    block. Measured at 0 bytes today because the pipeline logs rather than
-    prints, so the defect was latent: the first pass that printed would have
-    reinstated it silently, and a pane that is dark for twenty minutes and then
-    fills is worse than the CLI it replaces.
+    Not a buffer: a line reaches the log when it is printed, not when the job
+    ends, so a follower sees it as it happens.
 
     Partial writes are held until a newline, because `print` issues the text and
     the terminator as two separate calls and a line-per-write writer would
@@ -126,9 +101,7 @@ class _RoutedStdout:
     """`sys.stdout`, dispatched by calling thread.
 
     `contextlib.redirect_stdout` rebinds `sys.stdout` for the whole **process**,
-    so two generations on two threads captured each other's output and braided
-    two transcripts together with nothing marking the seam. `proto serve` got
-    away with it only because nobody had run two at once.
+    so two jobs on two threads would capture each other's output.
 
     This is the same idea done per thread: a job registers a writer for its own
     thread, and every other thread -- the main one, another job's -- goes on

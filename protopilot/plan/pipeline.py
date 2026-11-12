@@ -1,11 +1,10 @@
 """One plan, start to finish, on the job seam.
 
-Speaks the vocabulary `generation.build` does (`plan`, `pass_started`,
-`pass_done`, `pass_failed`, `finished`), so a view that folds a generation's
-events folds this one too. Standard library and proto.pilot's own modules only,
-for the reason `generation.py` gives.
+Emits typed events (`plan`, `pass_started`, `pass_done`, `pass_failed`,
+`finished`) that `protopilot.progress` folds. Standard library and proto.pilot's
+own modules only, so any caller can run a plan without a view installed.
 
-Three halves, as `generation` has two, so a front end can stop between them:
+Three halves, so a caller can stop between them:
 `scoped`, then its questions, `outlined`, then the review, then `build`. They run
 on one job and share one event list. Only research reaches disk before every pass
 has worked: the reviewed outline and each topic's transcript, under
@@ -15,7 +14,7 @@ has worked: the reviewed outline and each topic's transcript, under
 `repaired` verifies before the render, against pages drawn in memory, so repair
 only ever edits data. `_hand_back` writes, then reads the tree and checks again. A
 plan still red is handed back with a RUNBOOK, `finished` says `ok=False`, and the
-CLI exits 1, as `proto new`'s floor does. A failed pass is a different thing: a
+CLI exits 1. A failed pass is a different thing: a
 pass that returns nothing a plan can hold leaves no tree at all.
 
 Dreaming is the exception, because dreams are extras. A plan keeps going when its
@@ -484,7 +483,7 @@ def _register(plan: Plan, tree: Path) -> None:
     resolved = str(tree.resolve())
     if any(e.path == resolved and e.kind == registry.PLAN for e in registry.load()):
         return
-    registry.record(slug=plan.slug, name=plan.title, path=tree, port=None, idea=plan.idea, kind=registry.PLAN)
+    registry.record(slug=plan.slug, name=plan.title, path=tree, idea=plan.idea)
 
 
 def _research_account(plan: Plan) -> list[str]:
@@ -512,7 +511,7 @@ def _finish(job, tree: Path, plan: Plan, result: verify.PlanVerdict, attempts: i
     else:
         job.log(f"Not verified: red at {result.stage} after {attempts} check(s).")
         job.log(f"\nThe tree is at {tree}, and what is still wrong is written down in {render.RUNBOOK_FILE}.")
-    job.event("finished", ok=result.ok, attempts=attempts, project_dir=str(tree), run_hint="")
+    job.event("finished", ok=result.ok, attempts=attempts, project_dir=str(tree))
 
 
 #: The numbered lines under a runbook's "What was tried", as `verify.runbook` writes them.

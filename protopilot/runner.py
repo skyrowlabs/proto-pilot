@@ -1,14 +1,11 @@
 """Subprocess execution, behind an interface.
 
-Every docker call in proto-pilot goes through a `Runner`. That is what lets the
-verify loop and the repair loop be tested without a Docker daemon -- which
-matters more than it sounds, because those two are the parts most likely to
-be wrong and the parts an end-to-end test is least likely to cover.
+The `claude-code` backend runs the `claude` CLI through a `Runner`. That is
+what lets a test hand it a scripted result instead of a real subprocess.
 """
 
 from __future__ import annotations
 
-import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -51,8 +48,8 @@ class SubprocessRunner:
         except FileNotFoundError:
             return CommandResult(argv, 127, "", f"{argv[0]}: not found")
         except subprocess.TimeoutExpired as exc:
-            # A timeout is a result, not an exception: the loop needs the
-            # partial output to decide whether the build is slow or hung.
+            # A timeout is a result, not an exception: the caller reports the
+            # partial output with it.
             return CommandResult(
                 argv,
                 124,
@@ -66,17 +63,3 @@ def _text(value: object) -> str:
     if value is None:
         return ""
     return value.decode("utf-8", "replace") if isinstance(value, bytes) else str(value)
-
-
-def docker_available(runner: Runner) -> tuple[bool, str]:
-    """Whether we can actually run anything. Checked up front, because
-    discovering it after the generation passes have run wastes the tokens."""
-    if shutil.which("docker") is None:
-        return False, "docker is not installed or not on PATH"
-    result = runner.run(["docker", "info"], timeout=20)
-    if not result.ok:
-        return False, "the docker daemon is not reachable (`docker info` failed)"
-    compose = runner.run(["docker", "compose", "version"], timeout=20)
-    if not compose.ok:
-        return False, "`docker compose` is unavailable (needs Compose v2)"
-    return True, "docker ok"

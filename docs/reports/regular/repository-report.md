@@ -114,12 +114,13 @@ plan was filed to `docs/implementations/` (`29631a0`).
 
 ## What is unfinished
 
-The ready queue is empty. Both plans in the tank are blocked:
+The two plans that were blocked in the tank were dropped on 2026-11-11, never
+built, when the prototyping layer they extend was removed:
 
-1. ⛔ Blocked (product decision): [Drawing Freedom](../../TODO/drawing-freedom.md),
-   low priority, tabled 2026-11-06 with prototyping.
-2. ⛔ Blocked (product decision): [The Improvement Loop](../../TODO/improvement-loop.md),
-   low priority, tabled 2026-11-06 with prototyping.
+1. Dropped: [Drawing Freedom](../../implementations/dropped/drawing-freedom.md),
+   tabled 2026-11-06 with prototyping.
+2. Dropped: [The Improvement Loop](../../implementations/dropped/improvement-loop.md),
+   tabled 2026-11-06 with prototyping.
 
 The filed plan's deferred items are not in the tank: API research
 (`docs/implementations/spec/plan-prototypes.md:144`, `:217`), `proto new --from-plan`

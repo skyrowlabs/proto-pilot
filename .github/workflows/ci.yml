@@ -550,15 +550,11 @@ jobs:
       # The interpreter, scripts/requirements.txt and the project itself: one
       # action, shared by every workflow that runs this suite so they install the same thing.
       #
-      # Here "the project" is the product plus the generated app's stack: the
-      # end-to-end test runs a generated tree in process, so every dependency
-      # that tree needs is in an extra, and `scripts/install_project.py` installs
-      # every extra pyproject.toml names. `browser` looks expensive and is not --
-      # Playwright only costs anything once `playwright install` fetches browsers,
-      # which this workflow never runs; the browser stage is reported as skipped.
+      # Here "the project" is the product, and `scripts/install_project.py`
+      # installs it with every extra pyproject.toml names.
       #
-      # No API key and no Docker daemon: the offline baseline is what makes the
-      # pipeline testable here, which is the point of having one.
+      # No API key and no network: the offline twins are what make the plan
+      # pipeline testable here, which is the point of having them.
       #
       # The pip cache is keyed on both files the action installs from.
       - uses: ./.github/actions/unit-setup
@@ -649,18 +645,14 @@ jobs:
       - name: Install the project, if it is one
         run: python scripts/install_project.py
 
-      # There is no stack to stand up. proto.pilot's only real integration is
-      # generating a tree and booting it under Docker, and CI deliberately does
-      # not do that -- the offline baseline exists precisely so the whole
-      # pipeline (skeleton, five passes, write guard, repair loop) is exercised
-      # here with no daemon, no key and no credit. Those all run in the unit job.
+      # There is no stack to stand up. proto.pilot writes a folder of text and
+      # runs no service, and the offline twins exercise the whole plan pipeline
+      # (every pass, verification, the repair loop) with no key and no credit.
+      # Those all run in the unit job.
       #
       # So this job is a placeholder that reports honestly rather than a gate
-      # that lies. A Docker-backed suite is a real candidate later -- an offline
-      # generation needs no credentials and would catch the class only a running
-      # container can (a compose file that parses but will not boot). It is not
-      # here yet, and pretending otherwise by deleting the job would remove the
-      # reminder.
+      # that lies. It stays because it is a required context, and deleting it
+      # would not be this tree's change to make.
       #
       # Exit 5 is pytest for "the marker selected nothing". An empty selection is
       # REPORTED, never passed off as a run; every other non-zero status still
@@ -686,9 +678,8 @@ jobs:
   # matching `scheduled=False`. The template ships this job because a `ui`
   # marker with no job deletes tests from CI — proto.pilot reported that — but
   # the obligation is to make the row and the workflows agree, not to run an
-  # empty suite. Nothing here is marked `ui`: the 36 Textual pilot tests in
-  # `tests/test_console*.py` are headless, need no display, and belong on
-  # `unit`, where CI actually runs them.
+  # empty suite. Nothing here is marked `ui`, and this tree has no user
+  # interface to drive: `proto` prints to a terminal and exits.
   #
   # So this job would collect zero tests at the cost of a checkout and an
   # install, one day after the matrix above was halved to cut exactly that.

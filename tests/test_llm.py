@@ -16,10 +16,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from protopilot import passes
 from protopilot.llm import ClaudeLLM, _without_patterns
-from protopilot.passes import clarify
 from protopilot.plan import baseline
+from protopilot.plan import passes as plan_passes
 from protopilot.plan.model import DREAM_FIELD_WORDS
 from protopilot.plan.passes import collect
 
@@ -203,13 +202,31 @@ def test_what_the_api_is_sent_holds_no_pattern():
     assert sent == _without_patterns(PATTERNED) and sent != PATTERNED
 
 
-def test_every_schema_proto_new_sends_reaches_the_api_unchanged():
+def _keywords(schema: object, name: str) -> int:
+    """How often `name` appears as a schema keyword; a property that happens to be called that is not one."""
+    if isinstance(schema, list):
+        return sum(_keywords(item, name) for item in schema)
+    if not isinstance(schema, dict):
+        return 0
+    found = int(name in schema)
+    for key, value in schema.items():
+        inner = value.values() if key in ("properties", "$defs") and isinstance(value, dict) else [value]
+        found += sum(_keywords(item, name) for item in inner)
+    return found
+
+
+def test_every_schema_proto_plan_sends_reaches_the_api_with_no_pattern_and_is_otherwise_unchanged():
+    plan = baseline.build_plan("an idea")
     modules = [
-        importlib.import_module(info.name) for info in pkgutil.iter_modules(passes.__path__, "protopilot.passes.")
+        importlib.import_module(info.name)
+        for info in pkgutil.iter_modules(plan_passes.__path__, "protopilot.plan.passes.")
     ]
-    schemas = [module.SCHEMA for module in modules if hasattr(module, "SCHEMA")]
-    assert len(schemas) >= 5, "the enumeration found too few schemas to mean anything"
-    assert [schema for schema in [*schemas, clarify.schema()] if _without_patterns(schema) != schema] == []
+    schemas = [module.schema(plan) for module in modules if hasattr(module, "schema")]
+    assert len(schemas) >= 8, "the enumeration found too few schemas to mean anything"
+    for schema in schemas:
+        sent = _without_patterns(schema)
+        assert _keywords(sent, "pattern") == 0
+        assert sent == schema or _keywords(schema, "pattern") > 0, "a schema with no pattern must arrive as written"
 
 
 def test_moving_a_pattern_leaves_the_schema_it_was_given_alone():

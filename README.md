@@ -14,7 +14,6 @@
   <a href="#install"><b>Install</b></a> ·
   <a href="#commands"><b>Commands</b></a> ·
   <a href="#how-a-plan-is-made"><b>How a plan is made</b></a> ·
-  <a href="#prototypes-come-later"><b>Prototypes</b></a> ·
   <a href="#status"><b>Status</b></a> ·
   <a href="#working-on-this-repo"><b>Working on this repo</b></a>
 </p>
@@ -86,17 +85,16 @@ labelled an assumption. `--no-research` makes a plan in a minute or two, stamped
 *Not researched*.
 
 A plan is not a finished answer. It is the cheapest way to see the shape of an idea
-before spending anything on it, and it is what a prototype should be built from later.
+before spending anything on it.
 
 ## Install
 
 ```bash
 git clone https://github.com/skyrowlabs/proto-pilot && cd proto-pilot
 python -m venv .venv && . .venv/bin/activate
-pip install -e ".[dev]"
-proto doctor          # what each target needs, the SDK, credentials, a port
+pip install -e .
+proto doctor          # the SDK, and credentials for each backend
 ```
-
 
 The virtualenv is not optional advice — on a distro whose Python is externally
 managed (Arch, and Debian since 3.11) a bare `pip install -e .` refuses to run.
@@ -106,7 +104,12 @@ Claude subscription through the Claude Code CLI. The API is the default, and the
 never falls back from one to the other by itself, because they bill differently. To use
 a subscription, pass `--backend claude-code` or set `PROTOPILOT_LLM=claude-code`.
 
-Planning needs nothing else. Docker is only for `proto new --target web`.
+It needs nothing else: no Docker, no browser, no database.
+
+**Upgrading with old prototypes on disk?** Before 2026-11-11 `proto new` generated
+running apps. This version no longer runs them and never touches their folders.
+`proto ls` lists them as `old`, and `proto prune` forgets them. For a web prototype,
+run `docker compose down -v` in its folder, then delete the folder by hand.
 
 ## Commands
 
@@ -114,9 +117,9 @@ Planning needs nothing else. Docker is only for `proto new --target web`.
 |---|---|
 | `proto plan IDEA` | scope it, outline it with you, connect the topics, weigh the risks, pick first steps, dream a little, check the structure, write the folder |
 | `proto dream [DIR]` / `dream promote ID` / `dream drop ID --why WHY` | run another round of dreams; turn one into a topic; rule one out, with the reason kept |
-| `proto ls` | every plan and prototype on this machine, and which apps are running |
-| `proto rm` | delete one: a plan's folder, or an app's containers, data and tree |
-| `proto prune` | forget entries whose folder is gone |
+| `proto ls` | every plan on this machine |
+| `proto rm` | delete a plan's folder |
+| `proto prune` | forget entries whose folder is gone, and prototypes an older version made |
 | `proto doctor` | why it will not work here |
 
 Useful flags on `plan`: `--direction` (scope, emphasis, constraints), `--depth`
@@ -132,9 +135,6 @@ the pages and checks the plan again with no model call, and exits 1 if the plan 
 
 **Rendered pages are not for editing.** The plan is stored as data in the folder, every
 page is drawn from it, and a re-render overwrites them.
-
-The prototype commands are under [Prototypes come later](#prototypes-come-later). Run on a
-plan's folder, each of them refuses and says what to do instead.
 
 ## How a plan is made
 
@@ -238,57 +238,14 @@ It is what the test suite runs, so the whole pipeline is exercised on every comm
 pipeline that can only be tested with a network call and a credit card stops being
 tested.
 
-## Prototypes come later
-
-proto.pilot started as a tool that turned an idea into a running app. That still works
-and gets upkeep, but no new features: a prototype is worth more once an idea is concrete
-enough to give agents something to build, and a plan is how it gets there.
-[`docs/ideas/plans-first.md`](docs/ideas/plans-first.md) has the reasoning, and a later
-step is to build a prototype from one topic of a plan.
-
-```bash
-proto new "a shared list of who has borrowed which tool" --direction "make it feel like a ledger"
-```
-
-It writes a small spec, shows it to you, generates the app, then boots and drives it
-rather than assuming it works. Red gets a bounded repair loop, and if that fails the tree
-comes back with a `RUNBOOK.md` saying what is broken. The result is something to look at
-and throw away, not a starting point for production. The default is a Textual and SQLite
-app in your terminal. `--target web` gives you FastAPI and Postgres in Docker, and needs
-Docker with Compose v2.
-
-| | |
-|---|---|
-| `proto new IDEA` | generate, boot, verify, hand it back |
-| `proto add CHANGE` | amend the spec, regenerate, re-verify |
-| `proto up` / `down` / `logs` / `test` | run a `--target web` prototype; a terminal one uses `make run` |
-| `proto spec` | what this project actually promised |
-| `proto archetypes` | what shapes this build can generate, and what each asks |
-| `proto targets` | what media it can generate into, and what each can build |
-| `proto gc` | collect Docker resources a deleted tree left behind |
-
-`proto ls`, `proto rm` and `proto prune`, in [Commands](#commands), cover prototypes too.
-
-Three optional extras: `dev` pulls the web target's stack, `browser` adds Playwright (without
-it the web target's browser stage is reported as skipped, never as green), and `web` is
-the front end behind `proto serve`.
-
-Known gaps: `auth: "password"` is accepted by the spec and built by no pass, and `jobs`
-and `external_apis` are recorded and otherwise ignored.
-
-How it all works, including what a target owns and why the model can write so few paths,
-is in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#how-a-prototype-is-built).
-
 ## Testing
 
 ```bash
 ./pp test unit          # or: python -m pytest -q
 ```
 
-The unit suite needs no key, no network and no Docker daemon. Plans are tested through
-their offline twins and a fake model, with hostile model output as a first-class case.
-Prototypes are tested by generating a tree and running that tree's own smoke suite, with
-Docker and the API faked (`tests/fakes.py`) for the verify and repair loops.
+The unit suite needs no key and no network. Plans are tested through their offline
+twins and a fake model, with hostile model output as a first-class case.
 
 ## Model usage
 
@@ -297,8 +254,10 @@ per pass. Override with `PROTOPILOT_MODEL` / `PROTOPILOT_EFFORT`.
 
 ## Status
 
-**The direction changed on 2026-11-06:** planning is the product, and prototyping waits
-until a plan is concrete enough to feed it.
+**Planning is the whole product.** The direction changed on 2026-11-06, and on
+2026-11-11 prototyping was removed: `proto new`, both targets and both front ends are
+gone from the tree. The last commit that holds them is the tag `prototyping-final`.
+[`docs/ideas/plans-first.md`](docs/ideas/plans-first.md) has the reasoning.
 
 Early, and honest about it. `proto plan` runs against a real model today and writes a
 real plan, researched topic by topic on the `claude-code` backend, with its structure
