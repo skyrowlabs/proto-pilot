@@ -276,5 +276,12 @@
     "tests/test_worktree_holds.py": "11946748c334c319e6611ceeab85e7040c39ae86bdecd1ac3cff3910baeb117f",
     "tests/test_yaml_text.py": "2e52a1da88eda6f3a416e593a373d0f98f47a70ee6173cb150d652b97a93a430",
     "tests/workflows.py": "1717dc4352cd19b00a1e4818c9aa394d7695a8effa46a8b99256f50ade45bd6a"
+  },
+  "pending_added": {
+    "cli/pr.py": "7b60428765f16124e21dfbaeaa772e84859989c4e08e9a3bcb6bd23e0f502bd3",
+    "scripts/check_deleted_paths.py": "bafc1854677a0041fc878b4c736ff7a1d031317033d4bfce39509fc6d3aba2ee",
+    "scripts/deleted_paths_allowlist.yaml": "fc97479b8818f5552b196eb5d6b956721d9d88908f88c0722cf9a17213a04f15",
+    "tests/test_deleted_paths.py": "a9ce03618a2fc5c71d14bff866d647b7b7ba7d37733d7170843dd884af494f04",
+    "tests/test_pr_land.py": "6fb8b16b1ac61ee852ae6a7abf6e295a40a750ccd005c5735320b0b08fc01bf5"
   }
 }
