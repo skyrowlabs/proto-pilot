@@ -282,6 +282,19 @@ file, no shell. The research call runs under `RESEARCH_ISOLATION`: web search
 and fetch and nothing else. Widening either works perfectly in the happy case,
 which is why the violation is invisible. AGENTS.md carries the rule.
 
+### A step's word cap binds only the first time steps are written
+
+`start.schema` holds `action` and `why` to `model.STEP_FIELD_WORDS` with a
+`pattern`, which the claude-code backend enforces, but only while the plan has
+no steps. Repair and promote reuse that schema and must return every healthy
+step word for word, and a step written before the cap can be longer than it.
+Under the pattern they could not do both: the backend would refuse the verbatim
+step, or a rewritten one would trip the shrink guard and the repair would be
+thrown away. Either way an older plan could never be repaired, and nothing would
+say why. There the cap is asked for in the prompt and no more. A step's length
+is readability, never structure, so `apply` lands an over-long step from a
+backend that ignores the pattern.
+
 ### The registry is shared, so it is written whole and under a lock
 
 `projects.json` is written by every `proto plan`, `rm` and `prune`. Each

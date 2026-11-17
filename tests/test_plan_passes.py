@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -17,8 +18,8 @@ from research_script import ResearchingLLM
 from protopilot import cli
 from protopilot.jobs import Job
 from protopilot.plan import baseline, pipeline
-from protopilot.plan.model import TOPIC_COUNTS, Plan, plan_path
-from protopilot.plan.passes import PlanPassError, outline, scope, start
+from protopilot.plan.model import STEP_FIELD_WORDS, TOPIC_COUNTS, Plan, dream_words, plan_path
+from protopilot.plan.passes import PlanPassError, outline, repair, scope, start
 
 pytestmark = [pytest.mark.unit]
 
@@ -145,6 +146,59 @@ def test_start_schema_offers_every_topic():
     plan = baseline.build_plan(IDEA)
     enum = start.schema(plan)["properties"]["steps"]["items"]["properties"]["topic"]["enum"]
     assert enum == [topic.slug for topic in plan.topics]
+
+
+def _step_rules(plan: Plan) -> dict:
+    return start.schema(plan)["properties"]["steps"]["items"]["properties"]
+
+
+@pytest.mark.parametrize("field", list(STEP_FIELD_WORDS))
+def test_a_fresh_start_holds_each_step_field_to_its_word_cap(field):
+    rule = _step_rules(baseline.build_plan(IDEA).revised(steps=[]))[field]
+    most = STEP_FIELD_WORDS[field]
+    assert re.fullmatch(rule["pattern"], " ".join(["word"] * most))
+    assert not re.fullmatch(rule["pattern"], " ".join(["word"] * (most + 1)))
+
+
+@pytest.mark.parametrize("prompt", [start.SYSTEM, repair.SYSTEM], ids=["start", "repair"])
+def test_both_prompts_that_write_steps_name_both_caps(prompt):
+    # Repair has no pattern to hold it (see below), so its prompt is the only place the cap is asked for.
+    assert f"{STEP_FIELD_WORDS['action']} words at most" in prompt
+    assert f"{STEP_FIELD_WORDS['why']} words at most" in prompt
+
+
+def test_the_cap_pattern_admits_ordinary_punctuation_at_no_extra_cost():
+    # A live run under the pattern dropped every comma and full stop until the prompt said they were allowed.
+    rule = _step_rules(baseline.build_plan(IDEA).revised(steps=[]))["action"]
+    most = STEP_FIELD_WORDS["action"]
+    prose = ", ".join(["word"] * (most - 4)) + "; a load-bearing one."
+    assert dream_words(prose) == most and re.fullmatch(rule["pattern"], prose)
+    assert "Punctuation is allowed" in start.SYSTEM
+
+
+def test_repair_can_still_return_a_step_longer_than_the_cap_word_for_word():
+    # A plan from before the cap: repair must keep its healthy steps verbatim, so a pattern
+    # there would leave the backend unable to answer, and the shrink guard to throw it away.
+    long = " ".join(["word"] * (STEP_FIELD_WORDS["action"] * 3))
+    plan = baseline.build_plan(IDEA)
+    plan = plan.revised(steps=[plan.steps[0].model_copy(update={"action": long, "why": long})])
+    for rules in (_step_rules(plan), repair.schema(plan)["properties"]["steps"]["items"]["properties"]):
+        assert "pattern" not in rules["action"] and "pattern" not in rules["why"]
+
+
+def test_a_step_over_the_cap_from_a_backend_that_ignores_patterns_still_lands(tmp_path):
+    # The api backend asks for a pattern in words only; length is readability, never a reason to lose the plan.
+    long = " ".join(["word"] * (STEP_FIELD_WORDS["action"] * 2))
+    over = {"steps": [{"topic": "members", "action": long, "why": long}]}
+    result = pipeline.run_plan(job_for(), tmp_path / "tree", FakeLLM(script(start=over)))
+    assert result.ok
+    assert Plan.load(tmp_path / "tree").steps[0].action == long
+
+
+def test_the_offline_twin_s_steps_fit_the_cap():
+    for step in baseline.build_plan(IDEA).steps:
+        assert dream_words(step.action) <= STEP_FIELD_WORDS["action"]
+        assert dream_words(step.why) <= STEP_FIELD_WORDS["why"]
 
 
 def test_a_first_step_naming_no_topic_is_refused(tmp_path):

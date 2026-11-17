@@ -141,7 +141,10 @@ def _plan_page(plan: Plan, verified: bool) -> str:
     if plan.direction:
         scope.insert(0, f"**Direction:** {plan.direction}")
     topic_map = [f"[{t.title}]({_topic_file(t.slug)}): {t.why}" for t in plan.topics]
-    steps = [f"{n}. **{titles.get(s.topic, s.topic)}:** {s.action} {s.why}" for n, s in enumerate(plan.steps, start=1)]
+    steps = [
+        f"{n}. **{titles.get(s.topic, s.topic)}:** {s.action}\n   - Why here: {s.why}"
+        for n, s in enumerate(plan.steps, start=1)
+    ]
     return _page(
         f"# {plan.title}",
         _stamp(plan),

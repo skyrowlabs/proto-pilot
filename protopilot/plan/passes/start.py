@@ -9,8 +9,9 @@ ahead lands in the plan, goes red at `start_order`, and reaches repair.
 from __future__ import annotations
 
 from protopilot.plan import baseline
-from protopilot.plan.model import Plan, Step, Topic
+from protopilot.plan.model import STEP_FIELD_WORDS, Plan, Step, Topic
 from protopilot.plan.passes import BRIEF, PlanPassError, findings_block, scope_block, text, topics_block
+from protopilot.plan.passes.collect import word_pattern
 
 NAME = "start"
 MAX_STEPS = 5
@@ -30,6 +31,14 @@ Say where to begin. Prefer whichever step retires the riskiest unknown soonest.
 {ORDER_RULES}
 Return an ordered list of steps, no more than you are told. Each names a topic, an
 `action` someone could take soon, and a `why` that says why it comes at this point.
+
+A step is read as a to-do, so keep each one short; the topic page holds the detail.
+
+- `action`: one plain instruction of {STEP_FIELD_WORDS["action"]} words at most, starting with a verb.
+- `why`: one sentence of {STEP_FIELD_WORDS["why"]} words at most on why it comes here.
+
+Write both as ordinary prose, with commas, hyphens and a full stop where they belong.
+Punctuation is allowed: it ends a word just as a space does, and adds none.
 """
 
 
@@ -41,6 +50,19 @@ def ready(plan: Plan) -> list[Topic]:
 
 def _most_steps(plan: Plan) -> int:
     return min(MAX_STEPS, len(plan.topics))
+
+
+def _step_text(plan: Plan, field: str) -> dict:
+    """A step field's schema: held to its word cap only when the plan has no steps yet.
+
+    Repair and promote reuse this schema and must return a healthy step word for word,
+    and a step written before the cap may be longer than it. Held to the pattern, such
+    a plan could not be repaired at all; there the cap is only asked for, in `SYSTEM`.
+    """
+    rule: dict = {"type": "string"}
+    if not plan.steps:
+        rule["pattern"] = word_pattern(STEP_FIELD_WORDS[field])
+    return rule
 
 
 def schema(plan: Plan) -> dict:
@@ -55,8 +77,8 @@ def schema(plan: Plan) -> dict:
                     "type": "object",
                     "properties": {
                         "topic": {"type": "string", "enum": [topic.slug for topic in plan.topics]},
-                        "action": {"type": "string"},
-                        "why": {"type": "string"},
+                        "action": _step_text(plan, "action"),
+                        "why": _step_text(plan, "why"),
                     },
                     "required": ["topic", "action", "why"],
                     "additionalProperties": False,

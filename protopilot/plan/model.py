@@ -49,6 +49,10 @@ MAX_TOPICS = max(TOPIC_COUNTS.values())
 #: more is a topic. The fields are the budget, so spaced text the schema allows fits the cap.
 DREAM_FIELD_WORDS = {"title": 6, "what_if": 26, "takes": 12}
 DREAM_WORD_CAP = sum(DREAM_FIELD_WORDS.values())
+#: A first step is read as a to-do, so the action leads and is short. Uncapped, five steps
+#: of a real run measured 68-106 words of action and 70-88 of reason, which rendered as
+#: walls of text; the depth those carried is each topic page's unknowns and decisions.
+STEP_FIELD_WORDS = {"action": 30, "why": 25}
 #: What ends a word in the schema's pattern. A model held to `\S+` joined 28 words with
 #: hyphens, so punctuation has to break one. `dream_words` is the exact count, and stricter.
 WORD_BREAK = r"\s/_,.;:!?\u00b7\u200b\u2010-\u2015\u2212-"
