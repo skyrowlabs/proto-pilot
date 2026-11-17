@@ -33,10 +33,11 @@ repository's own tooling (`cli/`, `scripts/`). See AGENTS.md Rule 15.
 One `proto plan` run, end to end. Every arrow is a place something can be refused.
 
 ```
-  idea (one sentence) + direction
+  idea (one sentence) + direction + brief (goal, for, horizon, must, not: each optional)
     │
     ▼
-  scope ──────────────────  goal, constraints, up to three questions for you
+  scope ──────────────────  goal, constraints, up to three questions for you;
+    │                       a field the brief states is put back over the model's
     │
     ▼
   outline ────────────────  the topics, each with a reason it matters
@@ -233,7 +234,7 @@ one model value in a file name is a topic slug, which `model.py` checks, and
   old topic pages, unmarked, which is why `after_failure` says any page may be out of
   date and points at the rerun.
 - **A rerun of a finished plan is a re-render, and it verifies.** No pass runs, and it
-  needs neither `--yes` nor a terminal. Another idea, direction or `--depth` is refused.
+  needs neither `--yes` nor a terminal. Another idea, direction, brief or `--depth` is refused.
   `plan.json` may be hand-edited, so `rerender` judges it as it stands, and red takes
   the floor and exits 1. With no model there is no repair, so a red tree's rerun never
   retries one: a fresh attempt means removing the tree. Its runbook keeps what the

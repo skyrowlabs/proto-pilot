@@ -35,7 +35,7 @@ from protopilot import registry
 from protopilot.llm import LLM, LLMError, OfflineLLM, ResearchUnavailable, research_result
 from protopilot.plan import baseline, dreaming, ledger, render, verify
 from protopilot.plan.lenses import LENSES, Lens
-from protopilot.plan.model import DEFAULT_DEPTH, Depth, Dream, Plan, Topic, TopicResearch, plan_path
+from protopilot.plan.model import DEFAULT_DEPTH, Brief, Depth, Dream, Plan, Topic, TopicResearch, plan_path
 from protopilot.plan.passes import (
     PlanPassError,
     collect,
@@ -81,15 +81,22 @@ class Checked:
     tried: list[str]
 
 
-def _same_ask(plan: Plan, idea: str, direction: str) -> bool:
-    return (baseline.clean(idea), baseline.clean(direction)) == (plan.idea, plan.direction)
+def _same_ask(plan: Plan, idea: str, direction: str, brief: Brief | None) -> bool:
+    asked = (baseline.clean(idea), baseline.clean(direction), brief or Brief())
+    return asked == (plan.idea, plan.direction, plan.brief)
+
+
+def _brief(job) -> Brief:
+    """The brief a job was created with: the job holds it as plain data, which the plan validates."""
+    return Brief.model_validate(getattr(job, "brief", None) or {})
 
 
 def _steer(plan: Plan) -> str:
-    return f" with direction {plan.direction!r}" if plan.direction else " with no direction"
+    steer = f" with direction {plan.direction!r}" if plan.direction else " with no direction"
+    return f"{steer} and a brief of its own" if plan.brief else steer
 
 
-def resumable(tree: Path, idea: str, direction: str = "") -> Plan | None:
+def resumable(tree: Path, idea: str, direction: str = "", brief: Brief | None = None) -> Plan | None:
     """The reviewed outline a stopped run left in `tree`, None if it left none, refused if it is another plan's."""
     tree = Path(tree)
     if plan_path(tree).exists():
@@ -98,35 +105,35 @@ def resumable(tree: Path, idea: str, direction: str = "") -> Plan | None:
         draft = ledger.draft(tree)
     except (OSError, ValueError) as exc:
         raise PlanRefused(f"{ledger.research_dir(tree) / ledger.DRAFT_FILE} cannot be read: {exc}") from exc
-    if draft is not None and not _same_ask(draft, idea, direction):
+    if draft is not None and not _same_ask(draft, idea, direction, brief):
         raise PlanRefused(
             f"{tree} holds research in progress for {draft.idea!r}{_steer(draft)}. "
-            "Pick another --dir, or rerun with that same idea and direction to resume it."
+            "Pick another --dir, or rerun with that same idea, direction and brief to resume it."
         )
     return draft
 
 
-def existing_plan(tree: Path, idea: str, direction: str = "") -> Plan | None:
+def existing_plan(tree: Path, idea: str, direction: str = "", brief: Brief | None = None) -> Plan | None:
     """The plan to re-render from `tree`, None if `tree` is free or resumable, refused otherwise.
 
-    A plan for anything but this idea and direction is refused: exiting 0 on it
+    A plan for anything but this idea, direction and brief is refused: exiting 0 on it
     would hand back somebody else's plan as the answer to what was asked.
     """
     tree = Path(tree)
     if not tree.exists():
         return None
     if not plan_path(tree).exists():
-        if resumable(tree, idea, direction) is not None:
+        if resumable(tree, idea, direction, brief) is not None:
             return None
         raise PlanRefused(f"{tree} already exists and holds no plan; refusing to overwrite it")
     try:
         plan = Plan.load(tree)
     except (OSError, ValueError) as exc:
         raise PlanRefused(f"{plan_path(tree)} cannot be read as a plan: {exc}") from exc
-    if not _same_ask(plan, idea, direction):
+    if not _same_ask(plan, idea, direction, brief):
         raise PlanRefused(
             f"{tree} already holds a plan for {plan.idea!r}{_steer(plan)}. "
-            "Pick another --dir, or rerun with that same idea and direction to re-render it."
+            "Pick another --dir, or rerun with that same idea, direction and brief to re-render it."
         )
     return plan
 
@@ -205,7 +212,7 @@ def scoped(job, llm: LLM, depth: Depth | None = None, dream: bool = True, resear
     """The plan's scope, with any questions still open. Writes no files."""
     names = _names(dream, researching)
     job.event("plan", passes=names)
-    plan = scope.seed(job.idea, job.direction, None if llm.offline else depth or DEFAULT_DEPTH)
+    plan = scope.seed(job.idea, job.direction, None if llm.offline else depth or DEFAULT_DEPTH, _brief(job))
     return _model_pass(job, scope, plan, llm, names)
 
 
@@ -286,7 +293,7 @@ def _researched(job, plan: Plan, llm: LLM, tree: Path, names: list[str]) -> Plan
 
 
 def _refuse_if_taken(job, tree: Path) -> None:
-    if existing_plan(tree, job.idea, job.direction) is not None:
+    if existing_plan(tree, job.idea, job.direction, _brief(job)) is not None:
         raise PlanRefused(f"{tree} gained a plan while this one was being made; leaving it alone")
 
 
@@ -597,10 +604,10 @@ def run_plan(
 ) -> verify.PlanVerdict:
     """Every half with nobody asked, a resumed run, or a re-render of the plan already in `tree`."""
     tree = Path(tree)
-    if existing_plan(tree, job.idea, job.direction) is not None:
+    if existing_plan(tree, job.idea, job.direction, _brief(job)) is not None:
         return rerender(job, tree)
     llm = llm or OfflineLLM()
-    draft = resumable(tree, job.idea, job.direction)
+    draft = resumable(tree, job.idea, job.direction, _brief(job))
     if draft is not None:
         return resume(job, tree, draft, llm, dream, researching, depth)
     plan = outlined(job, llm, scoped(job, llm, depth, dream, researching), dream, researching)

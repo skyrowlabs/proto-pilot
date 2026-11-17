@@ -1,6 +1,7 @@
 """The command line.
 
-proto plan "start a community tool library"
+proto plan "start a community tool library" --for "one neighbourhood" --not "delivery"
+proto plan                      # at a terminal, asks for the idea and its brief
 proto dream | dream promote d1 | dream drop d2 --why "..."
 proto ls | rm | prune | doctor
 """
@@ -17,13 +18,20 @@ import click
 from protopilot import __version__, registry
 from protopilot.llm import ClaudeCodeLLM, ClaudeLLM, LLMError, build_llm
 from protopilot.plan.lenses import LENS_SLUGS
-from protopilot.plan.model import DEFAULT_DEPTH, TOPIC_COUNTS
+from protopilot.plan.model import DEFAULT_DEPTH, TOPIC_COUNTS, Brief
 
 if TYPE_CHECKING:
     from protopilot.plan.model import Depth
 
 FOLLOW_INTERVAL = 0.02
 PLAN_REVIEW_PROMPT = "Write this plan? Enter accepts, or: add TITLE | drop N | rename N TITLE | quit"
+#: The guided brief, in the order it is asked. Each is skipped when its flag was given.
+ASK_IDEA = "The idea, in a sentence"
+ASK_GOAL = "What should the plan let you decide or do? (Enter lets the model propose)"
+ASK_AUDIENCE = "Who is it for? (Enter lets the model propose)"
+ASK_HORIZON = "Over what span: time, budget, people? (Enter lets the model propose)"
+ASK_MUST = "A must-have the plan has to respect (Enter when done)"
+ASK_OUT = "Something deliberately out of scope (Enter when done)"
 
 #: Said once by `proto ls` when it lists a row an older version wrote for a prototype.
 OLD_ROWS = "proto.pilot no longer runs prototypes. Their folders are untouched, and `proto prune` forgets them."
@@ -88,6 +96,31 @@ def _plan_step(job, target: Path, work, after=None):
     return produced[0]
 
 
+def _ask_list(prompt: str) -> list[str]:
+    """One item a prompt until an empty answer, which ends the list."""
+    items: list[str] = []
+    while answer := click.prompt(prompt, default="", show_default=False).strip():
+        items.append(answer)
+    return items
+
+
+def _interview(brief: Brief) -> tuple[str, Brief]:
+    """The idea and the brief, asked one field at a time; a field a flag already gave is not asked."""
+    _echo("Planning a new idea. Only the idea is required; every Enter leaves a field to the model.\n")
+    idea = ""
+    while not idea:
+        idea = " ".join(click.prompt(ASK_IDEA).split())
+    return idea, brief.model_copy(
+        update={
+            "goal": brief.goal or click.prompt(ASK_GOAL, default="", show_default=False),
+            "audience": brief.audience or click.prompt(ASK_AUDIENCE, default="", show_default=False),
+            "horizon": brief.horizon or click.prompt(ASK_HORIZON, default="", show_default=False),
+            "must": brief.must or _ask_list(ASK_MUST),
+            "out": brief.out or _ask_list(ASK_OUT),
+        }
+    )
+
+
 def _ask_questions(plan):
     """Scope's questions, one prompt each; Enter leaves one open for `PLAN.md` to list."""
     from protopilot.plan.passes import scope
@@ -134,9 +167,14 @@ def _review_outline(plan):
 
 
 @main.command(name="plan")
-@click.argument("idea")
+@click.argument("idea", required=False)
+@click.option("--goal", default="", metavar="TEXT", help="What the finished plan should let you decide or do.")
+@click.option("--for", "audience", default="", metavar="WHO", help="Who the idea is for.")
+@click.option("--horizon", default="", metavar="SPAN", help="The span the plan covers: time, budget, people.")
+@click.option("--must", multiple=True, metavar="TEXT", help="A constraint the plan has to respect. Repeatable.")
+@click.option("--not", "out", multiple=True, metavar="TEXT", help="Something deliberately out of scope. Repeatable.")
+@click.option("--direction", default="", help="Free-text steer, for anything the fields above do not hold.")
 @click.option("--dir", "directory", default=None, help="Target directory (default: ./<slug>).")
-@click.option("--direction", default="", help="Extra steer: scope, emphasis, constraints.")
 @click.option(
     "--depth",
     type=click.Choice(list(TOPIC_COUNTS)),
@@ -161,9 +199,14 @@ def _review_outline(plan):
     help="Skip research, which takes minutes a topic; the plan is stamped Not researched.",
 )
 def plan_command(
-    idea: str,
-    directory: str | None,
+    idea: str | None,
+    goal: str,
+    audience: str,
+    horizon: str,
+    must: tuple[str, ...],
+    out: tuple[str, ...],
     direction: str,
+    directory: str | None,
     depth: str | None,
     offline: bool,
     backend: str | None,
@@ -173,6 +216,11 @@ def plan_command(
 ) -> None:
     """Turn IDEA into an organised set of text plans, research each topic on the web, and dream a little.
 
+    IDEA is one sentence. The brief beside it is optional, and what you state is the
+    plan's: --goal, --for and --horizon are kept as written, each --must is a constraint
+    and each --not is out of scope for every topic, step and dream. Anything left blank,
+    the model proposes. Leave out IDEA at a terminal to be asked for each in turn.
+
     Research runs on the claude-code backend, one call per topic, and a run that stops
     during it resumes when rerun. Offline, or with --no-research, the plan is stamped
     Not researched.
@@ -180,13 +228,21 @@ def plan_command(
     from protopilot.jobs import STORE
     from protopilot.plan import baseline, pipeline
 
+    brief = Brief(goal=goal, audience=audience, horizon=horizon, must=list(must), out=list(out))
+    if idea is None:
+        if yes or not _stdin_is_terminal():
+            raise click.ClickException(
+                "`proto plan` needs an idea: give it as the first argument, or run it at a terminal "
+                "without --yes to be asked for it. No model was called."
+            )
+        idea, brief = _interview(brief)
     if not baseline.clean(idea):
         raise click.ClickException("`proto plan` needs an idea; it was given an empty one")
 
     target = Path(directory).resolve() if directory else Path.cwd() / baseline.slug_for(idea)
     try:
-        existing = pipeline.existing_plan(target, idea, direction)
-        draft = None if existing else pipeline.resumable(target, idea, direction)
+        existing = pipeline.existing_plan(target, idea, direction, brief)
+        draft = None if existing else pipeline.resumable(target, idea, direction, brief)
     except pipeline.PlanRefused as exc:
         raise click.ClickException(str(exc)) from exc
 
@@ -221,7 +277,7 @@ def plan_command(
     researching = not no_research
     _refuse_unresearchable(llm, researching)
 
-    job = STORE.create(idea, direction)
+    job = STORE.create(idea, direction, brief.model_dump())
     dream = not no_dream
     plan = _plan_step(job, target, lambda j: pipeline.scoped(j, llm, cast("Depth | None", depth), dream, researching))
     if not yes:
@@ -261,7 +317,7 @@ def _resume(target: Path, draft, depth: str | None, offline: bool, backend: str 
     refusal = pipeline.resume_refusal(target, draft, llm, researching, asked)
     if refusal:
         raise click.ClickException(refusal)
-    job = STORE.create(draft.idea, draft.direction)
+    job = STORE.create(draft.idea, draft.direction, draft.brief.model_dump())
     result = _plan_step(job, target, lambda j: pipeline.resume(j, target, draft, llm, dream, researching))
     if not result.ok:
         sys.exit(1)

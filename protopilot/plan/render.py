@@ -149,6 +149,7 @@ def _plan_page(plan: Plan, verified: bool) -> str:
         f"## The idea\n\n{plan.idea}",
         "\n\n".join(scope),
         f"## Constraints\n\n{_bullets(plan.constraints)}",
+        f"## Out of scope\n\n{_bullets(plan.brief.out)}" if plan.brief.out else "",
         f"## Open questions\n\n{_bullets(plan.questions)}",
         f"## Topic map\n\n{_bullets(topic_map)}",
         f"## How the topics connect\n\n{_bullets([_edge_line(e, titles) for e in _edges(plan)])}",
