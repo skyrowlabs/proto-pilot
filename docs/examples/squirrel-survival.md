@@ -126,7 +126,13 @@ asks for. That read is a person's, and it is still open in the *Dogfood record*.
    not certain.
 2. **The steps are walls of text.** Each *Where to start* entry runs 150–200
    words, because the action and its reason render as one paragraph. A reader
-   wants the action first and short.
+   wants the action first and short. **Fixed after this run:** the start pass now
+   holds `action` to 30 words and `why` to 25, and `PLAN.md` puts the reason on
+   its own *Why here* line. On the same brief, a live `--no-research` run then
+   wrote steps of 20–24 and 19–22 words (this tree's were 80–106 and 76–88).
+   The first try at the cap lost every comma and full stop, until the prompt said
+   punctuation was allowed. This tree keeps its long steps, because it is the
+   record of its run.
 3. **No step answers an open question.** Scope asked whether an engine is already
    chosen, and nothing in the plan comes back to it. Open questions are rendered
    and then never used, which is

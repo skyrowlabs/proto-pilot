@@ -122,7 +122,7 @@ first committed real run: [walkthrough](../examples/squirrel-survival.md),
 - Wall time: about 17 minutes from outline to written tree; research took 96–127 s a topic.
 - Topics: 6 researched, 0 failed, 0 with nothing cited; 22 sources; green, exit 0.
 - Agent's observations, which are not the operator's read: steps render as 150–200-word
-  paragraphs; no step returns to an open question; an **Assumption:** line names a
+  paragraphs (since capped at 30 + 25 words, with the reason on its own line); no step returns to an open question; an **Assumption:** line names a
   checkable product fact; the scope pass echoed `--not` into constraints (fixed in the same
   change; 0 of 5 live samples echoed it afterwards); transcripts fingerprint the machine (#51).
 - Operator's five lines: _open — Jeston's to write._
