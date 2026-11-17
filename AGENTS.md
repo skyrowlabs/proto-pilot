@@ -421,6 +421,7 @@ Load on-demand only. Full mapping in `.github/DOCS_INDEX.md`.
 | The design argument        | `docs/ARCHITECTURE.md`           |
 | Live parking lot           | `docs/NOTES.md`                  |
 | Captured ideas (not scheduled) | `docs/ideas/README.md`       |
+| Worked examples (real runs)    | `docs/examples/README.md`    |
 | Reports (anchored to releases) | `docs/reports/README.md`     |
 
 <!-- Add a row per doc as it is written. `pp check docs` fails on a doc

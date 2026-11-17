@@ -1,0 +1,1073 @@
+{
+  "slug": "survival_game_where_you",
+  "title": "A survival game where you play a squirrel getting through its first winter",
+  "idea": "a survival game where you play a squirrel getting through its first winter",
+  "direction": "",
+  "brief": {
+    "goal": "decide whether a small playable slice is worth building, and what to build first",
+    "audience": "players who like short survival games that are cozy but tense",
+    "horizon": "about three months of evenings and weekends, one developer",
+    "must": [
+      "2D and single-player",
+      "one forest and one winter, start to finish"
+    ],
+    "out": [
+      "multiplayer",
+      "monetisation and a storefront launch"
+    ]
+  },
+  "goal": "decide whether a small playable slice is worth building, and what to build first",
+  "audience": "players who like short survival games that are cozy but tense",
+  "horizon": "about three months of evenings and weekends, one developer",
+  "constraints": [
+    "2D and single-player",
+    "one forest and one winter, start to finish",
+    "Multiplayer is out of scope",
+    "Monetisation and a storefront launch are out of scope"
+  ],
+  "questions": [
+    "What would count as evidence that the slice is worth continuing — the developer's own judgement while playing, or feedback from outside playtesters?",
+    "Does the developer already have an engine and 2D toolchain they work in, or is choosing one part of what the plan has to settle?",
+    "Is art and audio production part of this three months, or is the slice expected to run on placeholder assets?"
+  ],
+  "researched": true,
+  "depth": "standard",
+  "topics": [
+    {
+      "slug": "cozy_tense_contract",
+      "title": "What makes it cozy and tense at once",
+      "why": "The audience is defined by a pairing that usually pulls apart, so the slice has to settle which exact feelings count as cozy (shelter, warmth, a full cache) versus tense (cold, hunger, being hunted), how they alternate or overlap in a single session, and what would tip it into either bleak or toothless.",
+      "findings": [
+        {
+          "text": "The Project Horseshoe cozy-games report defines coziness as \"the fantasy of safety, abundance, and softness\" yet explicitly allows danger: cozy spaces work as \"reprieve or refuge\" and contrast (cold rain on the window) heightens warmth as long as the threat never breaks in. It names Dark Souls bonfires as the model loop of desire, adventure, rest.",
+          "assumption": false,
+          "source_ids": [
+            "s1"
+          ]
+        },
+        {
+          "text": "The same report lists what kills coziness, and two items hit a squirrel hoarding game directly: mandatory maintenance and needy dependents requiring constant care, and extrinsic obligation generally (\"Almost any form of extrinsic reward generates a pressing transactional short-term need\"). It advises making most activities optional and intrinsically satisfying.",
+          "assumption": false,
+          "source_ids": [
+            "s1"
+          ]
+        },
+        {
+          "text": "Shelter (play as a badger mother) shows where irreversible loss lands: a reviewer calls it harrowing, \"truly terrifying\" and emotionally taxing rather than relaxing, with no checkpoints and cubs \"gone for good.\" That design buys strong attachment at the cost of any coziness — useful as the boundary the slice should not cross.",
+          "assumption": false,
+          "source_ids": [
+            "s2"
+          ]
+        },
+        {
+          "text": "Winter Burrow (2025), a mouse surviving winter, is the closest comparable, and a reviewer concludes it \"isn't exactly a cosy game\" and is \"a lot more stressful to play than it looks\": warmth, hunger and stamina cut trips short, spiders and predators patrol outside, while the burrow is the warm, decoratable core.",
+          "assumption": false,
+          "source_ids": [
+            "s3"
+          ]
+        },
+        {
+          "text": "Winter Burrow's failure mode is instructive: the same review faults walking \"the same trail in and out of the burrow a hundred times\" before real progress, no in-game map, and \"rudimentary\" combat and crafting. The in/out rhythm is the right spine, but it goes from tense to tedious when each excursion is identical.",
+          "assumption": false,
+          "source_ids": [
+            "s3"
+          ]
+        },
+        {
+          "text": "A workable contract for the slice: tension is spatial and temporal (outside the den, late in a day), coziness is the bounded den where threat is audible but muted. Tip into bleak when a setback ends the run; tip into toothless when nothing in the cache can ever be lost. Prefer setbacks that cost comfort and time — a raided cache, a cold night — over death.",
+          "assumption": true,
+          "source_ids": []
+        }
+      ],
+      "risks": [
+        "The two halves cancel rather than alternate: a warmth/hunger clock running at all times makes the den a waiting room instead of a refuge, and the game lands as mildly stressful throughout rather than cozy or tense at any point.",
+        "Tension is delivered by the only mechanism that is cheap to build — a draining meter — which reads as nagging maintenance rather than threat, exactly the thing the cozy-games report in the findings warns kills coziness.",
+        "The audience splits in playtest: people who came for cozy quit at the first permanent loss, people who came for tense call it toothless, and the slice produces no clear verdict because it was aimed between them.",
+        "Irreversible loss of something the player has invested in (a season's cache, a nestmate) buys attachment at the cost of the stated audience promise, per the prey-animal comparable in the findings; a single such event can retroactively recolour the whole run as bleak.",
+        "The in-and-out rhythm the findings identify as the right spine degrades into sameness, so tension decays into tedium by the third or fourth excursion while the cozy side is unaffected — the game feels flat without either feeling broken.",
+        "Marketing or framing language promises cozy, the mechanics deliver survival pressure, and early reactions are dominated by the mismatch rather than by the design itself.",
+        "Conflict with the caching, pacing and simulation topics is structural, not incidental: each of those gets more interesting as it gets harsher, so the contract will be eroded by every downstream decision unless it is written down as a constraint the other topics must obey."
+      ],
+      "unknowns": [
+        "Does the target audience want cozy and tense interleaved within a single session, or cozy as the frame and tense as the content — and do those two readings even produce different builds?",
+        "Which specific feeling is doing the work of 'cozy' here: physical warmth, spatial safety, material abundance, or competence at a mastered routine?",
+        "What is the largest setback a player will accept without the run feeling punitive — losing time, losing comfort, losing stored food, or losing the run?",
+        "Does threat that is audible but cannot reach the den actually heighten the den's warmth, or does it just prevent the player from relaxing in it?",
+        "Can tension be purely spatial and temporal (outside, late) with no always-on timer, and does the game still feel like survival if the den pauses all pressure?",
+        "What does a player do inside the den that is intrinsically satisfying rather than an obligation, and is there anything to do there at all in the first slice?",
+        "Is 'bleak' caused by the severity of losses or by their unpredictability — and which one do testers actually report?"
+      ],
+      "decisions": [
+        "Write the contract as a hard constraint on all other topics, or treat it as an emergent tone to be tuned after the loop exists.",
+        "Pause or near-pause all survival pressure inside the den, versus running a slow drain everywhere so the den is only a better place to be.",
+        "Permit permanent loss of stored food at all, versus capping every setback at cost of time and comfort with nothing unrecoverable.",
+        "Make cozy activities optional and intrinsically rewarding, versus making den upkeep a required step in the loop.",
+        "Give the den a decoration or nest-building layer in the first slice, or defer all of it and test the outside loop alone.",
+        "Target one pole and let the other be flavour, versus committing to genuine alternation and accepting that it costs pacing work.",
+        "Resolve the cozy/tense tradeoff by difficulty setting (player chooses), versus by a single authored tuning the developer stands behind."
+      ]
+    },
+    {
+      "slug": "caching_and_memory_loop",
+      "title": "The hoarding loop and what the player remembers",
+      "why": "A squirrel's signature behaviour is burying food and finding it again, so the central design question is whether retrieval is tracked by the game, by the player's own memory, or by landmarks — each choice changes the core verb from bookkeeping to navigation to recall, and decides whether loss of a cache feels like drama or like paperwork.",
+      "findings": [
+        {
+          "text": "A designer talk on cognitive maps argues HUDs and minimaps actively weaken route memory, and offers four concrete levers for a memorable space: cluster similar objects into districts, make edges (cliffs, walls) bold and deliberate, place revisitable convergence nodes, and connect with paths. Its test: play the level with the HUD off and see if players can still navigate.",
+          "assumption": false,
+          "source_ids": [
+            "s4"
+          ]
+        },
+        {
+          "text": "The nearest shipped competitor, Winter Burrow (cozy mouse survival, Nov 2025), draws its main criticism exactly where this topic is risky: a reviewer calls the survival side a chore, cites walking \"the same trail in and out of the burrow a hundred times,\" and says the absence of an in-game map makes gathering more frustrating rather than more tense.",
+          "assumption": false,
+          "source_ids": [
+            "s3"
+          ]
+        },
+        {
+          "text": "Same review: being \"constantly short on something\" and converting raw items into intermediates (yarn, planks) before use is reported as tedium, not pressure. For a hoarding loop this suggests caches should be few, chunky and legible rather than many small deposits requiring tallying.",
+          "assumption": false,
+          "source_ids": [
+            "s3"
+          ]
+        },
+        {
+          "text": "Real fox squirrels use \"spatial chunking\": in a study of 45 squirrels given 16 nuts of four types, those collecting from a central spot buried each type in its own general area — a mnemonic strategy. This is a ready-made, player-facing recall structure: cache by kind in a zone, so remembering means remembering four places, not forty.",
+          "assumption": false,
+          "source_ids": [
+            "s5"
+          ]
+        },
+        {
+          "text": "Recommended split: the game tracks that a cache exists and what is in it (no mental arithmetic), while position is the player's job via landmarks plus a small hard cap of diegetic marks — survival games that allow unlimited pins, and ones that cap them (Rust allows five), bracket the design space. The cap is what converts memory into a decision.",
+          "assumption": true,
+          "source_ids": []
+        },
+        {
+          "text": "For a three-month slice, author cache loss rather than simulate it: a handful of scripted thefts or snow-buried landmarks with visible tells (tracks, a watching crow) reads as drama, whereas realistic pilferage rates applied to every cache reads as the game cheating. Build one forest clearing with three chunked cache zones and test retrieval with no map before building more.",
+          "assumption": true,
+          "source_ids": []
+        }
+      ],
+      "risks": [
+        "Retrieval becomes bookkeeping: if the game tracks caches in a list, the signature verb collapses into inventory management and the squirrel fantasy evaporates even though the system works.",
+        "Retrieval becomes punishment: if position is entirely the player's memory with no marks and no map, a forgotten cache is unrecoverable through no learnable fault, and the findings' comparable shows unmapped gathering reading as frustration rather than tension.",
+        "Many small deposits force tallying, which the findings flag as tedium; the hoarding fantasy pushes toward quantity while legibility pushes toward a handful of chunky caches, and quantity will win by default because it is easier to generate.",
+        "Simulated pilferage applied broadly reads as the game cheating — loss without a visible agent is indistinguishable from a bug or a bad roll.",
+        "Memory load is a hard accessibility and session-length problem: a player who returns after a week has lost their mental map and the run becomes unplayable even though the save is intact.",
+        "The forest is built before it is navigable: without deliberate landmarks, districts and edges, remembering locations is impossible regardless of which retrieval rule is chosen, so art and level work done early may need to be redone.",
+        "This topic directly conflicts with the cozy contract — cache loss is the main source of drama available and also the main thing that can make the run feel bleak."
+      ],
+      "unknowns": [
+        "Is the core verb meant to be navigation, recall, or planning — and which of the three does the target audience actually enjoy for an hour?",
+        "Does the game track that a cache exists and its contents while leaving only position to the player, and is that split legible to a player or does it feel arbitrary?",
+        "What is the right number of cache sites for one forest: few and chunky, or many and approximate?",
+        "Does caching by kind into zones (one area per food type) actually reduce what a player must remember, or does it just add a sorting chore at burial time?",
+        "How many diegetic marks (scratches, pins, bent twigs) can a player place before memory stops mattering — and is the cap felt as a decision or as a restriction?",
+        "Can a cache be lost in a way that a player will read as drama rather than unfairness, and what visible tell is required for that — a rival seen, tracks, a sound at the time of theft?",
+        "How does the player re-orient after a snowfall changes the landscape's appearance, and is that a deliberate mechanic or an accident of the art?",
+        "Should the first slice be testable with the HUD and all markers off, and what does failure of that test tell us?"
+      ],
+      "decisions": [
+        "Track caches in the game's UI, leave them entirely to player memory, or split tracking (contents yes, position no).",
+        "Allow unlimited diegetic marks, cap them at a small number, or allow none.",
+        "Author cache loss as a few scripted events with visible tells, versus simulating pilferage rates across all caches.",
+        "Build one clearing with a few chunked cache zones and test retrieval before building more forest, versus building the full forest first.",
+        "Make the chunk-by-type structure a rule the game enforces, a bonus it rewards, or a habit the player may invent.",
+        "Offer a map, a markers-only compromise, or nothing — and whether a map is an accessibility option rather than a design choice.",
+        "Decide whether forgetting a cache ends in permanent loss or in a costlier recovery (digging, searching, a hint)."
+      ]
+    },
+    {
+      "slug": "winter_arc_pacing",
+      "title": "Shape of one winter, start to finish",
+      "why": "The constraint is a single season played to completion, so the plan must establish whether there is an autumn preparation phase before scarcity, how long a full run takes in real minutes, how difficulty escalates as food thins, what the ending state is, and whether a failed run restarts the whole winter or something shorter.",
+      "findings": [
+        {
+          "text": "Don't Starve treats winter as a bounded block of 15-16 in-game days preceded by autumn, and escalates inside it rather than just raising numbers: nights get longer, berry bushes/grass/saplings regrow very slowly, farms stop, and scripted threats (Deerclops, a walrus hunting party) arrive. The prep phase is explicitly about stockpiles and warmth gear bought before the clock starts.",
+          "assumption": false,
+          "source_ids": [
+            "s6"
+          ]
+        },
+        {
+          "text": "A survival-design piece argues the common failure is a decreasing curve (early scarcity, then a comfortable late game) and recommends alternating pressure with recovery phases plus spikes, while noting that always-hard play just makes players tired of dying. It also recommends a stated end goal, giving \"a winter calamity\" as an example.",
+          "assumption": false,
+          "source_ids": [
+            "s7"
+          ]
+        },
+        {
+          "text": "The Flame in the Flood ships one content arc with two failure contracts: Traveler keeps your equipment on death and lets you reload a checkpoint, Survivalist makes death permanent and drains survival faster. A single-winter run can be authored once and sold as both a gentle and a permadeath experience via a difficulty toggle.",
+          "assumption": false,
+          "source_ids": [
+            "s8"
+          ]
+        },
+        {
+          "text": "The closest comparable, Shelter 2 (play an animal, feed young, seasons pass), ran about two hours and was faulted because after the strong opening \"all semblance of structure disappears\", and because unclear hunger feedback made it easy to end up with dead cubs. Short length was criticised less than the missing mid-game structure and unreadable needs.",
+          "assumption": false,
+          "source_ids": [
+            "s9"
+          ]
+        },
+        {
+          "text": "A 27-year red squirrel dataset found juveniles that claimed a territory earlier were much more likely to survive their first winter, partly because a territory holds a cone cache, and timing mattered more when winters were colder or predators more abundant. This supports an autumn phase whose outcome visibly sets your winter odds.",
+          "assumption": false,
+          "source_ids": [
+            "s10"
+          ]
+        },
+        {
+          "text": "Concrete shape I would commit to: roughly 60-90 real minutes total, about 12-16 short days at 3-5 minutes each, with the first quarter as autumn caching and the last third as the hard scarcity peak; ending at the thaw with a readable account of what you survived. Build the mid/late winter peak first, since that is where the game either works or does not.",
+          "assumption": true,
+          "source_ids": []
+        }
+      ],
+      "risks": [
+        "Difficulty runs downhill: by the time the player is competent, the stockpile is large and the last third — meant to be the scarcity peak — is the easiest part, which is the failure mode the survival-design source in the findings describes.",
+        "An autumn prep phase decides the run before the interesting part begins; a bad autumn means a doomed winter the player must still sit through, and a good autumn means no winter pressure at all.",
+        "The mid-game has no structure: the opening teaches and the end resolves, but the middle is repeated excursions, which is the specific criticism levelled at the closest animal-survival comparable in the findings.",
+        "Restart cost is mismatched to run length: full-winter restarts after a late failure discard an hour of play, while cheap restarts remove all weight from failure.",
+        "Session length collides with the audience — a run that only resolves in one unbroken sitting excludes the evenings-and-weekends player, while mid-run saves may undercut the tension of a single continuous winter.",
+        "The arc is built to be survivable at all costs and the ending becomes a formality, so there is no readable account of what the player actually endured.",
+        "Pacing is tuned against the developer's own expertise; the only person who has played the loop hundreds of times is the one setting the curve."
+      ],
+      "unknowns": [
+        "How long is a full run in real minutes, and is that length set by what the audience will sit through or by how long the loop stays interesting?",
+        "How many in-game days, at what real-time length each, and does the day length change as winter deepens?",
+        "Is there an autumn phase at all, and if so does its outcome visibly set the player's odds or merely stock the first few days?",
+        "What escalates besides scarcity — night length, weather severity, predator presence, travel cost — and which of those can be built in the time available?",
+        "Where does recovery sit in the curve: is there a thaw or a mild spell that lets the player breathe before the peak?",
+        "What is the ending state: survival to the thaw, a stated goal met, or a graded outcome — and what does the game tell the player they achieved?",
+        "Does failure restart the whole winter, the current day, or the last stretch, and does the player choose?",
+        "Is the hard scarcity peak the first thing to build, and can it be tested at all without the autumn phase that feeds it?",
+        "Does a single authored arc support both a gentle and a permadeath contract via one toggle, or do the two need different tuning?"
+      ],
+      "decisions": [
+        "Build the mid-to-late scarcity peak first, versus building the run in chronological order from autumn.",
+        "Include an autumn preparation phase in the first slice, or start the slice at the onset of scarcity with a granted starting cache.",
+        "Escalate by scripted events on a schedule, by rising resource scarcity, or by both.",
+        "Offer one tuning, or ship a gentle/keep-your-progress mode alongside a permadeath mode from the first slice.",
+        "Set the restart unit: whole winter, a chapter, or a day.",
+        "Allow saving mid-run, versus requiring one sitting, versus saving only at the den.",
+        "Decide the end condition and whether it is binary survival or a graded account of the winter.",
+        "Fix the real-minute target up front and tune content to it, versus letting length fall out of however much content gets built."
+      ]
+    },
+    {
+      "slug": "prey_animal_verbs",
+      "title": "Being small, cold and hunted in 2D",
+      "why": "The moment-to-moment feel depends on which animal pressures become mechanics — warmth, energy and torpor, predators overhead, climbing and the vertical layer of trees — and 2D means deciding whether the forest reads as a side-on climbable space or a top-down ground space, since that choice governs every control, threat and level layout downstream.",
+      "findings": [
+        {
+          "text": "Gray squirrels do not hibernate: they scatter-hoard several thousand caches per season and relocate them by spatial memory against near and distant landmarks, with scent unreliable once ground is snow-covered. Only ~1 in 4 kits reach age one. That gives a free, legible mechanic: snow degrades smell-based recovery, so the player must navigate by remembered landmarks.",
+          "assumption": false,
+          "source_ids": [
+            "s11"
+          ]
+        },
+        {
+          "text": "Real pressures map cleanly onto a vertical layer stack: main predators are hawks, owls and snakes; dense canopy and midstory give cover from aerial hunters; insulated dreys (30–60cm, moss/grass/feathers) cut heat loss and squirrels share them in cold spells; leaf-nest young survive 40% worse than cavity-den young; squirrels descend trunks head-first.",
+          "assumption": false,
+          "source_ids": [
+            "s11"
+          ]
+        },
+        {
+          "text": "Perspective is mostly an art-budget decision for a solo dev: top-down needs ~1x sprite sets, side view 1–1.5x (mirrored, with handedness fixes), isometric 2–2.5x. Top-down also shows only the tops of heads — which would hide the tail, posture and shivering that carry a squirrel's whole read.",
+          "assumption": false,
+          "source_ids": [
+            "s12"
+          ]
+        },
+        {
+          "text": "Rain World is the cautionary precedent for simulated predators in a 2D side-on world: creatures pursue their own goals, persist offscreen and have no fixed patrol routes, and the devs concede this made the game frustratingly hard, produced no-win situations for new players, and forced added guidance. Rooms were tuned to offer several evasion routes (ground, vents, pipework).",
+          "assumption": false,
+          "source_ids": [
+            "s13"
+          ]
+        },
+        {
+          "text": "For a cozy-tense slice, telegraph rather than simulate: one scripted aerial threat with a readable tell (shadow, alarm chatter from other squirrels, a few seconds to reach the trunk) gives tension that can be learned, while a self-interested predator AI risks the unfair deaths Rain World's team describe. Simulation depth belongs in the cache/weather systems, not the hunter.",
+          "assumption": true,
+          "source_ids": []
+        },
+        {
+          "text": "The closest commercial comparable is Winter Burrow (2025), a cozy small-animal winter survival game with a warmth clock and crafting, usually described as laid-back with a bittersweet edge; squirrel-specific caching games appear to be mostly free game-jam entries. Verify its camera and reception directly before positioning against it.",
+          "assumption": true,
+          "source_ids": []
+        }
+      ],
+      "risks": [
+        "The perspective choice is effectively irreversible and sits upstream of controls, threats and every level: choosing wrong costs most of the slice's budget to undo.",
+        "A top-down camera hides the animal's read — tail, posture, shivering — which the findings identify as where the squirrel character lives; a side view preserves it but doubles the sprite work and adds handedness problems for a solo artist.",
+        "A side-on climbable forest implies a vertical layer stack (ground, trunk, midstory, canopy), which multiplies level authoring, collision and threat design beyond what three months supports.",
+        "Self-interested predator AI produces unfair deaths and no-win situations, the precedent the findings describe; the developer discovers this only after building it, late.",
+        "Too many pressures at once: warmth, energy, torpor, aerial threat and climbing each need a readable surface, and stacking them makes the moment-to-moment feel busy rather than tense.",
+        "Climbing controls are a genuine feel problem — head-first descent, branch-to-branch traversal — and can absorb unbounded iteration time while contributing nothing to the hoard-and-starve question the slice exists to test.",
+        "Threat tells are built but not learnable: if the player cannot reliably convert the tell into a successful escape, the predator becomes weather rather than an opponent.",
+        "This topic conflicts with the slice scope: the most expressive version of the animal is also the most expensive thing to build."
+      ],
+      "unknowns": [
+        "Is the forest a side-on climbable space or a top-down ground space — and which one does the caching loop actually need?",
+        "Does verticality earn its cost, or can cover-from-above be expressed in a flat space through canopy density alone?",
+        "Which pressures become mechanics and which stay as fiction: warmth, energy, torpor, cold-weather sheltering, nest insulation?",
+        "How much time does a readable aerial threat need to give the player between tell and strike, and can that be tuned to feel fair without feeling trivial?",
+        "Is there one threat type in the slice or several, and do ground and aerial threats require different evasion verbs?",
+        "Should each space offer multiple escape routes by construction, and what does that constraint cost in level authoring time?",
+        "Can snow be used as a mechanic that degrades scent-based recovery and forces landmark navigation, and is that legible to a player who does not know the natural history?",
+        "What does the player's body condition look like on screen — meters, animation, sound, or a mix — and can it be read at a glance mid-chase?",
+        "Does sharing a nest or any social element belong in the slice, or is it a second-pass feature?"
+      ],
+      "decisions": [
+        "Commit to side-on or top-down before any art is produced, and record why, versus prototyping both at throwaway fidelity.",
+        "Build climbing as a core traversal verb, versus restricting trees to a few fixed escape points.",
+        "Use scripted, telegraphed threats, versus a persistent simulated predator with its own goals.",
+        "Pick a maximum number of simultaneous survival pressures for the slice and cut the rest.",
+        "Express body condition through animation and sound, through explicit meters, or both.",
+        "Decide whether warmth is a timer, a location property, or a consequence of nest quality.",
+        "Spend the art budget on expressive animation for one animal, versus on more environment and threat variety."
+      ]
+    },
+    {
+      "slug": "simulation_versus_legibility",
+      "title": "How much real squirrel behaviour to simulate",
+      "why": "Animal authenticity is likely part of the appeal, but every hidden system (weather, food spoilage, predator routines, body condition) needs a readable surface the player can plan against, so it must be established where fidelity earns its keep and where an invisible simulation would just feel like unfair randomness.",
+      "findings": [
+        {
+          "text": "Grey squirrels don't hibernate and can't store enough energy to go long without food: in very cold weather they sit in a thicker, often shared winter drey and come out intermittently to dig up caches. That supports a loop of short, cold-gated foraging trips out from a warm nest hub rather than any sleep-through-winter mechanic.",
+          "assumption": false,
+          "source_ids": [
+            "s14"
+          ]
+        },
+        {
+          "text": "The same factsheet asserts autumn caches are spread out and relocated \"by smell, rather than memory,\" with many never recovered. Popular natural history and the research literature disagree on this, so the cache-finding rule is a free design choice — you can safely build the loop on the player's own memory without feeling inauthentic.",
+          "assumption": false,
+          "source_ids": [
+            "s14"
+          ]
+        },
+        {
+          "text": "Field work on PIT-tagged acorns (Steele et al.) reportedly found caches disturbed within ~0.5–5 days when other squirrels were present but intact 16–27 days once neighbours were removed; Jacobs-lab work shows spatial memory and caches chunked by nut type. Pilferage is authentic, but only reads as fair if a visible rival does it.",
+          "assumption": true,
+          "source_ids": []
+        },
+        {
+          "text": "A design essay on realism argues that modelling spoilage from temperature, humidity and container turns survival into \"obsessive-compulsive inventory management,\" and recommends collapsing systems into a few readable states, exposing the rules, and capping variance so one bad roll can't erase hours. Treat weather and body condition as readable pressures, not detailed models.",
+          "assumption": false,
+          "source_ids": [
+            "s15"
+          ]
+        },
+        {
+          "text": "A review of Shelter 2, the closest comparable (play an animal, feed dependents), says its hunger meter, highlighted prey and collectibles felt grafted-on and \"never grow past their primitive first impression,\" in a world that is huge but empty, while the real feeling came from the cubs. Simulated systems must carry the stakes, not sit beside them.",
+          "assumption": false,
+          "source_ids": [
+            "s16"
+          ]
+        },
+        {
+          "text": "A study of a deliberately inscrutable game (Kirman, Linehan & Feltwell 2022) found players begin with systematic reasoning and, when they can't link action to effect, split between frustration and accepting the game as role-play. Only the second group tolerates opacity, and a cozy-but-tense survival audience is mostly the first.",
+          "assumption": false,
+          "source_ids": [
+            "s17"
+          ]
+        }
+      ],
+      "risks": [
+        "Hidden systems read as randomness: weather, spoilage, body condition and predator routines each need a visible surface, and any one of them left opaque makes planning feel pointless and losses feel arbitrary.",
+        "Detailed spoilage or condition modelling turns the game into obsessive inventory management, the failure the design source in the findings names, which also directly violates the cozy contract.",
+        "Authenticity is pursued where no player can perceive it, consuming time that buys nothing — fidelity in systems whose outputs never reach the screen.",
+        "Variance is uncapped and one bad roll erases an hour; this is the single most run-destroying form of unfairness in a survival game and the hardest to notice in short self-testing.",
+        "Simulated systems sit beside the stakes rather than carrying them, the criticism of the closest animal comparable in the findings: the meters feel grafted on while the emotional weight lives somewhere the simulation does not touch.",
+        "The audience is mostly systematic reasoners who need action linked to effect; opacity that a role-play-minded player would tolerate will instead read as broken to this audience.",
+        "Real behaviour and good play diverge — authentic squirrel strategy may be boring to execute — and resolving that by splitting the difference produces something neither authentic nor fun.",
+        "Sources on real behaviour disagree (the findings note conflicting claims about scent versus memory), so 'authentic' may be unfalsifiable as a design criterion while still being used to justify decisions."
+      ],
+      "unknowns": [
+        "Which systems does the player need to predict in order to plan, and which only need to be felt?",
+        "Can each simulated system be collapsed into a few named, readable states, and does doing so lose anything players would notice?",
+        "Are the rules exposed to the player directly (stated in-game), inferable from consistent feedback, or left to be learned by loss?",
+        "What variance cap keeps a run from being destroyed by one event, and is the cap stated or hidden?",
+        "Does authenticity matter to the target audience as accuracy, or only as the feeling of being a small animal?",
+        "Where the natural history is contested, which reading does the game adopt — and is that chosen for fidelity or for playability?",
+        "Does pilferage require a visible rival on screen to read as fair, and does the slice have the budget for one?",
+        "Is weather a schedule the player can learn, a forecastable signal, or a surprise?",
+        "What is the minimum feedback that makes hunger and cold readable before they become fatal — and how early must the warning come?"
+      ],
+      "decisions": [
+        "Collapse each system to a handful of named states, versus modelling continuous values underneath with a simplified display.",
+        "State the rules openly in-game, versus letting players infer them from consistent cues.",
+        "Include food spoilage at all, versus making stored food permanent until taken.",
+        "Make weather a learnable schedule, a forecast the player can read, or an unforecastable event.",
+        "Attribute every loss to a visible agent or cause, versus permitting unattributed losses.",
+        "Set a hard variance cap on how much a single event may cost, and whether to tell the player it exists.",
+        "Resolve contested natural history in favour of playability and say so, versus in favour of fidelity and design around it.",
+        "Spend simulation depth on the cache and weather systems, versus on the threats, versus on body condition — choosing one."
+      ]
+    },
+    {
+      "slug": "slice_scope_and_evidence",
+      "title": "What the first slice contains and how it is judged",
+      "why": "With one developer and roughly three months of evenings, the decision to build hinges on naming the smallest slice that tests the risky assumption rather than the easy one, what art and audio pipeline a solo developer can actually sustain for a forest and a winter, which playtest reactions would count as a yes, and what observation would make abandoning it the right call.",
+      "findings": [
+        {
+          "text": "Ron Gilbert argues the vertical slice is \"a dumb way to build a game\": it burns time and money producing something that looks ~90% done, and he recommends a prototype only where the gameplay or tech is genuinely risky, then iterative layering. For this project that means an ugly prototype of the hoard-and-starve loop, not a pretty forest.",
+          "assumption": false,
+          "source_ids": [
+            "s18"
+          ]
+        },
+        {
+          "text": "Shelter, the closest commercial reference (prey animal, scarcity, young to feed), was faulted for exactly the risky part: food was so plentiful the feeding tension never appeared, levels could be restarted with fresh cubs at no penalty, and most encounters reduced to waiting then dashing. Its art was praised regardless.",
+          "assumption": false,
+          "source_ids": [
+            "s19"
+          ]
+        },
+        {
+          "text": "That review pattern suggests the slice's pass/fail question is whether scarcity bites and losses stick, not whether winter looks good. A credible yes is a tester who hesitates over which cache to dig up or rations food; a no is a tester who never feels short of anything, or who shrugs at a loss and restarts.",
+          "assumption": true,
+          "source_ids": []
+        },
+        {
+          "text": "A solo dev's playtesting account advises testing with placeholder graphics, watching for hesitation and confusion rather than asking for opinions (\"I don't like this\" is too broad to act on), and treating one player quitting in frustration as actionable signal. It sets no continue/stop threshold.",
+          "assumption": false,
+          "source_ids": [
+            "s20"
+          ]
+        },
+        {
+          "text": "Useful abandonment tests: cost-to-finish math ignoring sunk time (if finishing needs a \"somehow\", it's doomed), and the redesign test — the loop still bores you and testers after several genuine redesign attempts. Define done up front as a few trusted signals checked on a schedule, e.g. testers finishing the build.",
+          "assumption": false,
+          "source_ids": [
+            "s21"
+          ]
+        },
+        {
+          "text": "Hour budgets argue for brutal first-slice scope: one tracked solo project logged 3,850 hours over 600 days, with over half of the first year's 1,050 hours on prototyping and R&D alone, though the dev later reckoned a prototype phase could be 60-80 hours. Three months of evenings is plausibly 120-200 hours total.",
+          "assumption": false,
+          "source_ids": [
+            "s22"
+          ]
+        }
+      ],
+      "risks": [
+        "The slice tests the easy assumption: a pretty forest and nice movement get built because they are tractable, while the risky question — does scarcity bite and do losses stick — goes untested, which is the trap the vertical-slice critique in the findings describes.",
+        "Food ends up plentiful and the central tension never appears, the exact fault the closest prey-animal comparable drew; a solo developer tuning their own game is systematically biased toward generosity.",
+        "Restarting at no penalty hollows out the stakes, and the slice therefore cannot measure whether loss matters because loss has been made free.",
+        "Hour budget overrun: three months of evenings is a modest total, and the findings' logged solo-project numbers suggest prototyping alone can consume a large fraction of it, so the slice ends half-built and unjudgeable.",
+        "Art and audio for a forest and a winter is an open-ended pipeline; committing to a style the developer cannot sustain for a full season means either a visibly unfinished game or months of unplanned asset work.",
+        "Playtest feedback is collected as opinions rather than observed behaviour, so the result is unactionable and the build/no-build decision is made on vibes.",
+        "No stop condition is defined in advance, so sunk time decides continuation; the project survives on the strength of the effort already spent rather than the evidence.",
+        "The slice conflicts with the prey-animal verbs topic: climbing, verticality and expressive animation are the most appealing things to build and the least informative about whether the game works.",
+        "Testers are drawn from people predisposed to like it (friends, the developer's circle), producing a false positive that only surfaces much later."
+      ],
+      "unknowns": [
+        "What is the single riskiest assumption — that hoarding and retrieval is fun, that scarcity creates tension, or that cozy and tense coexist — and which one can actually be tested first?",
+        "What is the smallest build that answers that question, and can it be answered with placeholder art?",
+        "What is the realistic hour budget for three months of evenings and weekends, and how much of it is prototyping versus content?",
+        "What art and audio pipeline can one person sustain for an entire forest and season, and has that been tested on a representative sample asset rather than a hero asset?",
+        "Which observed tester behaviours count as a yes — hesitating over which cache to open, rationing, returning for a second run — and how many testers must show them?",
+        "Which observed behaviours count as a no — never feeling short, shrugging at a loss, quitting in frustration — and is a single frustrated quit treated as signal?",
+        "How many genuine redesign attempts are allowed before the loop is judged unsalvageable?",
+        "What does the cost-to-finish look like ignoring time already spent, and does the plan contain a step that currently reads as 'somehow'?",
+        "Where do testers who are not friends or peers come from, and does recruiting them fit inside the timeline?",
+        "How is progress checked on a schedule rather than at the end, and what are the checkpoints?"
+      ],
+      "decisions": [
+        "Build an ugly prototype of the hoard-and-starve loop, versus a polished vertical slice of one area.",
+        "Name the one risky assumption the slice must test and cut everything that does not serve it, versus testing several at once.",
+        "Fix the hour budget and timebox the slice, versus building to a feature list and letting the schedule move.",
+        "Choose an art style for sustainability first, versus for appeal first — and decide whether the slice ships with placeholders.",
+        "Define the pass/fail signals and the stop condition in writing before building, versus deciding after seeing the build.",
+        "Decide whether failure in the slice carries a penalty, since testing whether losses stick requires that they do.",
+        "Test with strangers, versus with people the developer knows, versus both in sequence.",
+        "Set a checkpoint schedule with named signals, versus a single go/no-go at the end of three months.",
+        "Decide in advance what would make abandoning it the right call, and who makes that call."
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from_topic": "caching_and_memory_loop",
+      "to_topic": "prey_animal_verbs",
+      "kind": "depends-on"
+    },
+    {
+      "from_topic": "winter_arc_pacing",
+      "to_topic": "caching_and_memory_loop",
+      "kind": "depends-on"
+    },
+    {
+      "from_topic": "simulation_versus_legibility",
+      "to_topic": "prey_animal_verbs",
+      "kind": "depends-on"
+    },
+    {
+      "from_topic": "slice_scope_and_evidence",
+      "to_topic": "cozy_tense_contract",
+      "kind": "depends-on"
+    },
+    {
+      "from_topic": "slice_scope_and_evidence",
+      "to_topic": "caching_and_memory_loop",
+      "kind": "depends-on"
+    },
+    {
+      "from_topic": "slice_scope_and_evidence",
+      "to_topic": "winter_arc_pacing",
+      "kind": "depends-on"
+    },
+    {
+      "from_topic": "slice_scope_and_evidence",
+      "to_topic": "prey_animal_verbs",
+      "kind": "depends-on"
+    },
+    {
+      "from_topic": "prey_animal_verbs",
+      "to_topic": "cozy_tense_contract",
+      "kind": "informs"
+    },
+    {
+      "from_topic": "simulation_versus_legibility",
+      "to_topic": "caching_and_memory_loop",
+      "kind": "informs"
+    },
+    {
+      "from_topic": "simulation_versus_legibility",
+      "to_topic": "winter_arc_pacing",
+      "kind": "informs"
+    },
+    {
+      "from_topic": "simulation_versus_legibility",
+      "to_topic": "slice_scope_and_evidence",
+      "kind": "informs"
+    },
+    {
+      "from_topic": "caching_and_memory_loop",
+      "to_topic": "cozy_tense_contract",
+      "kind": "conflicts-with"
+    },
+    {
+      "from_topic": "winter_arc_pacing",
+      "to_topic": "cozy_tense_contract",
+      "kind": "conflicts-with"
+    },
+    {
+      "from_topic": "simulation_versus_legibility",
+      "to_topic": "cozy_tense_contract",
+      "kind": "conflicts-with"
+    },
+    {
+      "from_topic": "slice_scope_and_evidence",
+      "to_topic": "prey_animal_verbs",
+      "kind": "conflicts-with"
+    }
+  ],
+  "steps": [
+    {
+      "topic": "prey_animal_verbs",
+      "action": "Spend the first evenings settling the camera question and nothing else: build two throwaway grey-box movement tests of the same patch of forest — one side-on with a climbable trunk, one flat ground view — and record for each what the animal's body can express on screen, how many sprite states the walk/climb/freeze set would need, and whether an aerial threat with a visible tell can be dodged at all. Then write down the chosen perspective, the list of pressures that become mechanics versus stay as fiction, and the one threat type the slice will ship with, as a decision you will not revisit.",
+      "why": "Everything else in this plan is downstream of a choice that is effectively irreversible: controls, threat design, every level, and the art pipeline all inherit it, and this topic is the only one whose wrong answer would consume most of the available time to undo. It also depends on no other topic, so there is nothing to wait for. Settling it first converts the biggest budget risk into a fixed constraint the remaining steps can be planned against, rather than something discovered late."
+    },
+    {
+      "topic": "cozy_tense_contract",
+      "action": "Write a one-page contract, in the chosen perspective's terms, that states which feelings count as cozy and which as tense, where each is allowed to live (place and time of day), and the largest setback a run may inflict — then state the two boundary conditions explicitly: what would make it bleak and what would make it toothless. Make it a rule the later steps must obey, with any always-on pressure meter named as permitted or forbidden up front.",
+      "why": "This depends on nothing, so it could have come first, but it is cheap to settle and only becomes concrete once the perspective and the pressures are fixed. It comes before caching, pacing and scope because each of those gets more interesting as it gets harsher, and without a written constraint the contract will be eroded one reasonable decision at a time. Putting it here means later steps are judged against a standard that already exists."
+    },
+    {
+      "topic": "caching_and_memory_loop",
+      "action": "Prototype one small patch of forest with a handful of distinct landmarks and a few chunky cache sites, then test retrieval with the HUD and all markers switched off: can a player find what they buried, and what minimum support (diegetic marks, a capped number of them, cache contents tracked but not position) makes that possible without turning recall into a list to read. Decide and record which of navigation, recall or planning is the core verb, and what visible tell a lost cache must carry.",
+      "why": "The signature verb can only be designed once the space it happens in has a perspective, and it must be designed against the contract so that cache loss is drama rather than unfairness. It comes before pacing because the length and escalation of a winter are shaped by how many cache sites exist and how long retrieval takes. It is also the cheapest place to discover that the loop is bookkeeping rather than a game, which is the finding most likely to stop the project early and cheaply."
+    },
+    {
+      "topic": "winter_arc_pacing",
+      "action": "Lay out the season on paper as a day-by-day curve: total real minutes, number and length of days, whether an autumn phase exists and what its outcome visibly changes, what escalates besides scarcity, where recovery sits, what the ending state tells the player, and what a failure restarts. Then build only the scarcity peak — the hardest stretch — and play it with a hand-set starting stockpile, so the curve's worst case is testable before the phases that feed it exist.",
+      "why": "The arc can only be shaped once the retrieval loop's cost per excursion is known, because that is the unit the whole season is measured in. Building the peak rather than the opening comes here because the question the arc has to answer is whether difficulty rises or quietly falls away, and the only stretch that answers it is the one nothing else depends on. It must precede scope, since run length and restart cost set what a single playtest session can even observe."
+    },
+    {
+      "topic": "slice_scope_and_evidence",
+      "action": "Name the single riskiest assumption the slice exists to test, then write the slice definition around it: the smallest build that tests it with placeholder art, the hour budget for the three months with prototyping separated from content, the sustainable art and audio pipeline proven on an ordinary asset rather than a showpiece, the tester behaviours that count as a yes and as a no, where non-friend testers come from, scheduled checkpoints, and a stop condition agreed in advance.",
+      "why": "This is the decision the whole exercise is for, and it depends on all four earlier topics: the scope is bounded by the perspective's art cost, the contract's limits on harshness, the loop's shape, and the arc's length and restart rules. It comes last because a stop condition written before those are known would be unenforceable, and because the pass/fail signals must be phrased as observations of the specific loop that now exists rather than as general opinions about whether winter looks good."
+    }
+  ],
+  "dreams": [
+    {
+      "id": "d1",
+      "title": "A rehearsal for keeping something alive",
+      "what_if": "the cozy tense pairing were offered to people nursing something fragile through a hard season, as a rehearsal of vigilance that ends in spring",
+      "lens": "who-else",
+      "anchor": "cozy_tense_contract",
+      "takes": "a difficulty dial that never mocks the player for choosing warmth",
+      "verdict": "set-aside",
+      "reason": "Its only buildable take — a difficulty dial that never punishes choosing warmth — is already an open decision in the cozy/tense topic, so it re-frames who the game is for without settling anything the plan has not already put on the table.",
+      "if_adopted": "",
+      "pull": "low",
+      "reach": "medium",
+      "cost": "low",
+      "fit": "high",
+      "promoted_to": ""
+    },
+    {
+      "id": "d2",
+      "title": "You win by forgetting",
+      "what_if": "forgetting a cache were the point, each lost acorn becoming a sapling, so the score is the forest you leave rather than the belly you fill",
+      "lens": "the-opposite",
+      "anchor": "caching_and_memory_loop",
+      "takes": "an ending that shows spring growth, not survival statistics",
+      "verdict": "proposed",
+      "reason": "It turns the plan's most dangerous mechanic — cache loss reading as bleak or as paperwork — into the scoring axis, and supplies a candidate answer to the still-open question of what the ending state is, all inside 2D, single-player, one forest, one winter.",
+      "if_adopted": "The caching topic stops asking how retrieval should be tracked and starts asking which kinds of forgetting the player can read as consequence, while the winter arc has to establish a spring epilogue as the terminal state — so \"reach the thaw alive\" is no longer the win condition and an empty cache can no longer be defined as failure. The cozy/tense topic picks up a new open question: whether rewarding loss bleeds the tension out of scarcity, and what pressure replaces it.",
+      "pull": "high",
+      "reach": "high",
+      "cost": "medium",
+      "fit": "high",
+      "promoted_to": ""
+    },
+    {
+      "id": "d3",
+      "title": "Ten winters, one lineage, one forest",
+      "what_if": "one winter stretched into ten, played as a line of descendants, where the trees your grandparents forgot are the canopy you now climb and cache in",
+      "lens": "ten-times-bigger",
+      "anchor": "winter_arc_pacing",
+      "takes": "a forest that persists and ages between runs",
+      "verdict": "set-aside",
+      "reason": "It fights the stated one-forest-one-winter constraint head-on and adds cross-run persistence to a three-month solo budget, while the part worth keeping — forgotten caches becoming trees — is already carried by d2 at a fraction of the cost.",
+      "if_adopted": "",
+      "pull": "medium",
+      "reach": "high",
+      "cost": "high",
+      "fit": "low",
+      "promoted_to": ""
+    },
+    {
+      "id": "d4",
+      "title": "One night, one cache, five minutes",
+      "what_if": "the whole thing were a single freezing night with one buried acorn, no art beyond shapes, judged only by whether playtesters lower their voices",
+      "lens": "the-smallest-version",
+      "anchor": "slice_scope_and_evidence",
+      "takes": "a weekend build and six strangers watched, not surveyed",
+      "verdict": "proposed",
+      "reason": "It is the cheapest thing here that could actually move the stated goal, since it names a concrete build, a concrete observation, and a concrete population, and would be answerable before most of the horizon is spent; reach is only medium because the slice topic already contemplates an ugly prototype tested on strangers.",
+      "if_adopted": "The first step becomes a single-night build in placeholder shapes, which pushes the solo art and audio pipeline question out of the opening weeks and removes full-run length and difficulty escalation as things that must be settled before anything exists. It forces the side-on-versus-top-down decision to be made quickly and provisionally rather than reasoned out first, and it requires naming the observable behaviour that counts as a yes before the build starts, since stated opinions stop being the evidence.",
+      "pull": "high",
+      "reach": "medium",
+      "cost": "low",
+      "fit": "high",
+      "promoted_to": ""
+    },
+    {
+      "id": "d5",
+      "title": "The forest holds other real squirrels",
+      "what_if": "the single player wall came down and your caches sat in a forest strangers also dig in, so being watched replaces being hunted",
+      "lens": "remove-the-main-constraint",
+      "anchor": "prey_animal_verbs",
+      "takes": "asynchronous presence: tracks, raided holes, nobody online at once",
+      "verdict": "set-aside",
+      "reason": "Asynchronous presence is still other players, so it contradicts both the single-player constraint and the explicit multiplayer exclusion, and it adds a service to maintain that the horizon and the solo developer cannot absorb.",
+      "if_adopted": "",
+      "pull": "medium",
+      "reach": "high",
+      "cost": "high",
+      "fit": "low",
+      "promoted_to": ""
+    },
+    {
+      "id": "d6",
+      "title": "Body condition as a bedside chart",
+      "what_if": "hidden physiology were surfaced the way a bedside monitor does it, steady tones and a falling line, so the player reads the animal like a clinician",
+      "lens": "borrow-from-another-field",
+      "anchor": "simulation_versus_legibility",
+      "takes": "sound carrying the vitals so the screen stays a forest",
+      "verdict": "set-aside",
+      "reason": "It offers one concrete mechanism for a question the plan has left open in two topics at once — how body condition stays readable at a glance without covering the screen in meters — and is worth a look mainly so someone can rule on whether a clinical register fights the cozy side of the contract. A round proposes at most 3, and this was not among them.",
+      "if_adopted": "",
+      "pull": "medium",
+      "reach": "medium",
+      "cost": "medium",
+      "fit": "medium",
+      "promoted_to": ""
+    }
+  ],
+  "sources": [
+    {
+      "id": "s1",
+      "title": "Group Report: Coziness in Games: An Exploration of Safety, Softness, and Satisfied Needs",
+      "url": "https://www.projecthorseshoe.com/reports/featured/ph17r3.htm",
+      "fetched": true
+    },
+    {
+      "id": "s2",
+      "title": "Shelter - Review (Kritiqal)",
+      "url": "https://kritiqal.com/articles/2014/01/26/shelter-review",
+      "fetched": true
+    },
+    {
+      "id": "s3",
+      "title": "Review: Winter Burrow is a rare survival game that aims to be both cosy and stressful",
+      "url": "https://www.gosugamers.net/entertainment/news/77610-review-winter-burrow-is-a-rare-survival-game-that-aims-to-be-both-cosy-and-stressful",
+      "fetched": true
+    },
+    {
+      "id": "s4",
+      "title": "thatgamecompany's Designer on How Not to Get Lost in Game Using Cognitive Maps",
+      "url": "https://80.lv/articles/thatgamecompany-s-designer-on-how-not-to-get-lost-in-game-using-cognitive-maps?amp=1",
+      "fetched": true
+    },
+    {
+      "id": "s5",
+      "title": "Squirrels Chunk Their Buried Treasure - Scientific American",
+      "url": "https://www.scientificamerican.com/podcast/episode/squirrels-chunk-their-buried-treasure/",
+      "fetched": true
+    },
+    {
+      "id": "s6",
+      "title": "Winter - Don't Starve Wiki",
+      "url": "https://dontstarve.wiki.gg/wiki/Winter",
+      "fetched": true
+    },
+    {
+      "id": "s7",
+      "title": "How to Make Superb Survival Games",
+      "url": "https://www.gamedeveloper.com/game-platforms/how-to-make-superb-survival-games",
+      "fetched": true
+    },
+    {
+      "id": "s8",
+      "title": "Game modes | Basic information - The Flame in the Flood Guide",
+      "url": "https://www.gamepressure.com/theflameintheflood/game-modes/z28613",
+      "fetched": true
+    },
+    {
+      "id": "s9",
+      "title": "Shelter 2 review - Just Adventure",
+      "url": "https://www.justadventure.com/2015/03/31/shelter-2-review",
+      "fetched": true
+    },
+    {
+      "id": "s10",
+      "title": "Moving out early improves squirrels' odds of surviving winter, new study shows",
+      "url": "http://www.ualberta.ca/en/folio/2020/06/moving-out-early-improves-squirrels-odds-of-surviving-winter-new-study-shows.html",
+      "fetched": true
+    },
+    {
+      "id": "s11",
+      "title": "Eastern gray squirrel - Wikipedia",
+      "url": "https://en.wikipedia.org/wiki/Eastern_gray_squirrel",
+      "fetched": true
+    },
+    {
+      "id": "s12",
+      "title": "How many sprites do different perspectives need?",
+      "url": "https://cxong.github.io/2022/03/how-many-sprites-do-different-perspectives-need",
+      "fetched": true
+    },
+    {
+      "id": "s13",
+      "title": "Crafting the complex, chaotic ecosystem of Rain World",
+      "url": "https://www.gamedeveloper.com/design/crafting-the-complex-chaotic-ecosystem-of-i-rain-world-i-",
+      "fetched": true
+    },
+    {
+      "id": "s14",
+      "title": "Squirrel (Grey) - Winter — Better Planet Education factsheet",
+      "url": "https://betterplaneteducation.org.uk/factsheets/squirrel-grey-winter",
+      "fetched": true
+    },
+    {
+      "id": "s15",
+      "title": "The Ludic Fallacy: Why Realism Can Ruin Your Game Design — Wayline",
+      "url": "https://www.wayline.io/blog/ludic-fallacy-realism-game-design",
+      "fetched": true
+    },
+    {
+      "id": "s16",
+      "title": "Shelter 2 - Review | Kritiqal",
+      "url": "https://kritiqal.com/articles/2015/03/09/shelter-2-review",
+      "fetched": true
+    },
+    {
+      "id": "s17",
+      "title": "Inscrutable Games: How players respond to illegible or opaque game design — University XP",
+      "url": "https://www.universityxp.com/research/2024/2/4/inscrutable-games-how-players-respond-to-illegible-or-opaque-game-design",
+      "fetched": true
+    },
+    {
+      "id": "s18",
+      "title": "The Vertical Slice — Grumpy Gamer",
+      "url": "https://grumpygamer.com/vertical_slice",
+      "fetched": true
+    },
+    {
+      "id": "s19",
+      "title": "Shelter review: Badger over troubled water (Engadget)",
+      "url": "https://www.engadget.com/2013-08-28-shelter-review.html",
+      "fetched": true
+    },
+    {
+      "id": "s20",
+      "title": "What Early Playtesting Reveals: Lessons from Astro Burn",
+      "url": "https://gdevelop.io/blog/early-playtesting-lessons-from-astro-burn",
+      "fetched": true
+    },
+    {
+      "id": "s21",
+      "title": "When to Abandon a Game Project",
+      "url": "https://bugnet.io/blog/when-to-abandon-a-game-project",
+      "fetched": true
+    },
+    {
+      "id": "s22",
+      "title": "How Long Does It Take To Make An Indie Game?",
+      "url": "https://www.gamedeveloper.com/business/how-long-does-it-take-to-make-an-indie-game-",
+      "fetched": true
+    }
+  ],
+  "research": [
+    {
+      "topic": "cozy_tense_contract",
+      "state": "researched",
+      "failure": "",
+      "transcript": "cozy_tense_contract.jsonl",
+      "sha256": "3f92e0df6195ab2c075ffe41a953eebc1b12fdd70858024e466aae6f77e5a2a8",
+      "fetches": [
+        {
+          "url": "https://medium.com/kitfox-games/designing-for-coziness-d33d2519a59e",
+          "usable": false,
+          "why": "HTTP 403"
+        },
+        {
+          "url": "https://kritiqal.com/articles/2014/01/26/shelter-review",
+          "usable": true,
+          "why": ""
+        },
+        {
+          "url": "https://www.projecthorseshoe.com/reports/featured/ph17r3.htm",
+          "usable": true,
+          "why": ""
+        },
+        {
+          "url": "https://www.pcgamer.com/how-survival-games-get-hunger-and-thirst-wrong-and-how-to-fix-it",
+          "usable": true,
+          "why": ""
+        },
+        {
+          "url": "https://www.gosugamers.net/entertainment/news/77610-review-winter-burrow-is-a-rare-survival-game-that-aims-to-be-both-cosy-and-stressful",
+          "usable": true,
+          "why": ""
+        },
+        {
+          "url": "https://www.pcgamer.com/uk/how-survival-games-get-hunger-and-thirst-wrong-and-how-to-fix-it",
+          "usable": true,
+          "why": ""
+        }
+      ],
+      "unfetched": []
+    },
+    {
+      "topic": "caching_and_memory_loop",
+      "state": "researched",
+      "failure": "",
+      "transcript": "caching_and_memory_loop.jsonl",
+      "sha256": "d26a2241839f431627a6d7ca1f041b741d5b21e29b4e4e69ba97a4adfc879e66",
+      "fetches": [
+        {
+          "url": "https://80.lv/articles/thatgamecompany-s-designer-on-how-not-to-get-lost-in-game-using-cognitive-maps?amp=1",
+          "usable": true,
+          "why": ""
+        },
+        {
+          "url": "https://jacobs.berkeley.edu/wp-content/uploads/2020/09/Delgado-Jacobs-2019.pdf",
+          "usable": true,
+          "why": ""
+        },
+        {
+          "url": "https://www.pcgamer.com/outwards-useless-map-is-its-best-feature",
+          "usable": true,
+          "why": ""
+        },
+        {
+          "url": "https://www.gosugamers.net/entertainment/news/77610-review-winter-burrow-is-a-rare-survival-game-that-aims-to-be-both-cosy-and-stressful",
+          "usable": true,
+          "why": ""
+        },
+        {
+          "url": "https://www.scientificamerican.com/podcast/episode/squirrels-chunk-their-buried-treasure/",
+          "usable": true,
+          "why": ""
+        }
+      ],
+      "unfetched": []
+    },
+    {
+      "topic": "winter_arc_pacing",
+      "state": "researched",
+      "failure": "",
+      "transcript": "winter_arc_pacing.jsonl",
+      "sha256": "5a138d830bb10c2b96c3d7ad772396c8374812896a9af4c5a5ab4d614384f2ba",
+      "fetches": [
+        {
+          "url": "https://www.ualberta.ca/folio/2020/06/moving-out-early-improves-squirrels-odds-of-surviving-winter-new-study-shows.html",
+          "usable": false,
+          "why": "HTTP 301"
+        },
+        {
+          "url": "https://www.gamepressure.com/theflameintheflood/game-modes/z28613",
+          "usable": true,
+          "why": ""
+        },
+        {
+          "url": "https://dontstarve.wiki.gg/wiki/Winter",
+          "usable": true,
+          "why": ""
+        },
+        {
+          "url": "https://gamedev.net/news/resource-management-survival-games-are-about-time-management-r3987/",
+          "usable": false,
+          "why": "HTTP 403"
+        },
+        {
+          "url": "http://www.ualberta.ca/en/folio/2020/06/moving-out-early-improves-squirrels-odds-of-surviving-winter-new-study-shows.html",
+          "usable": true,
+          "why": ""
+        },
+        {
+          "url": "https://www.justadventure.com/2015/03/31/shelter-2-review",
+          "usable": true,
+          "why": ""
+        },
+        {
+          "url": "https://www.gamedeveloper.com/game-platforms/how-to-make-superb-survival-games",
+          "usable": true,
+          "why": ""
+        }
+      ],
+      "unfetched": []
+    },
+    {
+      "topic": "prey_animal_verbs",
+      "state": "researched",
+      "failure": "",
+      "transcript": "prey_animal_verbs.jsonl",
+      "sha256": "293497c3b5d72cf39cfcb61b0398e38622fbdfbd31579d10590f1d2b2540c52f",
+      "fetches": [
+        {
+          "url": "https://cxong.github.io/2022/03/how-many-sprites-do-different-perspectives-need",
+          "usable": true,
+          "why": ""
+        },
+        {
+          "url": "https://www.gamesradar.com/games/survival/winter-burrow-is-like-a-very-cozy-laid-back-dont-starve-with-a-bittersweet-edge-that-tugs-at-the-heartstrings",
+          "usable": true,
+          "why": ""
+        },
+        {
+          "url": "https://www.gamedeveloper.com/design/crafting-the-complex-chaotic-ecosystem-of-i-rain-world-i-",
+          "usable": true,
+          "why": ""
+        },
+        {
+          "url": "https://en.wikipedia.org/wiki/Eastern_gray_squirrel",
+          "usable": true,
+          "why": ""
+        },
+        {
+          "url": "https://store.steampowered.com/app/1973520/Winter_Burrow/",
+          "usable": true,
+          "why": ""
+        }
+      ],
+      "unfetched": []
+    },
+    {
+      "topic": "simulation_versus_legibility",
+      "state": "researched",
+      "failure": "",
+      "transcript": "simulation_versus_legibility.jsonl",
+      "sha256": "6cb01eb65b02b94181e74b5811a88339d84a06e615fdc77c7bccf6f2c26d3f21",
+      "fetches": [
+        {
+          "url": "https://betterplaneteducation.org.uk/factsheets/squirrel-grey/winter",
+          "usable": false,
+          "why": "HTTP 404"
+        },
+        {
+          "url": "https://www.universityxp.com/research/2024/2/4/inscrutable-games-how-players-respond-to-illegible-or-opaque-game-design",
+          "usable": true,
+          "why": ""
+        },
+        {
+          "url": "https://jacobs.berkeley.edu/wp-content/uploads/2022/12/Delgado-2017-Roy-Soc-Open-Sci.pdf",
+          "usable": true,
+          "why": ""
+        },
+        {
+          "url": "https://www.wayline.io/blog/ludic-fallacy-realism-game-design",
+          "usable": true,
+          "why": ""
+        },
+        {
+          "url": "https://kritiqal.com/articles/2015/03/09/shelter-2-review",
+          "usable": true,
+          "why": ""
+        },
+        {
+          "url": "https://www.ypte.org.uk/factsheets/squirrel-grey/winter",
+          "usable": false,
+          "why": "HTTP 301"
+        },
+        {
+          "url": "https://escholarship.org/uc/item/1d23x2mk",
+          "usable": false,
+          "why": "nothing came back"
+        },
+        {
+          "url": "https://betterplaneteducation.org.uk/factsheets/squirrel-grey-winter",
+          "usable": true,
+          "why": ""
+        }
+      ],
+      "unfetched": []
+    },
+    {
+      "topic": "slice_scope_and_evidence",
+      "state": "researched",
+      "failure": "",
+      "transcript": "slice_scope_and_evidence.jsonl",
+      "sha256": "88f2c4407ba7f0b0696197810cf2a1a75952a75428afcb3d769211c121e791ec",
+      "fetches": [
+        {
+          "url": "https://grumpygamer.com/vertical_slice",
+          "usable": true,
+          "why": ""
+        },
+        {
+          "url": "https://gdevelop.io/blog/early-playtesting-lessons-from-astro-burn",
+          "usable": true,
+          "why": ""
+        },
+        {
+          "url": "https://www.engadget.com/2013-08-28-shelter-review.html",
+          "usable": true,
+          "why": ""
+        },
+        {
+          "url": "https://www.gamedeveloper.com/business/how-long-does-it-take-to-make-an-indie-game-",
+          "usable": true,
+          "why": ""
+        },
+        {
+          "url": "https://bugnet.io/blog/when-to-abandon-a-game-project",
+          "usable": true,
+          "why": ""
+        }
+      ],
+      "unfetched": []
+    }
+  ]
+}

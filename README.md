@@ -122,7 +122,14 @@ run `docker compose down -v` in its folder, then delete the folder by hand.
 | `proto prune` | forget entries whose folder is gone, and prototypes an older version made |
 | `proto doctor` | why it will not work here |
 
-Useful flags on `plan`: `--direction` (scope, emphasis, constraints), `--depth`
+The idea is one sentence, and an optional brief beside it is yours to state: `--goal`,
+`--for` (the audience), `--horizon`, `--must` (a constraint, repeatable) and `--not`
+(out of scope, repeatable). What you state is kept as written, and the model fills only
+what you left blank. Run `proto plan` with no idea at a terminal and it asks for each.
+[`docs/examples/squirrel-survival.md`](docs/examples/squirrel-survival.md) is a full
+run with every field filled in, read end to end.
+
+Other useful flags on `plan`: `--direction` (free-text steer), `--depth`
 (`shallow`, `standard` or `deep`: 4, 6 or 8 topics, and how many findings and pages
 research gives each), `--dir`, `--backend`, `--offline` (no API calls, see below),
 `--yes` (skip the questions and the review), `--no-research` (a plan in a minute or two,
@@ -130,7 +137,7 @@ stamped *Not researched*), `--no-dream` (skip dreaming; `proto dream` can start 
 later). [`docs/CLI.md`](docs/CLI.md#proto-plan) has every flag.
 
 Off a terminal, `--yes` is required, so a script is refused rather than left waiting.
-Run on a folder that already holds a plan for the same idea and direction, it redraws
+Run on a folder that already holds a plan for the same idea, direction and brief, it redraws
 the pages and checks the plan again with no model call, and exits 1 if the plan is red.
 
 **Rendered pages are not for editing.** The plan is stored as data in the folder, every

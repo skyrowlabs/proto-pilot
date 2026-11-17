@@ -113,7 +113,19 @@ commit is a change in that repo, under its own rules.
 
 ### Dogfood record
 
-_Empty until Phase 1 runs._
+**Run 0 — squirrel survival game, 2026-11-16 (agent-run; does not count toward the three).**
+Not one of the ideas this phase names, and run by an agent with `--yes`, so nobody
+answered scope's questions or reviewed the outline. It is recorded because it is the
+first committed real run: [walkthrough](../examples/squirrel-survival.md),
+[tree](../examples/squirrel_survival/PLAN.md).
+
+- Wall time: about 17 minutes from outline to written tree; research took 96–127 s a topic.
+- Topics: 6 researched, 0 failed, 0 with nothing cited; 22 sources; green, exit 0.
+- Agent's observations, which are not the operator's read: steps render as 150–200-word
+  paragraphs; no step returns to an open question; an **Assumption:** line names a
+  checkable product fact; the scope pass echoed `--not` into constraints (fixed in the same
+  change); transcripts fingerprint the machine (#51).
+- Operator's five lines: _open — Jeston's to write._
 
 ## Phase 2 — Revise a plan after it is made
 
