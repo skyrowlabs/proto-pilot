@@ -124,7 +124,7 @@ first committed real run: [walkthrough](../examples/squirrel-survival.md),
 - Agent's observations, which are not the operator's read: steps render as 150–200-word
   paragraphs; no step returns to an open question; an **Assumption:** line names a
   checkable product fact; the scope pass echoed `--not` into constraints (fixed in the same
-  change); transcripts fingerprint the machine (#51).
+  change; 0 of 5 live samples echoed it afterwards); transcripts fingerprint the machine (#51).
 - Operator's five lines: _open — Jeston's to write._
 
 ## Phase 2 — Revise a plan after it is made

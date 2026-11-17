@@ -118,8 +118,12 @@ asks for. That read is a person's, and it is still open in the *Dogfood record*.
 
 1. **Fixed in this change:** the scope model restated every `--not` item as a
    constraint, so each appeared twice. The scope prompt now names out-of-scope
-   items as already recorded. That is a prompt fix with no deterministic guard,
-   so a later run should confirm it holds.
+   items as already recorded. **Checked 2026-11-16:** with the fixed prompt and
+   the same brief, 0 of 5 live samples restated a `--not` item (four calls of
+   the scope pass alone and one full `--no-research` run). In all five the model
+   added no constraints of its own and returned only questions. It is still a
+   prompt fix with no deterministic guard, so five clean samples make it likely,
+   not certain.
 2. **The steps are walls of text.** Each *Where to start* entry runs 150–200
    words, because the action and its reason render as one paragraph. A reader
    wants the action first and short.
