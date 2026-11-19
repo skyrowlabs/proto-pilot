@@ -127,6 +127,26 @@ first committed real run: [walkthrough](../examples/squirrel-survival.md),
   change; 0 of 5 live samples echoed it afterwards); transcripts fingerprint the machine (#51).
 - Operator's five lines: _open — Jeston's to write._
 
+**Run 1 — The Home Kitchen, a takeout restaurant in Peoria, IL, 2026-11-18 (agent-run, `--yes`; the not-software idea).**
+Idea and brief supplied by a person deciding about it; run by an agent, so scope's
+questions and the outline review were skipped. The tree is kept outside this repo, in
+the local, unpublished `alice-ideas` checkout beside it, transcripts included; nothing
+is committed here.
+
+- Command: the idea plus `--goal "create a business plan for opening the restaurant"`,
+  `--for`, four `--must` (lunch and dinner hours, online ordering only, 100% takeout,
+  the name), `--depth standard --backend claude-code -y`. No `--horizon`, no `--not`.
+- Wall time: not measured end to end; research took about 11 minutes, 102–123 s a topic.
+- Topics: 6 researched, 0 failed, 0 with nothing cited; 21 sources, 8 fetches unusable; green, exit 0.
+- Agent's observations, which are not the operator's read: the goal asked for a business
+  plan and the run wrote a plan *for* one (findings, unknowns, decisions; no projections
+  or summary to hand over), which is Phase 3's question, met on a real goal; a blank
+  `--horizon` stayed *Not established* though `--help` says the model proposes (#52); a
+  finding from two pages credits one (#53); one page under a redirecting URL became two
+  sources (#54); dream d5's dinner "simply arrives" reads as delivery against the takeout
+  `--must`, and was proposed anyway; open questions again went unanswered by any step.
+- Operator's five lines: _open — Jeston's to write._
+
 ## Phase 2 — Revise a plan after it is made
 
 **Problem.** See the first four bullets of *Problem*.
