@@ -1,6 +1,6 @@
 ---
 commit_range: v0.3.0..HEAD
-generated: "2026-11-15T04:01:57Z"
+generated: "2026-11-22T04:01:42Z"
 previous_release: v0.3.0
 release: unreleased
 status: in-flight
@@ -8,27 +8,28 @@ status: in-flight
 
 # Repository Report
 
-> **Window:** unreleased (since v0.3.0) — `v0.3.0..HEAD` (81 commits, at `97c4fb3`)
+> **Window:** unreleased (since v0.3.0) — `v0.3.0..HEAD` (89 commits, at `8b727f2`)
 
 Nothing in this window is in production. All of it is on `develop` and waits for
-the release after v0.3.0. That release will remove fourteen commands (`bb5058b`).
+the release after v0.3.0. That release removes fourteen commands (`bb5058b`) and
+adds the brief flags to `proto plan` (`dbfd81b`).
 
 ## Metrics
 
 | Figure | Value |
 | ------ | ----- |
-| Commits | 81 |
-| By type | docs 22 · chore 15 · fix 13 · test 5 · feat 5 · build 1 · refactor 1 (the other 19 have no conventional type: merge commits) |
+| Commits | 89 |
+| By type | docs 27 · chore 15 · fix 13 · feat 7 · test 5 · build 1 · refactor 1 (the other 20 have no conventional type; `git log --merges` counts 20 merge commits) |
 | Captures this job filed and still open (`finding_count`) | 0 |
 | Holding tank | 1 plan, `planned`; ready queue empty; nothing awaiting review |
 
 Most-changed files, by number of commits touching them:
-`docs/todo_index.json` 16, `.skeletor.json` 13, `docs/ARCHITECTURE.md` 11; then 8
-each for `docs/assets/skeletor-version.svg`, `docs/CLI.md` and
-`docs/TODO/remove-prototyping.md`; then 7 each for `protopilot/plan/pipeline.py`
-and `docs/TODO/plan-prototypes.md`; then 6 each for `AGENTS.md`,
-`scripts/reporting/jobs.py`, `protopilot/cli.py` and `README.md`. The collected
-data has no line counts, coverage or test results, so this report gives none.
+`docs/todo_index.json` 16, `docs/ARCHITECTURE.md` 13, `.skeletor.json` 13,
+`docs/CLI.md` 9; then 8 each for `docs/TODO/living-plans.md`,
+`protopilot/plan/pipeline.py`, `docs/assets/skeletor-version.svg` and
+`docs/TODO/remove-prototyping.md`; then 7 each for `AGENTS.md`, `README.md`,
+`protopilot/cli.py` and `docs/TODO/plan-prototypes.md`. The collected data has no
+line counts, coverage or test results, so this report gives none.
 
 ## What changed
 
@@ -37,113 +38,114 @@ The window finished two plans:
 (`29631a0`) and
 [Remove Prototyping](../../implementations/spec/remove-prototyping.md) (`9c8acba`).
 
+**The brief (`protopilot/cli.py`, `protopilot/plan/`)** — new since the last edition
+- `dbfd81b` adds `--goal`, `--for`, `--horizon`, `--must` and `--not` to
+  `proto plan` (`protopilot/cli.py:173`, `:231`). With no idea at a terminal it
+  asks for each in turn (`:117`).
+- The brief is a model of its own (`protopilot/plan/model.py:109`). Scope fills
+  only the blanks and puts each stated field back over what it returned
+  (`protopilot/plan/passes/scope.py:88-96`).
+- The brief is part of a plan's identity: a rerun with another brief is refused
+  (`protopilot/plan/pipeline.py:84-86`, `:133`). An empty brief is left out of
+  `plan.json` (`protopilot/plan/model.py:306`), so existing trees and the offline
+  golden do not change. Tests: `tests/test_plan_brief.py`.
+
+**Where to start (`protopilot/plan/passes/start.py`, `render.py`)** — new since the last edition
+- `9ee1427` caps each step at 30 words of action and 25 of reason
+  (`protopilot/plan/model.py:55`). The schema pattern applies only to a plan with
+  no steps yet (`protopilot/plan/passes/start.py:55-64`). Repair asks for the cap
+  in its prompt and does not enforce it. `PLAN.md` puts the reason on its own
+  *Why here* line (`protopilot/plan/render.py:145`), so
+  `tests/golden/plan_offline_manifest.json` was re-recorded.
+
+**Worked example and dogfood runs (`docs/examples/`, `docs/TODO/living-plans.md`)** — new since the last edition
+- `f3ecf83` commits a researched `--depth standard` run as the first worked
+  example: [walkthrough](../../examples/squirrel-survival.md) and tree
+  `docs/examples/squirrel_survival/`. Its research transcripts are left out
+  because of #51. `d5af86f` and `9b11b1d` record what changed after that run.
+- `8b727f2` records the Home Kitchen run as Run 1 (`docs/TODO/living-plans.md:130-148`).
+  It filed #52, #53 and #54. Its tree is kept outside this repo.
+
 **Prototyping removed (`protopilot/`, `pyproject.toml`)** — merged in `bd35ef6`
 - `bb5058b` (`feat(cli)!`) deletes the generator, both targets, both front ends,
   the skeleton and their tests. `proto new`, `add`, `spec`, `up`, `down`, `reset`,
   `logs`, `test`, `export`, `gc`, `console`, `serve`, `archetypes` and `targets`
-  are gone. The surviving verbs are listed at `protopilot/cli.py:5`. The tag
+  are gone. The surviving verbs are listed at `protopilot/cli.py:3-6`. The tag
   `prototyping-final` holds the last tree that has them.
-- Old registry rows are kept, listed as `old`, and dropped only by `proto prune`
-  (`protopilot/registry.py:26-32`, `:181`). `proto rm` refuses them
-  (`protopilot/cli.py:28-30`).
-- `4512671` drops the dependencies that only generated apps used: sqlalchemy,
-  textual, and the browser and web extras. `86249a7` moves `PLAN_DIR`, `SLUG_RE`
-  and `VerifyResult` into `protopilot/plan`, with no change in behaviour.
-- Tests: `a4e58a6` covers what the removal left untested. `334ae77` and `a4e58a6`
-  re-record the coverage baseline over the code that remains.
-- The two prototype designs went to `docs/implementations/dropped/` (`6f3eded`).
-  README and docs now describe planning as the whole product (`ad93437`).
+- Old registry rows are kept and listed as `old` (`protopilot/registry.py:32`).
+  Only `proto prune` drops them (`:181`).
+- `4512671` drops the dependencies only generated apps used. `86249a7` moves
+  `PLAN_DIR`, `SLUG_RE` and `VerifyResult` into `protopilot/plan`. `a4e58a6`
+  and `334ae77` add tests for what the removal left uncovered and re-record the
+  coverage baseline. `6f3eded` and `ad93437` move the designs and docs over.
 
-**Research: the call (`protopilot/llm.py`)**
+**Research (`protopilot/llm.py`, `protopilot/plan/`)**
 - The research call joined the `LLM` protocol (`protopilot/llm.py:63`). The CLI
-  backend allows web tools only (`:253`) — `fa439ef`. The API backend refuses it
-  with a message (`:172-174`).
-- A stream is refused if its init event is missing or lists anything other than
-  the research tools (`6e7e529`), or if the session used a tool that is not a web
-  tool (`c66db5e`); see `research_result`, `:293-319`.
-
-**Research: the pass and the ledger (`protopilot/plan/`)**
-- `bb62291` makes one call per topic, resumable from `.protopilot/research/`. Its
-  ledger of fetches feeds `sources.md` and the verifier. `97f01b8` gives `connect`,
-  `consider` and `start` the findings.
-- Fixes: the research state of each topic is now rebuilt from its own transcript
-  (`71206ba`); the pipeline guards a resume as well as the command (`a464aff`);
-  findings past the depth's count are refused (`f07f350`); page-derived text is
-  escaped (`a3022f4`, `59507c8`); sources are listed by number (`ff1d644`); dream
-  verbs read the reconciled plan (`e930533`). Tests: `450225e`, `feeb62e`.
+  backend allows only the web tools (`:254`), and the API backend refuses
+  (`:172-174`), per `fa439ef`. `6e7e529` and `c66db5e` reject streams that used
+  other tools (`research_result`, `:293`).
+- `bb62291` makes one resumable call per topic. Its ledger feeds `sources.md`
+  and the verifier. `97f01b8` passes the findings to `connect`, `consider` and
+  `start`. The fixes are `71206ba`, `a464aff`, `f07f350`, `a3022f4`,
+  `59507c8`, `ff1d644` and `e930533`, with tests in `450225e` and `feeb62e`.
 
 **Plans in the registry (`protopilot/registry.py`, `cli.py`)**
-- `2c0dda7`: `proto ls` lists plan trees. `21fa97f`: a plan whose render is
-  blocked after saving is still registered. `4d53ba8`: the registry guards kinds,
-  slugs and unsafe roots, and serialises writers with `flock` (now
-  `protopilot/registry.py:128`, unsafe-delete guard `:210-211`). The console and
-  app-verb changes in `39f9168`, `c6e2a97` and `969342e` were deleted by `bb5058b`.
+- `2c0dda7` makes `proto ls` list plan trees, and `21fa97f` registers a plan whose
+  render was blocked. `4d53ba8` adds the guards and `flock` writers
+  (`protopilot/registry.py:128-141`, unsafe-delete guard `:210-211`).
 
-**Planning docs**
-- `247f4ae` adds the [living-plans](../../TODO/living-plans.md) spec. `2c21368`
-  and `c95170d` record the owner's rulings on its open questions.
+**Skeletor (`.skeletor.json` v0.81.1 → v0.88.0)**: twelve upgrades, listed in the
+previous edition. Nothing has changed since `97c4fb3`.
 
-**Skeletor (`.skeletor.json` v0.81.1 → v0.88.0)** — twelve upgrades: `a03f0de`,
-`78825df`, `1640d0e`, `73d51ab`, `e3751fa`, `2e17f22`, `9529342`/`8fa9b2b`,
-`3f55fbf`, `8ed46ed`, `6291350`, `cc531c0`.
-- The v0.88.0 apply conflicted in `tests/cli_smoke_allowlist.yaml` and was ported
-  by hand. `bb9e0eb` then recorded v0.88.0 as the base.
-- `e3751fa` (v0.81.7) adds the skeletor version badge
-  (`docs/assets/skeletor-version.svg`).
-- From the v0.81.x upgrades, still true at HEAD: report runs that exit 0 without
-  a commit are recorded as failed. Coverage data lives at `tmp/.coverage`.
-
-**Reporting (`scripts/reporting/jobs.py`)**
-- `f0761d9` adds this job to `AUTO_PUSH` (`scripts/reporting/jobs.py:379`). Its
-  report commit is now published through an auto-merging pull request.
+**Reporting (`scripts/reporting/jobs.py`)**: `f0761d9` puts this job in
+`AUTO_PUSH` (`scripts/reporting/jobs.py:379`).
 
 ## Risks
 
 1. **The next release breaks every v0.3.0 user of the app verbs.** Fourteen
-   commands are removed outright (`bb5058b`). `protopilot/cli.py` has no message
-   for a removed verb; the only notice is `OLD_ROWS` (`:29`), which `proto ls`
-   prints. Their registry rows survive as `old`
-   (`protopilot/registry.py:32`). The 0.3.0 registry test is ticked
-   (`docs/implementations/spec/remove-prototyping.md:420`). The spec's last check,
-   CI green on `develop` at the merge SHA, is still unticked (`:426`). **Not
-   filed:** the release notes are the release skill's job, and that check is an
-   observation, not work.
-2. **This report now lands on `develop` without a person reading it**
-   (`scripts/reporting/jobs.py:379`). A wrong figure or a stale `path:line` would
-   be merged by the runner, not caught at review. The gate below does not catch
-   this either (risk 5).
-3. **The research pass has been run live once:** the bakery idea at
-   `--depth shallow` on `claude-code`
-   (`docs/implementations/spec/plan-prototypes.md:236`). Every other test pins
-   behaviour against fakes. `standard` and `deep` have no live run on record.
-   **Not filed:** judging a run is a person's reading, not a task.
-4. **Whether a fetch is "usable" is a guess built on an undocumented CLI field.**
-   The ledger reads `code` and `bytes` from `tool_use_result`
-   (`protopilot/plan/ledger.py:66`, `:95`) only when a message holds one result
-   (`:97`), plus text patterns (`:32-43`). If the Claude CLI changes its stream
-   shape, fetches will be misjudged and nothing will fail loudly. **Not filed:**
-   only a live call tests this, and this job cannot write acceptance criteria that
-   pass without network access.
-5. **The anchor check still does not see a stale window or a stale body.**
-   `check()` (`scripts/docs/release_window.py:177-199`) checks that the fields and
-   the Window line exist, not that they match `git`. Still true at `97c4fb3`. The
-   code is template-owned, so the fix belongs in skeletor. **Not filed.** This
-   run did not check skeletor's current template for the same gap.
-6. **On the API backend, every plan comes out Not researched**
-   (`protopilot/llm.py:172-174`). API research is still deferred
-   (`docs/implementations/spec/plan-prototypes.md:144`, `:217`). This is intended,
-   but the two backends make different products.
+   commands are removed outright (`bb5058b`). The only notice is `OLD_ROWS`
+   (`protopilot/cli.py:37`), and only `proto ls` prints it (`:447`). The spec's
+   CI-at-merge-SHA check is still unticked
+   (`docs/implementations/spec/remove-prototyping.md:426`). **Not filed:** release
+   notes belong to the release skill.
+2. **`--not` is held by a prompt alone.** `scope.apply` merges the model's
+   constraints without dropping any that restate an out-of-scope item
+   (`protopilot/plan/passes/scope.py:96`). Five clean live samples are the only
+   evidence (`docs/examples/squirrel-survival.md:119-126`). In Run 1 a dream
+   contradicted a `--must` and was still proposed
+   (`docs/TODO/living-plans.md:146-147`). **Not filed:** the walkthrough chose to
+   leave it as a prompt fix, so adding a guard is a decision, not a task.
+3. **The step cap holds only where the backend honours schema patterns.** It
+   applies only to a plan with no steps, and repair only asks for it
+   (`protopilot/plan/passes/start.py:55-64`, `protopilot/plan/passes/repair.py:44-46`).
+   An over-long step still lands, which the commit says is intended (`9ee1427`).
+4. **The committed example tree breaks if someone re-renders it in place.** It goes
+   red at `sources_fetched` and exits 1, because its transcripts are absent
+   (`docs/examples/squirrel-survival.md:154-158`). Only that prose warns against
+   it.
+5. **This report lands on `develop` without a person reading it**
+   (`scripts/reporting/jobs.py:379`), and the anchor check
+   (`scripts/docs/release_window.py:177-199`) still verifies only that the fields
+   exist. It does not check that they match `git`. The check is template-owned.
+   **Not filed:** the fix belongs in skeletor.
+6. **Live research coverage is still thin.** There are three runs on record:
+   bakery at `shallow` (`docs/implementations/spec/plan-prototypes.md:236`), and
+   the squirrel and Home Kitchen runs at `standard`
+   (`docs/TODO/living-plans.md:116-148`). All three used `claude-code`. `deep`
+   has never been run live. The ledger still judges a fetch from undocumented CLI
+   fields (`protopilot/plan/ledger.py:66`, `:95-97`). Run 1 had 8 unusable fetches
+   (`docs/TODO/living-plans.md:140`). On the API backend every plan comes out
+   *Not researched* (`protopilot/llm.py:172-174`). **Not filed:** these need live
+   calls or a person's reading.
 
 ## What is unfinished
 
-1. [Living Plans](../../TODO/living-plans.md) — `planned`, not ready, 28 open
-   tasks. Its Phase 1 is a person's reading, and the findings may reorder the rest
-   (`docs/TODO/living-plans.md:19-20`).
+1. [Living Plans](../../TODO/living-plans.md) is `planned`, not ready, with 35
+   unchecked boxes. Phase 1 has two agent-run records (Run 0 and Run 1), and
+   neither counts toward the three operator runs. Both still have the
+   operator's five lines open (`docs/TODO/living-plans.md:128`, `:148`).
 
-Deferred items from the filed plans that are not in the tank: API research
+Open outside the tank: GitHub issues #48, #49, #51, #52, #53 and #54. Two deferred
+items from filed plans are also open: API research
 (`docs/implementations/spec/plan-prototypes.md:144`, `:217`) and the CI check
-after the removal merged (`docs/implementations/spec/remove-prototyping.md:426`).
-The deferred `proto new --from-plan` (`plan-prototypes.md:255`) and the
-Improvement Loop handoff (`:257`) both depended on prototyping, so the removal
-made them moot. My reading, not a ruling: Living Plans' handoff brief is the
-nearest thing to a replacement.
+after the removal (`docs/implementations/spec/remove-prototyping.md:426`).
