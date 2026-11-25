@@ -137,7 +137,8 @@ one model value in a file name is a topic slug, which `model.py` checks, and
   finding an assumption, its URL kept as
   `unfetched` for `sources.md`. `ledger.normal` matches URLs without a fragment or
   trailing slash, and keeps http/https, `www.` and `:443` apart, which errs toward an
-  assumption. `WebFetch` returns a model's summary of a page, so a citation shows that
+  assumption. A redirect is not knowable: `WebFetch` follows a same-host one and records
+  only the URL asked for, so two URLs for one page stay two sources (#54). `WebFetch` returns a model's summary of a page, so a citation shows that
   summary was read, never that the claim is in the source, and the green line says so.
 - **The ledger is redrawn from transcripts, so a hand edit cannot upgrade it.** Each
   topic's raw stream lands in `.protopilot/research/<slug>.jsonl`, and its sha256 in
