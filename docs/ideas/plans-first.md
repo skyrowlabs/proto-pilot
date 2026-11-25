@@ -1,6 +1,6 @@
 # Plans first — the pivot to architectural planning
 
-> **Status: a direction, decided.** Jeston, 2026-11-06. It supersedes decision 1
+> **Status: a direction, decided.** 2026-11-06. It supersedes decision 1
 > of [sketches-not-scaffolds](sketches-not-scaffolds.md). The plan that builds it
 > is [`plan-prototypes`](../implementations/spec/plan-prototypes.md); this doc holds the argument
 > and the plan holds the phases.
@@ -11,7 +11,7 @@
    what the tool is for: research, topics and how they connect, things to consider,
    where to start, and extensions of the idea.
 2. ~~Physical prototyping is tabled, not deleted.~~ **Superseded 2026-11-11.**
-   Jeston ruled that the physical prototyping layer is removed outright and the
+   It was decided that the physical prototyping layer is removed outright and the
    written plan is featured: the generator, both targets and both front ends left
    the tree, and the CLI is `plan`, `dream`, `ls`, `rm`, `prune` and `doctor`.
    The plan that did it is

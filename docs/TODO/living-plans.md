@@ -17,7 +17,7 @@ summary: "Let a plan be revised, tested and handed off after it is made: answer 
 > **Depends on**: [`remove-prototyping.md`](../implementations/spec/remove-prototyping.md) — every phase here edits `protopilot/cli.py` and `registry.py`, which that plan rewrites
 
 Not `ready`: Phase 1 is a person's reading, and its findings may reorder or cut
-the rest. Each later phase also lists questions only Jeston can answer.
+the rest. Each later phase also lists questions only the maintainer can answer.
 
 The slug is not `plan-depth` because `--depth` already means topic count
 (`model.TOPIC_COUNTS`), and this plan is about a plan's life after it is made.
@@ -87,7 +87,7 @@ maturing, no code).
 - [ ] `proto plan` with research, `--depth standard`, on house.fly's idea, from
       a sentence and a direction written without opening its notes (~operator)
 - [ ] The same for Node Zero (~operator)
-- [ ] One to three more: one idea that is not software, and one Jeston already
+- [ ] One to three more: one idea that is not software, and one the maintainer already
       knows well enough to catch a wrong finding (~operator)
 - [ ] For each run, record under *Dogfood record* below: wall time, topics
       researched / failed / nothing cited, and the operator's read in five
@@ -105,11 +105,11 @@ maturing, no code).
 five lines, and the phase order below carries a sentence saying which run put
 each phase where it is.
 
-**Ruled by Jeston, 2026-11-11:** house.fly's and Node Zero's ideas may go
+**Decided 2026-11-11:** house.fly's and Node Zero's ideas may go
 through the model, and the resulting plans may be committed to those repos. Each
 commit is a change in that repo, under its own rules.
 
-**Ruled by Jeston, 2026-11-11:** three runs first, then decide whether two more are worth it.
+**Decided 2026-11-11:** three runs first, then decide whether two more are worth it.
 
 ### Dogfood record
 
@@ -125,17 +125,16 @@ first committed real run: [walkthrough](../examples/squirrel-survival.md),
   paragraphs (since capped at 30 + 25 words, with the reason on its own line); no step returns to an open question; an **Assumption:** line names a
   checkable product fact; the scope pass echoed `--not` into constraints (fixed in the same
   change; 0 of 5 live samples echoed it afterwards); transcripts fingerprint the machine (#51).
-- Operator's five lines: _open — Jeston's to write._
+- Operator's five lines: _open — the operator's to write._
 
-**Run 1 — The Home Kitchen, a takeout restaurant in Peoria, IL, 2026-11-18 (agent-run, `--yes`; the not-software idea).**
+**Run 1 — a takeout restaurant, 2026-11-18 (agent-run, `--yes`; the not-software idea).**
 Idea and brief supplied by a person deciding about it; run by an agent, so scope's
 questions and the outline review were skipped. The tree is kept outside this repo, in
-the local, unpublished `alice-ideas` checkout beside it, transcripts included; nothing
-is committed here.
+a local, unpublished checkout, transcripts included; nothing is committed here.
 
 - Command: the idea plus `--goal "create a business plan for opening the restaurant"`,
   `--for`, four `--must` (lunch and dinner hours, online ordering only, 100% takeout,
-  the name), `--depth standard --backend claude-code -y`. No `--horizon`, no `--not`.
+  the restaurant's name), `--depth standard --backend claude-code -y`. No `--horizon`, no `--not`.
 - Wall time: not measured end to end; research took about 11 minutes, 102–123 s a topic.
 - Topics: 6 researched, 0 failed, 0 with nothing cited; 21 sources, 8 fetches unusable; green, exit 0.
 - Agent's observations, which are not the operator's read: the goal asked for a business
@@ -145,7 +144,7 @@ is committed here.
   finding from two pages credits one (#53); one page under a redirecting URL became two
   sources (#54); dream d5's dinner "simply arrives" reads as delivery against the takeout
   `--must`, and was proposed anyway; open questions again went unanswered by any step.
-- Operator's five lines: _open — Jeston's to write._
+- Operator's five lines: _open — the operator's to write._
 
 ## Phase 2 — Revise a plan after it is made
 
@@ -235,7 +234,7 @@ topic file is byte-identical. With a scripted research backend,
 `proto research SLUG` changes that topic's file, `sources.md` and `PLAN.md` and
 nothing else.
 
-**Open questions for Jeston**
+**Open questions for the maintainer**
 
 1. `proto answer` and `proto topic` and `proto research` as top-level verbs, or
    one group (`proto revise …`)? **Ruled 2026-11-11: top-level.** Each
@@ -290,7 +289,7 @@ Tasks:
 - [ ] The approval record, written by a verb that calls no model and lands
       through `_land`; a test that a plan changed after approval exports a brief
       saying so
-- [ ] Run the real readers, and record what happened here: Jeston reads a
+- [ ] Run the real readers, and record what happened here: the maintainer reads a
       `BRIEF.md` from a Phase 1 plan and says whether he could approve from it
       alone (~operator); the approved brief is handed to a coding agent in an
       empty directory, and what it does first is read (~operator)
@@ -299,7 +298,7 @@ Tasks:
 --brief` on a red plan exits 1 and writes nothing; and the two operator runs
 are recorded with what each reader got wrong.
 
-**Open questions for Jeston**
+**Open questions for the maintainer**
 
 1. Does approving need its own verb (`proto approve`), or is it a flag on
    `proto export --brief`? A verb keeps "I read it" apart from "I made a file".
@@ -358,7 +357,7 @@ check; a plan with `--broke` recorded re-renders with the finding marked and
 exits 0 if its structure holds; and the operator's one real probe is in the
 *Dogfood record*.
 
-**Open questions for Jeston**
+**Open questions for the maintainer**
 
 1. One probe per plan, or one per first step? **Ruled 2026-11-11: one open
    probe at a time.** One keeps it a decision; several make a
@@ -372,7 +371,7 @@ exits 0 if its structure holds; and the operator's one real probe is in the
 
 ## Phase 5 — Research stays on the subscription
 
-**Ruled by Jeston, 2026-11-11:** no API credit is bought. Research is done from
+**Decided 2026-11-11:** no API credit is bought. Research is done from
 subscription usage, which is the `claude-code` backend, and the API backend's
 research is not built or measured.
 
@@ -402,7 +401,7 @@ Tasks:
 **Done is checked by:** `proto plan --backend api` without `--no-research` says
 in one sentence which backend researches.
 
-**Open questions for Jeston**
+**Open questions for the maintainer**
 
 1. A less generic baseline is more code that no real plan uses. Is the offline
    run a demo worth improving, or only the test suite's fixture?

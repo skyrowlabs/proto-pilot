@@ -202,7 +202,7 @@ Comes before research because it needs no tools and can be judged on offline out
 - [x] `proto dream promote <id>` and `proto dream drop <id> --why "…"`
 - [x] `--no-dream` on `proto plan`
 - [x] Judge one real idea by hand: are the lenses producing different dreams, and does
-      the evaluation separate them? (~operator) Ruled 2026-11-07 by Jeston, on the tool
+      the evaluation separate them? (~operator) Decided 2026-11-07, on the tool
       library run (17 dreams): the lenses differ, and the evaluation separates them.
 
 ## Phase 6 — Research
@@ -274,7 +274,7 @@ target showed cost more than the seam looks.
 
 ## Open decisions
 
-All six are Jeston's rulings, 2026-11-06.
+All six were decided on 2026-11-06.
 
 1. **One document or a tree?** Ruled: a folder, with `PLAN.md` as the entry, so topics
    can grow alone. `proto plan export --single` flattens it for sharing.
@@ -307,7 +307,7 @@ All six are Jeston's rulings, 2026-11-06.
 - [x] `proto new` output is unchanged: the golden manifests do not move
 - [x] (~operator) One real idea run end to end with research, read by a person, who can
       name a topic they would not have thought of and a first step they would act on.
-      Ruled 2026-11-07 by Jeston, on the bakery run (shallow research, 10 of 10 cited
+      Decided 2026-11-07, on the bakery run (shallow research, 10 of 10 cited
       sources fetched): yes, a new topic and a first step.
 
 ## Dropped, and why
