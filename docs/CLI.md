@@ -110,7 +110,9 @@ is never read as evidence and never resumed from.
 **A run that stops during research, or after it, resumes.** Rerun the same command: the
 reviewed outline and each researched topic's transcript are kept in
 `.protopilot/research/`, and no topic already done is asked again. The transcripts stay
-after the plan lands, as the evidence a rerun checks sources against. A topic researched
+after the plan lands, as the evidence a rerun checks sources against. A transcript keeps the
+fetches, tool uses and answer, and nothing about the machine: its first event is cut to the
+tools the session held. A topic researched
 again gets a numbered transcript beside its first, `<slug>.2.jsonl`. A resume is refused
 with `--no-research`, with a `--depth` other than the outline's, offline, and on a
 backend that cannot research, because finishing there would drop the research already

@@ -298,6 +298,36 @@ def stream_events(transcript: str) -> list[dict]:
     return events
 
 
+#: What a kept init event holds: what `research_result` re-checks on a replay, and nothing about the machine.
+INIT_KEPT = ("type", "subtype", "tools", "mcp_servers")
+
+
+def scrubbed(transcript: str) -> str:
+    """The stream as a plan tree keeps it: init cut to `INIT_KEPT`, other system events dropped (#51).
+
+    Run only after the full stream was checked. Fetches, tool uses and the result pass unchanged,
+    so the ledger reads the same evidence, and the digest is taken of this form.
+    """
+    kept = []
+    for line in transcript.splitlines():
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            kept.append(line)
+            continue
+        if not isinstance(event, dict) or event.get("type") != "system":
+            kept.append(line)
+        elif event.get("subtype") == "init":
+            init = {key: event[key] for key in INIT_KEPT if key in event}
+            servers = init.get("mcp_servers")
+            if isinstance(servers, list):
+                init["mcp_servers"] = [
+                    {k: s[k] for k in ("name", "status") if k in s} if isinstance(s, dict) else s for s in servers
+                ]
+            kept.append(json.dumps(init))
+    return "\n".join(kept) + "\n" if kept else ""
+
+
 def _tool_uses(events: list[dict]) -> list[dict]:
     """Every `tool_use` block an assistant event holds, whatever its name."""
     blocks = []
@@ -446,13 +476,14 @@ class ClaudeCodeLLM:
         ]
         with tempfile.TemporaryDirectory(prefix="protopilot-research-") as empty:
             result = self._runner.run(argv, cwd=Path(empty), timeout=self.timeout)
+        kept = scrubbed(result.stdout)
         if not result.ok:
             message = f"pass {label!r} failed: {_stream_error(result.stdout, result.stderr)}"
-            raise ResearchFailed(message, result.stdout, retry=result.returncode != TIMED_OUT)
+            raise ResearchFailed(message, kept, retry=result.returncode != TIMED_OUT)
         try:
-            return Researched(research_result(result.stdout, label), result.stdout)
+            return Researched(research_result(result.stdout, label), kept)
         except LLMError as exc:
-            raise ResearchFailed(str(exc), result.stdout, retry=not isinstance(exc, Breach)) from exc
+            raise ResearchFailed(str(exc), kept, retry=not isinstance(exc, Breach)) from exc
 
 
 #: The return code `runner.SubprocessRunner` gives a call that ran out of time.
