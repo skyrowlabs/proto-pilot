@@ -221,8 +221,9 @@ def plan_command(
 
     IDEA is one sentence. The brief beside it is optional, and what you state is the
     plan's: --goal, --for and --horizon are kept as written, each --must is a constraint
-    and each --not is out of scope for every topic, step and dream. Anything left blank,
-    the model proposes. Leave out IDEA at a terminal to be asked for each in turn.
+    and each --not is out of scope for every topic, step and dream. A blank --goal, the
+    model proposes. A blank --for or --horizon is filled only from what IDEA says, and
+    otherwise reads Not established. Leave out IDEA at a terminal to be asked for each in turn.
 
     Research runs on the claude-code backend, one call per topic, and a run that stops
     during it resumes when rerun. Offline, or with --no-research, the plan is stamped
