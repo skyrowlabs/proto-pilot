@@ -101,7 +101,9 @@ through a model's summary of it, so a citation shows the summary was read, not t
 claim is in the page. With `--backend api` the command refuses before any call unless
 `--no-research` is given. Offline, nothing is researched. A topic whose research fails
 says so on its page and costs nothing else. A plan with a topic left out is stamped
-*Partly researched*, and `PLAN.md` names every topic not researched.
+*Partly researched*, and `PLAN.md` names every topic not researched. A topic research
+failed for, or that cited nothing, also gets an open question and a line under its step
+naming `proto research SLUG`; both are drawn from the ledger, so they leave once it lands.
 A call whose answer is refused or fails is asked once more, unless the session held more
 than the web or ran out of time. Each stream not used is kept as
 `.protopilot/research/<topic>.refused-<n>.jsonl`, and the failure names it. A kept stream

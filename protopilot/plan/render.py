@@ -105,6 +105,19 @@ def topic_research(plan: Plan, topic: Topic) -> tuple[bool, str]:
     return False, "Research did not run for it."
 
 
+def unbacked(plan: Plan) -> list[Topic]:
+    """Topics research was asked of and could not back: failed, or cited nothing. Drawn, never stored (#49)."""
+    states = {record.topic: record.state for record in plan.research}
+    return [t for t in plan.topics if states.get(t.slug, "researched") != "researched"]
+
+
+def _unbacked_question(topic: Topic) -> str:
+    return (
+        f"What would research find for {md_text(topic.title)}? It was asked and backed nothing, so the plan "
+        f"rests on no source there. `proto research {topic.slug}` asks again."
+    )
+
+
 def _stamp(plan: Plan) -> str:
     """The entry page's word on research: whole, partly with each topic left out named, or not at all."""
     if not plan.researched:
@@ -155,8 +168,15 @@ def _plan_page(plan: Plan, verified: bool) -> str:
     if plan.direction:
         scope.insert(0, f"**Direction:** {plan.direction}")
     topic_map = [f"[{t.title}]({_topic_file(t.slug)}): {t.why}" for t in plan.topics]
+    left = unbacked(plan)
+    shaky = {t.slug for t in left}
     steps = [
         f"{n}. **{titles.get(s.topic, s.topic)}:** {s.action}\n   - Why here: {s.why}"
+        + (
+            f"\n   - Not researched: run `proto research {s.topic}` before relying on this step."
+            if s.topic in shaky
+            else ""
+        )
         for n, s in enumerate(plan.steps, start=1)
     ]
     dropped = [f"{t.title} (`{t.slug}`): {t.why}" for t in plan.dropped_topics]
@@ -168,7 +188,7 @@ def _plan_page(plan: Plan, verified: bool) -> str:
         "\n\n".join(scope),
         f"## Constraints\n\n{_bullets(plan.constraints)}",
         f"## Out of scope\n\n{_bullets(plan.brief.out)}" if plan.brief.out else "",
-        f"## Open questions\n\n{_bullets(plan.questions)}",
+        f"## Open questions\n\n{_bullets([*plan.questions, *(_unbacked_question(t) for t in left)])}",
         f"## Topic map\n\n{_bullets(topic_map)}",
         f"## How the topics connect\n\n{_bullets([_edge_line(e, titles) for e in _edges(plan)])}",
         "## Where to start\n\n" + ("\n".join(steps) or "None recorded."),
