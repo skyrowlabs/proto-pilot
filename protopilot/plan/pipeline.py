@@ -248,7 +248,7 @@ def _asked(job, plan: Plan, llm, tree: Path, topic: Topic, label: str) -> Resear
         try:
             return llm.research(system=system, user=user, schema=research.schema(plan), label=label)
         except ResearchFailed as exc:
-            kept = ledger.write_refused(tree, topic.slug, attempt, exc.transcript) if exc.transcript else ""
+            kept = ledger.write_refused(tree, topic.slug, exc.transcript) if exc.transcript else ""
             if attempt == RESEARCH_ATTEMPTS or not exc.retry:
                 raise ResearchFailed(str(exc), exc.transcript, retry=False, kept=kept) from exc
             where = f"; its stream is kept at {kept}" if kept else ""

@@ -14,7 +14,7 @@ from plan_script import IDEA, script
 from research_script import ResearchingLLM, transcript
 
 from protopilot.jobs import Job
-from protopilot.llm import ClaudeCodeLLM, Researched
+from protopilot.llm import ClaudeCodeLLM, LLMError, Researched
 from protopilot.plan import ledger, pipeline
 from protopilot.plan.model import Plan
 from protopilot.runner import CommandResult
@@ -45,8 +45,8 @@ class Streams:
 
 
 class Live(ResearchingLLM):
-    def __init__(self, streams: Streams) -> None:
-        super().__init__(script(), {})
+    def __init__(self, streams: Streams, responses: list | None = None) -> None:
+        super().__init__(script() if responses is None else responses, {})
         self.streams = streams
 
     def research(self, *, system: str, user: str, schema: dict, label: str) -> Researched:
@@ -115,3 +115,28 @@ def test_a_failed_process_reports_its_result_events_error_not_the_streams_tail(t
     plan, _, _ = planned(tree, (1, failed, ""), (1, failed, ""))
     record = plan.research_of(TOPIC)
     assert record is not None and "failed: overloaded" in record.failure and "costUSD" not in record.failure
+
+
+def test_a_resumed_run_adds_kept_streams_and_never_overwrites_the_first_runs(tmp_path):
+    tree, down = tmp_path / "tree", LLMError("the backend went away")
+    with pytest.raises(LLMError):
+        pipeline.run_plan(
+            Job(id="t", idea=IDEA), tree, Live(Streams((0, stray(), ""), (0, stray(), "")), script(connect=down))
+        )
+    first = {name: (ledger.research_dir(tree) / name).read_bytes() for name in kept(tree)}
+    assert sorted(first) == [ledger.refused_name(TOPIC, 1), ledger.refused_name(TOPIC, 2)]
+    again = Live(Streams((0, stray("other"), ""), (0, stray("other"), "")), script()[2:])
+    pipeline.run_plan(Job(id="t", idea=IDEA), tree, again)  # type: ignore[arg-type]
+    assert kept(tree) == [ledger.refused_name(TOPIC, n) for n in (1, 2, 3, 4)]
+    assert all((ledger.research_dir(tree) / name).read_bytes() == said for name, said in first.items())
+
+
+def test_next_refused_ignores_evidence_temp_files_symlinks_and_other_topics(tmp_path):
+    folder = ledger.research_dir(tmp_path)
+    folder.mkdir(parents=True)
+    assert ledger.next_refused(tmp_path, TOPIC) == 1
+    for name in (ledger.refused_name(TOPIC, 3), ledger.transcript_name(TOPIC), ledger.refused_name("other", 8)):
+        (folder / name).write_text("x", encoding="utf-8")
+    (folder / f".{ledger.refused_name(TOPIC, 9)}.tmp").write_text("x", encoding="utf-8")
+    (folder / ledger.refused_name(TOPIC, 7)).symlink_to(folder / ledger.transcript_name(TOPIC))
+    assert ledger.next_refused(tmp_path, TOPIC) == 4

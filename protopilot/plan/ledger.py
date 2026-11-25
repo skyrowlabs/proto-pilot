@@ -138,11 +138,21 @@ def refused_name(slug: str, attempt: int) -> str:
     return f"{slug}.refused-{attempt}.jsonl"
 
 
-def write_refused(tree: Path, slug: str, attempt: int, transcript: str) -> str:
-    """Keep a stream whose answer was not used, apart from the evidence, and return its path in the tree."""
+def next_refused(tree: Path, slug: str) -> int:
+    """One past the highest `n` of this topic's kept streams, so a resumed run overwrites none. Names only."""
+    kept = re.compile(rf"{re.escape(slug)}\.refused-([1-9]\d*)\.jsonl")
+    folder = research_dir(tree)
+    if not folder.is_dir():
+        return 1
+    found = (kept.fullmatch(path.name) for path in folder.iterdir() if not path.is_symlink() and path.is_file())
+    return max((int(match.group(1)) for match in found if match), default=0) + 1
+
+
+def write_refused(tree: Path, slug: str, transcript: str) -> str:
+    """Keep a stream whose answer was not used, apart from the evidence, under the next free number; return its path."""
     folder = research_dir(tree)
     folder.mkdir(parents=True, exist_ok=True)
-    name = refused_name(slug, attempt)
+    name = refused_name(slug, next_refused(tree, slug))
     temp = folder / f".{name}.tmp"
     temp.write_text(transcript, encoding="utf-8")
     temp.replace(folder / name)
