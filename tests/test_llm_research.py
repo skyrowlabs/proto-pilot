@@ -19,6 +19,7 @@ from protopilot.llm import (
     ClaudeCodeLLM,
     ClaudeLLM,
     LLMError,
+    ResearchFailed,
     ResearchUnavailable,
     research_result,
 )
@@ -112,6 +113,18 @@ def test_a_failed_process_is_an_llm_error():
     runner = _Capturing("", code=1)
     with pytest.raises(LLMError, match="failed"):
         ClaudeCodeLLM(runner=runner, binary="claude").research(system="s", user="u", schema={}, label="r")
+
+
+@pytest.mark.parametrize(
+    ("said", "retry"),
+    [(transcript(result={"type": "result", "subtype": "error_max_turns", "is_error": True}), True)]
+    + [(transcript(tools=["StructuredOutput", "WebFetch", "WebSearch", "Bash"]), False)],
+    ids=["a-slip", "a-breach"],
+)
+def test_a_refused_stream_comes_back_whole_and_only_a_slip_is_worth_asking_again(said: str, retry: bool):
+    with pytest.raises(ResearchFailed) as raised:
+        researched(said)
+    assert raised.value.transcript == said and raised.value.retry is retry
 
 
 def test_the_api_backend_refuses_research_with_what_to_do_instead():

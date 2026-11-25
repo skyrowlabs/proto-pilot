@@ -149,7 +149,10 @@ one model value in a file name is a topic slug, which `model.py` checks, and
   (`findings_block`). Topic pages say per topic whether research ran, failed, cited
   nothing, or never ran because a person promoted the topic from a dream.
 - **A failed topic costs only itself, and a stopped run resumes.** A topic whose call or
-  output fails is recorded `failed` and the run goes on. Before the first call the
+  output fails is recorded `failed` and the run goes on. `pipeline._asked` asks a refused
+  call once more unless `llm.ResearchFailed.retry` is False (a `Breach`, or a timeout), and
+  keeps every unused stream as `<topic>.refused-<n>.jsonl`. No slug holds a dot, so no
+  reader of evidence opens one. Before the first call the
   reviewed outline is saved as `outline.json` beside the transcripts, and each topic's
   transcript as it lands, so a run that stops, or fails at a later pass, resumes on
   rerun: `resumable` finds the outline, and a topic with a transcript is replayed, not

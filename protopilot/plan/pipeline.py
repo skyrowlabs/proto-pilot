@@ -32,7 +32,15 @@ from pathlib import Path
 from typing import TypeVar
 
 from protopilot import registry
-from protopilot.llm import LLM, LLMError, OfflineLLM, ResearchUnavailable, research_result
+from protopilot.llm import (
+    LLM,
+    LLMError,
+    OfflineLLM,
+    Researched,
+    ResearchFailed,
+    ResearchUnavailable,
+    research_result,
+)
 from protopilot.plan import baseline, dreaming, ledger, render, verify
 from protopilot.plan.lenses import LENSES, Lens
 from protopilot.plan.model import DEFAULT_DEPTH, Brief, Depth, Dream, Plan, Topic, TopicResearch, plan_path
@@ -61,6 +69,8 @@ RENDER = "render"
 T = TypeVar("T")
 #: A model's error can be a page of text, and it lands in `dreams.md`.
 MOST_FAILURE_CHARS = 300
+#: A research call refused by a slip is asked once more; a second refusal fails the topic (#56).
+RESEARCH_ATTEMPTS = 2
 
 
 class PlanRefused(Exception):
@@ -231,6 +241,21 @@ def _short(exc: BaseException) -> str:
     return baseline.clean(str(exc))[:MOST_FAILURE_CHARS].rstrip(" .") or type(exc).__name__
 
 
+def _asked(job, plan: Plan, llm, tree: Path, topic: Topic, label: str) -> Researched:
+    """The research call, asked once more after a slip. Every stream not used is kept, never read as evidence."""
+    system, user = research.build(plan, topic)
+    for attempt in range(1, RESEARCH_ATTEMPTS + 1):
+        try:
+            return llm.research(system=system, user=user, schema=research.schema(plan), label=label)
+        except ResearchFailed as exc:
+            kept = ledger.write_refused(tree, topic.slug, attempt, exc.transcript) if exc.transcript else ""
+            if attempt == RESEARCH_ATTEMPTS or not exc.retry:
+                raise ResearchFailed(str(exc), exc.transcript, retry=False, kept=kept) from exc
+            where = f"; its stream is kept at {kept}" if kept else ""
+            job.log(f"    {topic.slug}: {_short(exc)}{where}; asking once more")
+    raise AssertionError("unreachable")
+
+
 def _research_topic(job, plan: Plan, llm, tree: Path, topic: Topic) -> Plan:
     """One topic researched, or recorded as failed. A transcript already on disk is replayed, not paid for again."""
     label = f"{research.NAME} {topic.slug}"
@@ -238,8 +263,7 @@ def _research_topic(job, plan: Plan, llm, tree: Path, topic: Topic) -> Plan:
     started = time.monotonic()
     try:
         if stored is None:
-            system, user = research.build(plan, topic)
-            got = llm.research(system=system, user=user, schema=research.schema(plan), label=label)
+            got = _asked(job, plan, llm, tree, topic, label)
             transcript, data = got.transcript, got.data
         else:
             transcript, data = stored, research_result(stored, label)
@@ -251,6 +275,8 @@ def _research_topic(job, plan: Plan, llm, tree: Path, topic: Topic) -> Plan:
         raise
     except (LLMError, PlanPassError, ValueError) as exc:
         failure = _short(exc)
+        if isinstance(exc, ResearchFailed) and exc.kept:
+            failure = f"{failure}; its stream is kept at {exc.kept}"
         job.log(f"    {topic.slug}: research failed, and the topic goes on unresearched: {failure}")
         job.event("research_failed", topic=topic.slug, error=failure)
         record = TopicResearch(topic=topic.slug, state="failed", failure=failure)

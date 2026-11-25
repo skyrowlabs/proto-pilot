@@ -43,6 +43,22 @@ class ResearchUnavailable(LLMError):
     """This backend cannot make a research call; the message says what to use instead."""
 
 
+class Breach(LLMError):
+    """A research session that held more than the web, or did not say what it held. Never worth asking again."""
+
+
+class ResearchFailed(LLMError):
+    """A research call whose answer was not used, with the stream it came in.
+
+    The stream is kept apart from accepted transcripts and never read as evidence. `retry`
+    is False when asking again would repeat the same outcome: a breach, or a timeout.
+    """
+
+    def __init__(self, message: str, transcript: str, retry: bool, kept: str = "") -> None:
+        super().__init__(message)
+        self.transcript, self.retry, self.kept = transcript, retry, kept
+
+
 @dataclass(frozen=True)
 class Researched:
     """A research call's validated object, and the raw stream-json it came in: the evidence."""
@@ -299,18 +315,18 @@ def research_result(transcript: str, label: str) -> dict:
     events = stream_events(transcript)
     inits = [e for e in events if e.get("type") == "system" and e.get("subtype") == "init"]
     if not inits:
-        raise LLMError(f"pass {label!r}: the research stream has no init event, so its tools are unknown")
+        raise Breach(f"pass {label!r}: the research stream has no init event, so its tools are unknown")
     for init in inits:
         tools = init.get("tools")
         servers = init.get("mcp_servers")
         if not isinstance(tools, list) or not all(isinstance(tool, str) for tool in tools):
-            raise LLMError(f"pass {label!r}: an init event does not list its tools, so they are unknown")
+            raise Breach(f"pass {label!r}: an init event does not list its tools, so they are unknown")
         if not isinstance(servers, list):
-            raise LLMError(f"pass {label!r}: an init event does not list its MCP servers, so they are unknown")
+            raise Breach(f"pass {label!r}: an init event does not list its MCP servers, so they are unknown")
         extra = sorted(set(tools) - RESEARCH_HELD)
         if extra or servers:
             held = ", ".join(extra) or "an MCP server"
-            raise LLMError(f"pass {label!r}: the research session held {held}, so its answer was not used")
+            raise Breach(f"pass {label!r}: the research session held {held}, so its answer was not used")
     used = sorted({str(block.get("name")) for block in _tool_uses(events)} - RESEARCH_HELD)
     if used:
         raise LLMError(f"pass {label!r}: the research session used {', '.join(used)}, so its answer was not used")
@@ -429,8 +445,30 @@ class ClaudeCodeLLM:
         with tempfile.TemporaryDirectory(prefix="protopilot-research-") as empty:
             result = self._runner.run(argv, cwd=Path(empty), timeout=self.timeout)
         if not result.ok:
-            raise LLMError(f"pass {label!r} failed: {result.output[-500:] or 'no output'}")
-        return Researched(research_result(result.stdout, label), result.stdout)
+            message = f"pass {label!r} failed: {_stream_error(result.stdout, result.stderr)}"
+            raise ResearchFailed(message, result.stdout, retry=result.returncode != TIMED_OUT)
+        try:
+            return Researched(research_result(result.stdout, label), result.stdout)
+        except LLMError as exc:
+            raise ResearchFailed(str(exc), result.stdout, retry=not isinstance(exc, Breach)) from exc
+
+
+#: The return code `runner.SubprocessRunner` gives a call that ran out of time.
+TIMED_OUT = 124
+
+
+def _stream_error(stdout: str, stderr: str) -> str:
+    """What a failed stream says went wrong: its result event's error, else stderr's tail, else stdout's."""
+    for line in reversed(stdout.splitlines()):
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(event, dict) and event.get("type") == "result":
+            detail = event.get("result") or event.get("api_error_status") or event.get("subtype")
+            if detail:
+                return str(detail)[-500:]
+    return (stderr.strip() or stdout.strip())[-500:] or "no output"
 
 
 def _api_errors() -> tuple[type[BaseException], ...]:

@@ -133,6 +133,22 @@ def write_transcript(tree: Path, slug: str, transcript: str) -> str:
     return name
 
 
+def refused_name(slug: str, attempt: int) -> str:
+    """Never a `transcript_name`: a slug holds no dot, so no reader of evidence can open one."""
+    return f"{slug}.refused-{attempt}.jsonl"
+
+
+def write_refused(tree: Path, slug: str, attempt: int, transcript: str) -> str:
+    """Keep a stream whose answer was not used, apart from the evidence, and return its path in the tree."""
+    folder = research_dir(tree)
+    folder.mkdir(parents=True, exist_ok=True)
+    name = refused_name(slug, attempt)
+    temp = folder / f".{name}.tmp"
+    temp.write_text(transcript, encoding="utf-8")
+    temp.replace(folder / name)
+    return f"{RESEARCH_DIR}/{name}"
+
+
 def read_transcript(tree: Path, slug: str) -> str | None:
     path = research_dir(tree) / transcript_name(slug)
     if path.is_symlink() or not path.is_file():

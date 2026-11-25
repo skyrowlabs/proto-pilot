@@ -101,6 +101,10 @@ through a model's summary of it, so a citation shows the summary was read, not t
 claim is in the page. With `--backend api` the command refuses before any call unless
 `--no-research` is given. Offline, nothing is researched. A topic whose research fails
 says so on its page and costs nothing else; `PLAN.md` names every topic not researched.
+A call whose answer is refused or fails is asked once more, unless the session held more
+than the web or ran out of time. Each stream not used is kept as
+`.protopilot/research/<topic>.refused-<n>.jsonl`, and the failure names it. A kept stream
+is never read as evidence and never resumed from.
 
 **A run that stops during research, or after it, resumes.** Rerun the same command: the
 reviewed outline and each researched topic's transcript are kept in
