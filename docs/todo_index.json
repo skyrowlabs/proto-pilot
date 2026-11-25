@@ -47,7 +47,7 @@
         "release"
       ],
       "summary": "Remove personal traces and private-project context from the tracked tree, then hand the visibility flip to the maintainer; history is kept as it is.",
-      "open_tasks": 29,
+      "open_tasks": 1,
       "auto_generated": false
     }
   ]

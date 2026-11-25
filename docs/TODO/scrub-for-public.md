@@ -93,10 +93,10 @@ breaks those references.
 - Produces: `scrub-check.sh` prints `path:line:match` per hit and exits 1 on any
   hit, 0 on none. Later tasks re-run it.
 
-- [ ] Write `scrub-check.sh`: `git ls-files -z | xargs -0 grep -n -i -I -E -f ~/.config/proto-pilot/private-names.txt`, inverted exit status
-- [ ] Run it; save the output to `~/.config/proto-pilot/hits-before.txt`. Expected: roughly 80 files
-- [ ] Run `./pp test unit -k publication`. Expected: PASS; record any failure as a Task 2 item
-- [ ] Sort the hit files into Task 2 (personal), Task 3 (reword) and Task 4 (delete). Nothing is committed in this task
+- [x] Write `scrub-check.sh`: `git ls-files -z | xargs -0 grep -n -i -I -E -f ~/.config/proto-pilot/private-names.txt`, inverted exit status
+- [x] Run it; save the output to `~/.config/proto-pilot/hits-before.txt`. Expected: roughly 80 files
+- [x] Run `./pp test unit -k publication`. Expected: PASS; record any failure as a Task 2 item
+- [x] Sort the hit files into Task 2 (personal), Task 3 (reword) and Task 4 (delete). Nothing is committed in this task
 
 ### Task 2: Personal traces and the stale description
 
@@ -104,52 +104,52 @@ breaks those references.
 - Modify: every file Task 1 sorted here
 - Modify: `scripts/repo_settings.py:21`, `cli/__init__.py:102`
 
-- [ ] Replace each attributed ruling with an unattributed decision, keeping the date: "<name> ruled on 2026-11-11 that…" becomes "Decided 2026-11-11: …"
-- [ ] Set `DESCRIPTION` and the `pp` docstring to one line describing the planning tool, matching the README's opening sentence
-- [ ] Run `scrub-check.sh`. Expected: no hit for the maintainer's name
-- [ ] Run `./pp check pre-push`. Expected: green
-- [ ] Commit: `docs: drop personal attribution and the prototyping tagline`
+- [x] Replace each attributed ruling with an unattributed decision, keeping the date: "<name> ruled on 2026-11-11 that…" becomes "Decided 2026-11-11: …"
+- [x] Set `DESCRIPTION` and the `pp` docstring to one line describing the planning tool, matching the README's opening sentence
+- [x] Run `scrub-check.sh`. Expected: no hit for the maintainer's name
+- [x] Run `./pp check pre-push`. Expected: green
+- [x] Commit: `docs: drop personal attribution and the prototyping tagline`
 
 ### Task 3: Reword private-project mentions
 
 **Files:**
 - Modify: every file Task 1 sorted here, across `docs/`, `tests/`, `protopilot/`, `scripts/`
 
-- [ ] Replace each mention with a generic term ("another project", "a sibling repository", "an example idea") where the sentence still teaches something
-- [ ] Where a worked example or fixture is built around a private project's idea, change the idea to a neutral one only if the test asserts nothing about its wording; otherwise move the file to Task 4
-- [ ] Regenerate any index the edits touch, using the command `pp check docs` names
-- [ ] Run `scrub-check.sh`. Expected: hits only in files sorted to Task 4
-- [ ] Run `./pp check pre-push`. Expected: green
-- [ ] Commit: `docs: generalise mentions of private sibling projects`
+- [x] Replace each mention with a generic term ("another project", "a sibling repository", "an example idea") where the sentence still teaches something
+- [x] Where a worked example or fixture is built around a private project's idea, change the idea to a neutral one only if the test asserts nothing about its wording; otherwise move the file to Task 4
+- [x] Regenerate any index the edits touch, using the command `pp check docs` names
+- [x] Run `scrub-check.sh`. Expected: hits only in files sorted to Task 4
+- [x] Run `./pp check pre-push`. Expected: green
+- [x] Commit: `docs: generalise mentions of private sibling projects`
 
 ### Task 4: Delete what only makes sense privately
 
 **Files:**
 - Delete: files Task 1 sorted here. Candidates to read first: `docs/reports/`, run logs inside `docs/TODO/living-plans.md`, `docs/ideas/hosted.md`, `tests/fixtures/`
 
-- [ ] Delete whole files with `git rm`; cut passages in place. A filed plan in `docs/implementations/` is edited, never removed, so the archive keeps its shape
-- [ ] Fix every link the deletes broke
-- [ ] Confirm `git check-ignore tmp prototypes` prints both
-- [ ] Run `scrub-check.sh`. Expected: exit 0, no output
-- [ ] Run `./pp check pre-push` and `./pp test unit`. Expected: green
-- [ ] Commit: `docs: remove private working material before publication`
+- [x] Delete whole files with `git rm`; cut passages in place. A filed plan in `docs/implementations/` is edited, never removed, so the archive keeps its shape
+- [x] Fix every link the deletes broke
+- [x] Confirm `git check-ignore tmp prototypes` prints both
+- [x] Run `scrub-check.sh`. Expected: exit 0, no output
+- [x] Run `./pp check pre-push` and `./pp test unit`. Expected: green
+- [x] Commit: `docs: remove private working material before publication`
 
 ### Task 5: Verify and hand over the flip
 
-- [ ] Run `pre-commit run gitleaks --all-files` and a full-history scan (`gitleaks git --log-opts=--all`). Expected: no findings. A finding in history stops this plan and goes to the maintainer: it is the one case for a fresh history
-- [ ] Push `develop` (standing rule: commit under the gates, then push)
-- [ ] Raise one DECISIONS row in the sky.boss deck for the two operator steps below
-- [ ] Apply the new description with `./pp settings --apply` (~operator)
+- [x] Run `pre-commit run gitleaks --all-files` and a full-history scan (`gitleaks git --log-opts=--all`). Expected: no findings. A finding in history stops this plan and goes to the maintainer: it is the one case for a fresh history
+- [x] Push `develop` (standing rule: commit under the gates, then push)
+- [x] Raise one DECISIONS row in the sky.boss deck for the two operator steps below — no deck tab was live; the steps went to the maintainer in chat
+- [x] Apply the new description with `gh repo edit --description` (`pp settings` writes it only when GitHub's is empty) (~operator)
 - [ ] Make the repository public (~operator)
 - [ ] After the flip, change the README's `repo-private` badge to `repo-public`
 - [ ] After the flip, update the company workspace's project brief and repos table to read public; one commit in that repo (~deferred)
 
 ## Acceptance
 
-- [ ] `scrub-check.sh` exits 0 over `git ls-files`
-- [ ] `./pp test unit` passes, including `tests/test_publication.py`
-- [ ] `./pp check pre-push` is green
-- [ ] The full-history gitleaks scan reports no findings
+- [x] `scrub-check.sh` exits 0 over `git ls-files`
+- [x] `./pp test unit` passes, including `tests/test_publication.py`
+- [x] `./pp check pre-push` is green
+- [x] The full-history gitleaks scan reports no findings
 - [ ] `gh repo view skyrowlabs/proto-pilot --json visibility,description` reads `PUBLIC` and the new description (~operator)
 
 ## Dropped, and why
