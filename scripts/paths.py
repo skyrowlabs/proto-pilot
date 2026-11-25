@@ -498,7 +498,7 @@ NARRATIVE += (NOTES_FILE,)
 #: to create is what a narrative document exists to do. `docs/ideas/hosted.md` is
 #: tabled and cites what it ruled out; it has simply not yet cited a path dead
 #: enough to redden anything. skeletor added `research` to the tuple in this
-#: series after stash.flow filed 17 documents where the table said to and watched
+#: series after another adopter filed 17 documents where the table said to and watched
 #: a resolve-check fire — the upstream fix reaches every adopter that kept the
 #: template's name, and silently misses this one.
 #:

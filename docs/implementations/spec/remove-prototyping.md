@@ -403,7 +403,7 @@ an agent cannot take. They are listed so the PR body can carry them.
    is not edited here. Also worth reporting: the docs lifecycle has no state for
    a plan that was dropped rather than finished.
 3. **Tell the workspace its two copies are stale.** The proto.pilot row in
-   `skyrow-workspace/workspace.md` ("its Dockerised prototypes are tabled but
+   the company workspace guide ("its Dockerised prototypes are tabled but
    still run") and the product copy in `skyrowlabs.com/README.md`. Two other
    repos, two other changes.
 

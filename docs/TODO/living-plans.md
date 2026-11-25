@@ -80,13 +80,13 @@ bakery and a tool library. Both were invented for the README. Every later phase
 here is a guess about what a real plan lacks.
 
 **Design.** No code. Three to five runs with research on ideas somebody is
-actually deciding about. The workspace has two at concept stage, which makes
-them fair tests: house.fly (research notes, no code) and Node Zero (design
-maturing, no code).
+actually deciding about. Two of the maintainer's other projects are at concept stage, which makes
+them fair tests: one with research notes and no code, one with a maturing design
+and no code.
 
-- [ ] `proto plan` with research, `--depth standard`, on house.fly's idea, from
+- [ ] `proto plan` with research, `--depth standard`, on the first project's idea, from
       a sentence and a direction written without opening its notes (~operator)
-- [ ] The same for Node Zero (~operator)
+- [ ] The same for the second (~operator)
 - [ ] One to three more: one idea that is not software, and one the maintainer already
       knows well enough to catch a wrong finding (~operator)
 - [ ] For each run, record under *Dogfood record* below: wall time, topics
@@ -105,7 +105,7 @@ maturing, no code).
 five lines, and the phase order below carries a sentence saying which run put
 each phase where it is.
 
-**Decided 2026-11-11:** house.fly's and Node Zero's ideas may go
+**Decided 2026-11-11:** both projects' ideas may go
 through the model, and the resulting plans may be committed to those repos. Each
 commit is a change in that repo, under its own rules.
 
