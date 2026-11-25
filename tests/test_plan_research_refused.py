@@ -140,3 +140,12 @@ def test_next_refused_ignores_evidence_temp_files_symlinks_and_other_topics(tmp_
     (folder / f".{ledger.refused_name(TOPIC, 9)}.tmp").write_text("x", encoding="utf-8")
     (folder / ledger.refused_name(TOPIC, 7)).symlink_to(folder / ledger.transcript_name(TOPIC))
     assert ledger.next_refused(tmp_path, TOPIC) == 4
+
+
+def test_a_process_that_fails_once_then_succeeds_ends_researched_with_its_transcript(tmp_path):
+    tree = tmp_path / "tree"
+    error = {"type": "result", "subtype": "error_during_execution", "is_error": True, "result": "overloaded"}
+    plan, streams, _ = planned(tree, (1, transcript(result=error), ""))
+    record = plan.research_of(TOPIC)
+    assert streams.asked == 2 and record is not None and record.state == "researched"
+    assert ledger.read_transcript(tree, TOPIC) == transcript()
