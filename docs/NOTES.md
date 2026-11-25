@@ -55,8 +55,8 @@ is the last commit that holds it.
   here that is not a commit.
 - ~~**No `CONTRIBUTING.md`, issue templates, `dependabot.yml` or `CODEOWNERS`.**~~
   All four arrived with the skeletor `governed` tier on 2026-09-01. They are
-  the scaffold's generic wording and have not been read against this project;
-  do that before the visibility flip, not after.
+  the scaffold's generic wording; read against this project on 2026-11-24 and
+  kept as they are.
 
 ## Open — found in a neighbour, to report not fix
 

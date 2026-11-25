@@ -141,6 +141,7 @@ breaks those references.
 - [ ] Raise one DECISIONS row in the sky.boss deck for the two operator steps below
 - [ ] Apply the new description with `./pp settings --apply` (~operator)
 - [ ] Make the repository public (~operator)
+- [ ] After the flip, change the README's `repo-private` badge to `repo-public`
 - [ ] After the flip, update the company workspace's project brief and repos table to read public; one commit in that repo (~deferred)
 
 ## Acceptance
