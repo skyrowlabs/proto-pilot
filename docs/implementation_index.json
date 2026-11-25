@@ -1,7 +1,7 @@
 {
   "_generated_by": "scripts/docs/gen_impl_index.py",
   "_note": "Generated — never hand-edit. Edit the doc's frontmatter and rerun.",
-  "count": 7,
+  "count": 8,
   "by_category": {
     "dropped": [
       "drawing-freedom",
@@ -12,6 +12,7 @@
       "plan-prototypes",
       "proto-console",
       "remove-prototyping",
+      "scrub-for-public",
       "terminal-target"
     ]
   },
@@ -134,6 +135,24 @@
       "category": "spec",
       "completed": "2026-11-11",
       "agent_value": 2
+    },
+    {
+      "slug": "scrub-for-public",
+      "title": "Scrub for Public",
+      "path": "docs/implementations/spec/scrub-for-public.md",
+      "priority": "high",
+      "updated": "2026-11-24",
+      "tags": [
+        "publication",
+        "docs",
+        "release"
+      ],
+      "summary": "Remove personal traces and private-project context from the tracked tree, then hand the visibility flip to the maintainer; history is kept as it is.",
+      "open_tasks": 0,
+      "auto_generated": false,
+      "category": "spec",
+      "completed": "2026-11-24",
+      "agent_value": 1
     },
     {
       "slug": "terminal-target",

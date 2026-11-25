@@ -1,11 +1,8 @@
 {
   "_generated_by": "scripts/docs/gen_todo_index.py",
   "_note": "Generated — never hand-edit. Edit the plan's frontmatter or header lines and rerun.",
-  "count": 2,
+  "count": 1,
   "by_status": {
-    "blocked": [
-      "scrub-for-public"
-    ],
     "planned": [
       "living-plans"
     ]
@@ -30,24 +27,6 @@
       ],
       "summary": "Let a plan be revised, tested and handed off after it is made: answer its questions, change or re-research one topic, record what a real test showed, and emit a brief another tool can start from.",
       "open_tasks": 28,
-      "auto_generated": false
-    },
-    {
-      "slug": "scrub-for-public",
-      "title": "Scrub for Public",
-      "path": "docs/TODO/scrub-for-public.md",
-      "shelf_status": "blocked",
-      "priority": "high",
-      "queue_order": null,
-      "blocked_on": "owner-ops",
-      "updated": "2026-11-24",
-      "tags": [
-        "publication",
-        "docs",
-        "release"
-      ],
-      "summary": "Remove personal traces and private-project context from the tracked tree, then hand the visibility flip to the maintainer; history is kept as it is.",
-      "open_tasks": 1,
       "auto_generated": false
     }
   ]

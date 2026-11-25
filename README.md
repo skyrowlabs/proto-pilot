@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/repo-private-7a8fa8?labelColor=1c2633" alt="repo: private">
+  <img src="https://img.shields.io/badge/repo-public-818cf8?labelColor=1c2633" alt="repo: public">
   <img src="https://img.shields.io/badge/stage-poc-818cf8?labelColor=1c2633" alt="stage: poc">
   <img alt="Python 3.11 to 3.14" src="https://img.shields.io/badge/python-3.11%E2%80%933.14-818cf8?labelColor=1c2633">
   <img alt="works offline" src="https://img.shields.io/badge/works-offline-818cf8?labelColor=1c2633">

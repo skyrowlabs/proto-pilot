@@ -16,7 +16,7 @@ that were dropped, and the constraints that shaped what landed.
 
 **Machine-readable index**: [`../implementation_index.json`](../implementation_index.json).
 
-**7 archived plans** across 2 categories.
+**8 archived plans** across 2 categories.
 
 ---
 
@@ -36,6 +36,7 @@ that were dropped, and the constraints that shaped what landed.
 | ⭐⭐⭐ | [Plan Prototypes and Dreaming](spec/plan-prototypes.md) | 2026-11-07 | Add `proto plan`, which turns an idea into a researched, connected, organised set of text plans, plus a dreaming step that collects, evaluates and proposes lighter extensions of the idea. |
 | ⭐⭐ | [Remove Prototyping](spec/remove-prototyping.md) | 2026-11-11 | Delete everything that generates, runs or verifies an app, both front ends included, so that the surviving CLI is plan, dream, ls, rm, prune and doctor. |
 | ⭐ | [Archetypes and Theme](spec/archetypes-and-theme.md) | 2026-09-01 | Give the spec a shape axis and a look axis, so a chess app and a gear tracker stop being the same CRUD app with a different adjective. |
+| ⭐ | [Scrub for Public](spec/scrub-for-public.md) | 2026-11-24 | Remove personal traces and private-project context from the tracked tree, then hand the visibility flip to the maintainer; history is kept as it is. |
 
 ---
 

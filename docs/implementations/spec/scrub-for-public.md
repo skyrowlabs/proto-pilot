@@ -1,18 +1,18 @@
 ---
-title: "Scrub for Public"
+title: Scrub for Public
 slug: scrub-for-public
-shelf_status: blocked
 priority: high
+category: spec
+agent_value: 1
+completed: 2026-11-24
 updated: 2026-11-24
 tags: [publication, docs, release]
-summary: "Remove personal traces and private-project context from the tracked tree, then hand the visibility flip to the maintainer; history is kept as it is."
+summary: Remove personal traces and private-project context from the tracked tree, then hand the visibility flip to the maintainer; history is kept as it is.
 ---
 
 # Scrub for Public
 
 > **Status**: 🔴 Planned
-> **Shelf-Status**: blocked
-> **Blocked-On**: owner-ops
 > **Priority**: High — the open-source release was decided on 2026-09-03 and this is the only thing between it and the flip
 > **Updated**: 2026-11-24
 
@@ -140,9 +140,9 @@ breaks those references.
 - [x] Push `develop` (standing rule: commit under the gates, then push)
 - [x] Raise one DECISIONS row in the sky.boss deck for the two operator steps below — no deck tab was live; the steps went to the maintainer in chat
 - [x] Apply the new description with `gh repo edit --description` (`pp settings` writes it only when GitHub's is empty) (~operator)
-- [ ] Make the repository public (~operator)
-- [ ] After the flip, change the README's `repo-private` badge to `repo-public`
-- [ ] After the flip, update the company workspace's project brief and repos table to read public; one commit in that repo (~deferred)
+- [x] Make the repository public (~operator)
+- [x] After the flip, change the README's `repo-private` badge to `repo-public`
+- [x] After the flip, update the company workspace's project brief and repos table to read public; one commit in that repo
 
 ## Acceptance
 
@@ -150,7 +150,7 @@ breaks those references.
 - [x] `./pp test unit` passes, including `tests/test_publication.py`
 - [x] `./pp check pre-push` is green
 - [x] The full-history gitleaks scan reports no findings
-- [ ] `gh repo view skyrowlabs/proto-pilot --json visibility,description` reads `PUBLIC` and the new description (~operator)
+- [x] `gh repo view skyrowlabs/proto-pilot --json visibility,description` reads `PUBLIC` and the new description (~operator)
 
 ## Dropped, and why
 
