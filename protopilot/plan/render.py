@@ -29,6 +29,11 @@ THROUGH_A_SUMMARY = (
     "summary was read, never that the claim is in the source"
 )
 RESEARCHED = f"> **Researched.** Cited findings rest on pages fetched during this run, {THROUGH_A_SUMMARY}."
+#: The entry page's stamp when research reached some topics and not others, by any route.
+PARTLY_RESEARCHED = (
+    "> **Partly researched.** {done} of {total} topics are researched. Their cited findings rest on pages "
+    f"fetched during research, {THROUGH_A_SUMMARY}."
+)
 TOPIC_RESEARCHED = (
     f"> **Researched.** Cited findings rest on pages fetched during this run, {THROUGH_A_SUMMARY}. "
     "Anything uncited is an assumption."
@@ -101,7 +106,7 @@ def topic_research(plan: Plan, topic: Topic) -> tuple[bool, str]:
 
 
 def _stamp(plan: Plan) -> str:
-    """The entry page's word on research: whole, in part with each topic left out named, or not at all."""
+    """The entry page's word on research: whole, partly with each topic left out named, or not at all."""
     if not plan.researched:
         why = f"\n>\n> Research did not run: {plan.research_failure}" if plan.research_failure else ""
         return NOT_RESEARCHED + why
@@ -109,17 +114,26 @@ def _stamp(plan: Plan) -> str:
     left = [f"> - {t.title}: {why}" for t, (done, why) in left if not done]
     if not left:
         return RESEARCHED
+    partly = PARTLY_RESEARCHED.format(done=len(plan.topics) - len(left), total=len(plan.topics))
     return "\n".join(
-        [RESEARCHED, ">", "> These topics are **not researched**, and every finding in them is an assumption:", *left]
+        [partly, ">", "> These topics are **not researched**, and every finding in them is an assumption:", *left]
     )
 
 
 def _topic_stamp(plan: Plan, topic: Topic) -> str:
+    """A topic's own word on research.
+
+    A topic research never reached reads the same whatever the rest of the plan is, so
+    researching one topic of an unresearched plan redraws no other topic's page.
+    """
     done, why = topic_research(plan, topic)
+    tried = plan.research_of(topic.slug) is not None
     if not plan.researched:
-        failed = plan.research_of(topic.slug)
-        return f"{NOT_RESEARCHED} {why}" if failed is not None else NOT_RESEARCHED
-    return TOPIC_RESEARCHED if done else f"> **Not researched.** {why} Every finding here is an assumption."
+        return f"{NOT_RESEARCHED} {why}" if tried else NOT_RESEARCHED
+    if done:
+        return TOPIC_RESEARCHED
+    own = tried or any(dream.promoted_to == topic.slug for dream in plan.dreams)
+    return f"> **Not researched.** {why} Every finding here is an assumption." if own else NOT_RESEARCHED
 
 
 def _edges(plan: Plan) -> list[Edge]:
@@ -145,6 +159,7 @@ def _plan_page(plan: Plan, verified: bool) -> str:
         f"{n}. **{titles.get(s.topic, s.topic)}:** {s.action}\n   - Why here: {s.why}"
         for n, s in enumerate(plan.steps, start=1)
     ]
+    dropped = [f"{t.title} (`{t.slug}`): {t.why}" for t in plan.dropped_topics]
     return _page(
         f"# {plan.title}",
         _stamp(plan),
@@ -157,6 +172,11 @@ def _plan_page(plan: Plan, verified: bool) -> str:
         f"## Topic map\n\n{_bullets(topic_map)}",
         f"## How the topics connect\n\n{_bullets([_edge_line(e, titles) for e in _edges(plan)])}",
         "## Where to start\n\n" + ("\n".join(steps) or "None recorded."),
+        (
+            f"## Dropped topics\n\nA person ruled these out, and the reason is kept.\n\n{_bullets(dropped)}"
+            if dropped
+            else ""
+        ),
         f"Extensions of the idea are kept apart, in [{DREAMS_FILE}]({DREAMS_FILE}).",
     )
 
@@ -224,7 +244,8 @@ def _dream_order(dream: Dream) -> tuple[int, str, str]:
 
 
 def _dreams_page(plan: Plan) -> str:
-    titles = {t.slug: t.title for t in plan.topics}
+    titles = {t.slug: f"{t.title} (a dropped topic)" for t in plan.dropped_topics}
+    titles.update({t.slug: t.title for t in plan.topics})
     dreams = sorted(plan.dreams, key=_dream_order)
     sections = (
         ("Proposals", "proposed"),

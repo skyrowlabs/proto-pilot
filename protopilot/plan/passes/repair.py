@@ -12,9 +12,10 @@ failing check named in the plan repair started from, however many attempts it
 takes. `worsened` keeps the floor from holding a plan worse than the one before.
 Everything else is proved by verifying the whole plan again.
 
-`unsettled` is the rule a promotion adds: what the plan held before it is settled,
-so a repair there obeys what `promote.apply` obeys, and the loop or fault a new link
-caused is mended at a new link.
+`unsettled` is the rule a change to a finished plan adds: what the plan held before
+it is settled, so a repair may move only the links and steps of the topics the change
+touched, and may not rewrite another topic. After a promotion those are the new topic,
+so the loop or fault a new link caused is mended at a new link.
 """
 
 from __future__ import annotations
@@ -58,14 +59,31 @@ new topic, and add steps only as those links require.
 """
 
 
+TOUCHED_RULE = """\
+A person has just changed one part of this plan: {topics}. Every link and step that does
+not involve it is settled: keep them all, word for word. Change only links that touch
+it, and steps only as those links require.
+"""
+
+
+RESTARTED_RULE = """\
+The steps of this plan were just made again. Every link is settled: keep them all, word
+for word. No step is settled: reorder the steps, or add the steps they are waiting on.
+"""
+
+
 def fixable(result: verify.PlanVerdict) -> list[verify.CheckResult]:
     return [check for check in result.failed if check.name in FIXES]
 
 
-def failure(result: verify.PlanVerdict, rejection: str = "", held: Plan | None = None) -> str:
-    """What `build` is told: the failing checks repair can reach, and why its last try was thrown away."""
+def failure(
+    result: verify.PlanVerdict, rejection: str = "", held: Plan | None = None, touched: frozenset[str] | None = None
+) -> str:
+    """What `build` is told: the failing checks repair can reach, what is settled, and why its last try was thrown away."""
     text = "\n\n".join(check.report() for check in fixable(result))
-    text = f"{text}\n\n{SETTLED_RULE}" if held else text
+    rule = TOUCHED_RULE.format(topics=", ".join(sorted(touched))) if touched else SETTLED_RULE
+    rule = RESTARTED_RULE if held is not None and not held.steps else rule
+    text = f"{text}\n\n{rule}" if held else text
     return f"{text}\n\nYour last repair was thrown away: {rejection}." if rejection else text
 
 
@@ -139,17 +157,25 @@ def rejected(entry: Plan, after: Plan) -> str:
     return _steps_lost(entry, after)
 
 
-def unsettled(held: Plan, after: Plan) -> str:
-    """Why `after` moved what `held` had settled, or an empty string. `held` is the plan before a promotion."""
-    new = {topic.slug for topic in after.topics} - {topic.slug for topic in held.topics}
-    was, now = {_key(edge) for edge in held.edges}, {_key(edge) for edge in after.edges}
-    strays = sorted(_key(e) for e in after.edges if _key(e) not in was and not new & {e.from_topic, e.to_topic})
-    steps = sorted({step.topic for step in held.steps if step not in after.steps})
-    if was - now:
-        return f"it removed settled links: {', '.join(sorted(was - now))}"
+def unsettled(held: Plan, after: Plan, touched: frozenset[str] | None = None) -> str:
+    """Why `after` moved what `held` had settled, or an empty string. `held` is the plan before a person's change.
+
+    `touched` is the topics that change was about. Left out, they are the topics `after` gained.
+    """
+    opened = touched if touched is not None else {t.slug for t in after.topics} - {t.slug for t in held.topics}
+    was, now = {_key(edge): edge for edge in held.edges}, {_key(edge): edge for edge in after.edges}
+    settled = {key for key, edge in was.items() if not opened & {edge.from_topic, edge.to_topic}}
+    strays = sorted(key for key, e in now.items() if key not in was and not opened & {e.from_topic, e.to_topic})
+    steps = sorted({step.topic for step in held.steps if step not in after.steps and step.topic not in opened})
+    kept = {topic.slug: topic for topic in after.topics}
+    rewritten = sorted(t.slug for t in held.topics if t.slug not in opened and kept.get(t.slug, t) != t)
+    if settled - now.keys():
+        return f"it removed settled links: {', '.join(sorted(settled - now.keys()))}"
     if strays:
         return f"it added links between settled topics: {', '.join(strays)}"
-    return f"it changed settled steps: {', '.join(steps)}" if steps else ""
+    if steps:
+        return f"it changed settled steps: {', '.join(steps)}"
+    return f"it rewrote settled topics: {', '.join(rewritten)}" if rewritten else ""
 
 
 def worsened(found: verify.PlanVerdict, after: Plan) -> str:

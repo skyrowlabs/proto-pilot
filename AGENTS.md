@@ -60,7 +60,8 @@ turns a sentence and a little direction into a folder of text plans: scope ->
 an outline a person reviews -> typed links between topics -> risks, unknowns and
 decisions -> first steps -> dreams -> checks on the structure, never the truth ->
 bounded repair -> a tree handed back green or with a `RUNBOOK.md`. `proto dream`
-adds to the pool of dreams and settles one. Research runs one web-only call per topic
+adds to the pool of dreams and settles one. `proto answer`, `proto topic` and
+`proto research SLUG` revise a plan already made, one change at a time. Research runs one web-only call per topic
 on the `claude-code` backend; a source counts only if the run's own transcript shows it
 fetched, and a plan made without research is stamped *Not researched*.
 
@@ -134,7 +135,7 @@ follow-up.**
 | Path | What |
 | ---- | ---- |
 | `protopilot/llm.py` | `LLM` Protocol + three backends |
-| `protopilot/plan/` | `proto plan` and `proto dream`. `passes/` holds its model passes, research, repair and the dream passes among them, and `pipeline.py` runs them; `model.py` is `plan.json`, the truth; `render.py` draws the markdown from it; `verify.py` checks structure, never truth, and a plan still red is handed back with a `RUNBOOK.md`; `lenses.py` is the fixed lenses as data, `dreaming.py` is the pool's rules, and `ledger.py` reads what research fetched from its transcripts — see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#the-plan-pipeline) |
+| `protopilot/plan/` | `proto plan`, `proto dream` and the verbs that revise a plan. `passes/` holds its model passes, research, repair and the dream passes among them, and `pipeline.py` runs them; `model.py` is `plan.json`, the truth; `render.py` draws the markdown from it; `verify.py` checks structure, never truth, and a plan still red is handed back with a `RUNBOOK.md`; `lenses.py` is the fixed lenses as data, `dreaming.py` is the pool's rules, `revising.py` is what a person may do to a finished plan's topics, and `ledger.py` reads what research fetched from its transcripts — see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md#the-plan-pipeline) |
 | `protopilot/registry.py` | Tracked plan trees, each a plan by its own files — see the `prune()` trap in `docs/NOTES.md` |
 | `protopilot/jobs.py`, `protopilot/progress.py` | The job a plan runs on and its typed events, and the pure fold of those events |
 | `protopilot/runner.py` | The subprocess seam the `claude-code` backend runs through |

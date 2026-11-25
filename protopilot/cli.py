@@ -3,6 +3,9 @@
 proto plan "start a community tool library" --for "one neighbourhood" --not "delivery"
 proto plan                      # at a terminal, asks for the idea and its brief
 proto dream | dream promote d1 | dream drop d2 --why "..."
+proto answer 1
+proto research scope --deeper
+proto topic add "Insurance" --why "..." | topic drop scope --why "..." | topic rename scope "The boundary"
 proto ls | rm | prune | doctor
 """
 
@@ -291,11 +294,14 @@ def plan_command(
         sys.exit(1)  # the tree is handed back with a RUNBOOK, and the exit code says it is red
 
 
-def _refuse_unresearchable(llm, researching: bool) -> None:
+def _refuse_unresearchable(llm, researching: bool, one_topic: bool = False) -> None:
     """A backend that cannot research is refused before any call, rather than billed for a stamped plan."""
+    from protopilot.llm import API_RESEARCH, API_RESEARCH_ONE
+
     # Only a backend that says it cannot is refused here. One with no research call at all is
     # labelled by the pipeline instead, and runs unresearched.
     refusal = str(getattr(llm, "research_refusal", "")) if researching and not llm.offline else ""
+    refusal = API_RESEARCH_ONE if one_topic and refusal == API_RESEARCH else refusal
     if refusal:
         raise click.ClickException(f"{refusal} No model was called.")
 
@@ -354,15 +360,23 @@ def _dream_llm(offline: bool, backend: str | None):
         raise click.ClickException(str(exc)) from exc
 
 
-def _dream_options(command):
-    """The flags every dream verb that may call a model takes, spelt as `proto plan` spells them."""
-    command = click.option("--offline", is_flag=True, help="Deterministic templates; no API calls.")(command)
-    return click.option(
-        "--backend",
-        type=click.Choice(["api", "claude-code", "offline"]),
-        default=None,
-        help="api bills API credit; claude-code bills a Claude subscription.",
-    )(command)
+def _backend_options(offline_help: str):
+    """The flags every verb that may call a model takes, spelt as `proto plan` spells them."""
+
+    def decorate(command):
+        command = click.option("--offline", is_flag=True, help=offline_help)(command)
+        return click.option(
+            "--backend",
+            type=click.Choice(["api", "claude-code", "offline"]),
+            default=None,
+            help="api bills API credit; claude-code bills a Claude subscription.",
+        )(command)
+
+    return decorate
+
+
+_dream_options = _backend_options("Deterministic templates; no API calls.")
+_revise_options = _backend_options("The deterministic twin; no API calls.")
 
 
 @main.group(name="dream", cls=_DreamCommand)
@@ -421,6 +435,136 @@ def dream_drop_command(dream_id: str, why: str, directory: str) -> None:
 
     target = Path(directory).resolve()
     _dream_step(target, lambda j: pipeline.drop(j, target, dream_id, why))
+
+
+def _revise_step(target: Path, work) -> None:
+    """Run one change to a finished plan as its own job, and exit as a red plan exits."""
+    from protopilot.jobs import STORE
+    from protopilot.plan import pipeline
+
+    if not _plan_step(STORE.create(str(target)), target, work, pipeline.after_revise_failure).ok:
+        sys.exit(1)
+
+
+@main.command(name="answer")
+@click.argument("number", required=False, type=click.IntRange(min=1), metavar="[N]")
+@click.option("--dir", "directory", default=".", help="Plan directory (default: cwd).")
+def answer_command(number: int | None, directory: str) -> None:
+    """Answer open question N of a plan, or each in turn. Calls no model.
+
+    An answer becomes a constraint and the question leaves the list. Enter leaves a
+    question open. Nothing else moves: no topic is outlined or researched again.
+    """
+    from protopilot.plan import baseline, pipeline
+
+    target = Path(directory).resolve()
+    try:
+        questions = pipeline.open_questions(target)
+    except pipeline.PlanRefused as exc:
+        raise click.ClickException(str(exc)) from exc
+    if not questions:
+        _echo("This plan has no open question, so there is nothing to answer.")
+        return
+    if number and number > len(questions):
+        raise click.ClickException(
+            f"This plan has {len(questions)} open question(s), so there is no question {number}."
+        )
+    asked = [number] if number else range(1, len(questions) + 1)
+    answers = {}
+    for n in asked:
+        prompt = f"{n}. {questions[n - 1]} (Enter leaves it open)"
+        answers[questions[n - 1]] = click.prompt(prompt, default="", show_default=False)
+    if not any(baseline.clean(said) for said in answers.values()):
+        _echo("No answer was given, so nothing was changed.")
+        return
+    _revise_step(target, lambda j: pipeline.answer(j, target, answers))
+
+
+@main.group(name="topic")
+def topic_group() -> None:
+    """Change the topics of a plan that is already made."""
+
+
+@topic_group.command(name="rename")
+@click.argument("slug", metavar="SLUG")
+@click.argument("title", metavar="TITLE")
+@click.option("--dir", "directory", default=".", help="Plan directory (default: cwd).")
+def topic_rename_command(slug: str, title: str, directory: str) -> None:
+    """Give topic SLUG the title TITLE. Calls no model.
+
+    The slug is the topic's identity and does not change, so its file, links, steps,
+    dreams and research stay where they are.
+    """
+    from protopilot.plan import pipeline
+
+    target = Path(directory).resolve()
+    _revise_step(target, lambda j: pipeline.rename_topic(j, target, slug, title))
+
+
+@topic_group.command(name="drop")
+@click.argument("slug", metavar="SLUG")
+@click.option("--why", required=True, help="What ruled it out; it stays in the plan.")
+@click.option("--dir", "directory", default=".", help="Plan directory (default: cwd).")
+@_revise_options
+def topic_drop_command(slug: str, why: str, directory: str, offline: bool, backend: str | None) -> None:
+    """Rule out topic SLUG, with what pointed at it: its links, its step, its sources nothing else cites.
+
+    A dream that extended it is set aside, never deleted, and the topic is remembered
+    with the reason. A model is called only if the drop leaves no first step.
+    """
+    from protopilot.plan import pipeline
+
+    target = Path(directory).resolve()
+    _revise_step(
+        target, lambda j: pipeline.drop_topic(j, target, slug, why, lambda: build_llm(offline=offline, backend=backend))
+    )
+
+
+@topic_group.command(name="add")
+@click.argument("title", metavar="TITLE")
+@click.option("--why", required=True, help="One line on why it matters to the idea.")
+@click.option("--dir", "directory", default=".", help="Plan directory (default: cwd).")
+@_revise_options
+def topic_add_command(title: str, why: str, directory: str, offline: bool, backend: str | None) -> None:
+    """Add the topic TITLE to a plan, connected and verified.
+
+    Offline, it is linked to nothing and has no risks, unknowns or decisions. Either
+    way it is not researched.
+    """
+    from protopilot.plan import pipeline
+
+    llm = _dream_llm(offline, backend)
+    target = Path(directory).resolve()
+    _revise_step(target, lambda j: pipeline.add_topic(j, target, title, why, llm))
+
+
+@main.command(name="research")
+@click.argument("slug", metavar="SLUG")
+@click.option(
+    "--deeper",
+    is_flag=True,
+    help="Give this one call the findings and pages of the next --depth up. The plan's depth is not changed.",
+)
+@click.option("--dir", "directory", default=".", help="Plan directory (default: cwd).")
+@_backend_options("Refused: research reads the web, and offline reads nothing.")
+def research_command(slug: str, deeper: bool, directory: str, offline: bool, backend: str | None) -> None:
+    """Research topic SLUG of a plan on the web, and replace what it had found.
+
+    One research call on the claude-code backend, then the topic's links and notes are
+    fitted again; no other topic is written. An earlier transcript stays beside the new
+    one. It does not run offline, and a try that stopped after its call is replayed.
+    """
+    from protopilot.plan import pipeline
+
+    llm = _dream_llm(offline, backend)
+    if llm.offline:
+        raise click.ClickException(
+            "`proto research` reads the web, and offline reads nothing. Choose a backend that researches. "
+            "Nothing was changed."
+        )
+    _refuse_unresearchable(llm, True, one_topic=True)
+    target = Path(directory).resolve()
+    _revise_step(target, lambda j: pipeline.research_topic(j, target, slug, llm, deeper))
 
 
 @main.command(name="ls")

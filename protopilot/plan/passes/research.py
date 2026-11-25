@@ -13,11 +13,13 @@ The offline twin cannot read the web, so it records nothing and the plan stays s
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
+from typing import cast
 
 from protopilot.plan import ledger
-from protopilot.plan.model import DEFAULT_DEPTH, Fetch, Finding, Plan, Source, Topic, TopicResearch
+from protopilot.plan.model import DEFAULT_DEPTH, Depth, Fetch, Finding, Plan, Source, Topic, TopicResearch
 from protopilot.plan.passes import listed, scope_block, text
 
 NAME = "research"
@@ -46,6 +48,13 @@ You research one topic of a plan, with web search and web fetch and nothing else
 
 def effort(plan: Plan) -> tuple[int, int, int]:
     return EFFORT[plan.depth or DEFAULT_DEPTH]
+
+
+def deeper(plan: Plan) -> Depth | None:
+    """The depth one step past this plan's, for one call's effort, or None at the deepest."""
+    depths = list(EFFORT)
+    following = depths[depths.index(plan.depth or DEFAULT_DEPTH) + 1 :]
+    return cast(Depth, following[0]) if following else None
 
 
 def schema(plan: Plan) -> dict:
@@ -86,6 +95,11 @@ def build(plan: Plan, topic: Topic) -> tuple[str, str]:
         "## The plan's other topics, for context only\n\n```json\n" + json.dumps(others, ensure_ascii=False) + "\n```",
     ]
     return system, "\n\n".join(blocks)
+
+
+def asked(plan: Plan, topic: Topic) -> str:
+    """A fingerprint of what a call for `topic` is asked, whatever its depth: the scope, the topic, the others."""
+    return hashlib.sha256(build(plan, topic)[1].encode("utf-8")).hexdigest()
 
 
 def offline(plan: Plan) -> Plan:

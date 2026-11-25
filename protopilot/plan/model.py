@@ -215,6 +215,16 @@ class Dream(_Record):
     _promoted_to = field_validator("promoted_to")(_checked_topic_link)
 
 
+class DroppedTopic(_Record):
+    """A topic a person removed from a finished plan, and why: what was ruled out is kept."""
+
+    slug: str
+    title: str
+    why: str
+
+    _slug = field_validator("slug")(_checked_slug)
+
+
 class Plan(_Record):
     slug: str
     title: str
@@ -246,6 +256,8 @@ class Plan(_Record):
     research: list[TopicResearch] = Field(default_factory=list)
     # Why research did not run at all, for `PLAN.md`.
     research_failure: str = ""
+    # Topics `proto topic drop` removed. Empty is the usual case, and then plan.json omits the key.
+    dropped_topics: list[DroppedTopic] = Field(default_factory=list)
 
     _slug = field_validator("slug")(_checked_slug)
 
@@ -305,7 +317,7 @@ class Plan(_Record):
             del data["depth"]
         if not self.brief:
             del data["brief"]
-        for key in ("dream_failure", "research", "research_failure"):
+        for key in ("dream_failure", "research", "research_failure", "dropped_topics"):
             if not data[key]:
                 del data[key]
         absent = [folder for folder in (path.parent, *path.parent.parents) if not folder.exists()]

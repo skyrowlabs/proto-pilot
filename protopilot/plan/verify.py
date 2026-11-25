@@ -242,6 +242,8 @@ def sources_fetched(plan: Plan, pages: Pages) -> CheckResult:
             problems.append(f"source {source.id} ({source.url}) has no usable fetch in this run's ledger{typed}")
     if plan.researched and not plan.sources:
         problems.append("the plan says it was researched, and it holds no source")
+    elif plan.researched and plan.research and not any(record.state == "researched" for record in plan.research):
+        problems.append("the plan says it was researched, and no topic's research cites a page it fetched")
     problems += _borrowed(plan)
     advice = "Only a research run can record a fetch, so remove the source or research it."
     return _judged("sources_fetched", plan.sources, problems, advice, "The plan has no sources to check.")
@@ -286,16 +288,26 @@ def dream_length(dream: Dream) -> int:
     return sum(dream_words(getattr(dream, field)) for field in CAPPED_FIELDS)
 
 
+#: The verdicts of a dream nobody is being offered, whose anchor may be a topic the plan dropped.
+SETTLED_VERDICTS = ("set-aside", "dropped", "promoted")
+
+
 def dreams_shaped(plan: Plan, pages: Pages) -> CheckResult:
-    """Every dream has an anchor topic, a verdict, and fits its word cap, and one id means one dream."""
+    """Every dream has an anchor topic, a verdict, and fits its word cap, and one id means one dream.
+
+    A dream no longer on offer may keep the anchor of a topic the plan remembers dropping.
+    """
     known = {topic.slug for topic in plan.topics}
+    remembered = {topic.slug for topic in plan.dropped_topics} - known
     ids = [dream.id for dream in plan.dreams]
     problems = [
         f"more than one dream has the id {repeated}" for repeated in sorted({i for i in ids if ids.count(i) > 1})
     ]
     for dream in plan.dreams:
         words = dream_length(dream)
-        if dream.anchor not in known:
+        if dream.anchor in remembered and dream.verdict not in SETTLED_VERDICTS:
+            problems.append(f"dream {dream.id} is on offer, and its anchor {dream.anchor!r} is a dropped topic")
+        elif dream.anchor not in known | remembered:
             problems.append(f"dream {dream.id} is anchored to {dream.anchor!r}, which is not a topic")
         if dream.verdict is None:
             problems.append(f"dream {dream.id} has no verdict")

@@ -96,7 +96,7 @@ an assumption, and a green plan means the structure holds, never that the plan i
 
 ## Going further
 
-- [`docs/CLI.md`](docs/CLI.md): every command and flag: `plan`, `dream`, `ls`, `rm`, `prune`, `doctor`
+- [`docs/CLI.md`](docs/CLI.md): every command and flag: `plan`, `dream`, `answer`, `topic`, `research`, `ls`, `rm`, `prune`, `doctor`
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): how a plan is made, pass by pass, and why
 - [`docs/examples/`](docs/examples/README.md): worked runs
 

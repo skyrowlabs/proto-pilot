@@ -16,9 +16,10 @@ stale in the half nobody re-reads.
 **Planning is the whole product.** `proto plan "an idea"` turns a sentence and a
 little direction into a folder of text plans: topics, how they connect, risks,
 first steps, and dreams kept apart from the plan. `proto dream` adds to the pool
-of dreams and settles one. Its pipeline is [below](#the-plan-pipeline).
+of dreams and settles one, and `proto answer`, `proto topic` and `proto research`
+revise a plan already made. Its pipeline is [below](#the-plan-pipeline).
 
-The CLI is `plan`, `dream`, `ls`, `rm`, `prune` and `doctor`. Nothing here
+The CLI is `plan`, `dream`, `answer`, `topic`, `research`, `ls`, `rm`, `prune` and `doctor`. Nothing here
 generates, runs or verifies an app, nothing listens on a port, and nothing calls
 Docker. The layer that did was removed on 2026-11-11; the tag `prototyping-final`
 is the last commit that holds it, and [plans-first](ideas/plans-first.md) has the
@@ -70,7 +71,7 @@ One `proto plan` run, end to end. Every arrow is a place something can be refuse
 
 | Component | Responsibility | Talks to |
 | --------- | -------------- | -------- |
-| `protopilot/cli.py` | The `proto` command: `plan`, `dream`, `ls`, `rm`, `prune`, `doctor` | everything below |
+| `protopilot/cli.py` | The `proto` command: `plan`, `dream`, `answer`, `topic`, `research`, `ls`, `rm`, `prune`, `doctor` | everything below |
 | `protopilot/plan/model.py` | **The truth.** `plan.json`, the slug rule and where a plan keeps its files | `pydantic` |
 | `protopilot/plan/passes/` | One module per pass: prompt, JSON Schema, `apply`, and an offline twin | `llm.py`, `protopilot/plan/model.py` |
 | `protopilot/plan/pipeline.py` | Orchestration: the halves a run stops between, the repair loop, the runbook floor, resume | `plan/passes/`, `jobs.py`, `registry.py` |
@@ -79,6 +80,7 @@ One `proto plan` run, end to end. Every arrow is a place something can be refuse
 | `protopilot/plan/verify.py` | The structural checks, the verdict type and the runbook | `protopilot/plan/render.py`, `protopilot/plan/ledger.py` |
 | `protopilot/plan/ledger.py` | What research fetched, read from its transcripts and never from a citation | `llm.py` |
 | `protopilot/plan/lenses.py`, `protopilot/plan/dreaming.py` | The six lenses as data, and the rules of the dream pool | `protopilot/plan/model.py` |
+| `protopilot/plan/revising.py` | What `proto topic add` and `drop` may do to a finished plan's topics, and what a drop takes with it | `protopilot/plan/model.py`, `protopilot/plan/passes/` |
 | `protopilot/llm.py` | `LLM` Protocol + three backends (api, claude-code, offline) | `anthropic`, the `claude` CLI |
 | `protopilot/runner.py` | The subprocess seam the `claude-code` backend runs through, behind a Protocol so it can be faked | `subprocess` |
 | `protopilot/jobs.py` | In-process job store: `proto plan` runs on a job and emits typed events | `cli.py`, `protopilot/plan/pipeline.py` |
@@ -92,7 +94,8 @@ One `proto plan` run, end to end. Every arrow is a place something can be refuse
 `PLAN.md`, `topics/`, `dreams.md`, `sources.md` and a stored `plan.json`, with a
 `RUNBOOK.md` when the plan ends red. Why is [plans-first](ideas/plans-first.md); the design and what is still to build are
 [plan-prototypes](implementations/spec/plan-prototypes.md); flags are in [CLI.md](CLI.md#proto-plan), and
-`proto dream`'s [beside them](CLI.md#proto-dream).
+`proto dream`'s [beside them](CLI.md#proto-dream), with the verbs that
+[revise a plan](CLI.md#revising-a-plan).
 
 **It is the only pipeline here.** It runs on the job seam and its event
 vocabulary, keeps its own files in `.protopilot/` (`PLAN_DIR`), owns the slug rule
@@ -137,19 +140,28 @@ one model value in a file name is a topic slug, which `model.py` checks, and
   summary was read, never that the claim is in the source, and the green line says so.
 - **The ledger is redrawn from transcripts, so a hand edit cannot upgrade it.** Each
   topic's raw stream lands in `.protopilot/research/<slug>.jsonl`, and its sha256 in
-  `plan.json`. `sources_fetched` reads the ledger and never `Source.fetched`, and
+  `plan.json`. A topic researched again gets `<slug>.2.jsonl` beside it, then `.3`, and
+  the record names the one that counts (`ledger.transcript_number`). `sources_fetched` reads the ledger and never `Source.fetched`, and
   `rerender`, `_hand_back` and `_held` redraw the ledger from the transcripts first, so
   `fetched: true`, or a fetch typed into the ledger, stays red. Each record's state is
-  redrawn too (`ledger.reconciled`), from its own transcript, which must carry the topic's
-  own name and the recorded sha256, and a cited finding must rest on its own topic's
+  redrawn too (`ledger.reconciled`), from its own transcript, which must be one of the
+  topic's own by name and carry the recorded sha256, and a cited finding must rest on its own topic's
   fetches. A record whose transcript fails that is `failed` with `NO_EVIDENCE`. A forged
   transcript is past any check here.
 - **Page text never reaches a later pass.** What does is the findings, bounded in count
   and length by the research schema, as JSON under a note that they are untrusted data
   (`findings_block`). Topic pages say per topic whether research ran, failed, cited
   nothing, or never ran because a person promoted the topic from a dream.
+- **Researched is whole, partly, or not at all, and partly is derived.**
+  `Plan.researched` stays a flag that follows the ledger's records. `render._stamp` draws
+  *Partly researched* when it is set and `topic_research` leaves a topic out, and names
+  each one, so `plan.json` did not change shape. A topic research never reached draws one
+  stamp whatever the rest of the plan is (`_topic_stamp`), so researching one topic of an
+  unresearched plan redraws no other topic's page. `sources_fetched` refuses a plan that
+  says researched while no record is, and a topic that cites a page its own research
+  never fetched.
 - **A failed topic costs only itself, and a stopped run resumes.** A topic whose call or
-  output fails is recorded `failed` and the run goes on. `pipeline._asked` asks a refused
+  output fails is recorded `failed` and the run goes on. `pipeline._call` asks a refused
   call once more unless `llm.ResearchFailed.retry` is False (a `Breach`, or a timeout), and
   keeps every unused stream as `<topic>.refused-<n>.jsonl`, `n` rising across runs. No slug holds a dot, so no
   reader of evidence opens one. Before the first call the
@@ -184,16 +196,53 @@ one model value in a file name is a topic slug, which `model.py` checks, and
   `_dreamed_or_noted` keeps the plan as it stood, records `dream_failure` for `dreams.md`,
   and carries on, so the exit code is the plan's own. In `dream_round` the same failure
   is a refusal: the tree stays as it was and the CLI exits 1.
-- **`dream_round`, `promote` and `drop` extend a green plan or do nothing.** `_held` refuses
+- **`dream_round`, `promote`, `drop` and the verbs that revise a plan extend a green plan or
+  do nothing.** `_held` refuses
   a red plan before any model call, and `_land` writes only a green result, and only if
   `plan.json` has not moved meanwhile. A page edited by hand is drawn over, with a line
   naming it. If the draw itself fails, `_put_back` restores the tree and says how far
   that got. A round whose dreams all fall out still lands, with nothing added.
+- **A finished plan is revised one verb at a time, and each lands as a dream verb does.**
+  `answer`, `rename_topic`, `drop_topic`, `add_topic` and `research_topic` in `pipeline.py`
+  go `_held`, the change, verification with any repair, then `_land`; none has its own save
+  path. `answer` folds an answer into `constraints` through `scope.answered` and reruns no
+  pass. A slug is a topic's identity, so `rename_topic` changes the title alone.
+  `revising.dropped` takes a topic with its links, its step, its ledger record and any
+  source nothing else cites, sets aside a dream anchored to it, drops the dream it was
+  promoted from, clears `researched` when no researched record is left, and remembers it
+  in `Plan.dropped_topics`, which `plan.json` omits when
+  empty; `start` runs again only if `start_order` fails on what is left, which is when no
+  step is. `dreams_shaped` lets a dream that is
+  no longer on offer keep the anchor of a remembered topic. `add_topic` is
+  `revising.added`, which is `outline.add` and forgets a remembered topic only when it
+  comes back under its old slug, then the promotion's own pass and guard.
+- **Re-research replaces one topic's record, never merges.** `research_topic` writes the
+  new transcript under the next number before anything else, so a try that fails later
+  leaves the plan as it was and a rerun replays that transcript. What makes a transcript
+  replayable is its mark, `<slug>.pending.json`: the number, the depth asked, the
+  transcript the record named when the try began, the transcript's sha256, and
+  `research.asked`, a hash of the call's user prompt, which holds the scope, the
+  constraints, the topic and the other topics' slugs and titles and no depth. So a
+  rename, an addition or a drop of any other topic makes a new call too. `ledger.stale` and
+  `_research_try` replay it only while all of those hold, at its own depth unless the
+  rerun asks for more, and the log says why a new call was made. A replay that raises
+  drops the mark, so a bad transcript cannot wedge the topic. A landing or a drop removes
+  the mark, a result `_land` refuses keeps it, and `add_topic` clears any mark for the slug it takes. Every other call is
+  numbered past all the topic's transcripts on disk (`ledger.next_number`), so a dropped
+  topic added again is researched afresh and no evidence is overwritten. The first run's
+  resume is another path: `_asked` at number 1, with no mark. Findings are replaced,
+  a source only that topic cited is removed (`revising.without_orphans`), and
+  `ledger.reconciled` settles `researched` from the records. `connect` and `consider` then
+  run with `only=SLUG`: `connect.apply` refuses a link that does not touch the topic and
+  keeps every other link, and `consider.apply` writes that topic's notes alone. `--deeper`
+  lends the call the next depth's `research.EFFORT` and stores nothing. Offline it is
+  refused.
 - **Only `proto dream promote` turns a dream into a topic.** `dreaming.promoted` is called
   from `pipeline.promote` and nowhere else. The topic goes last, one call in
   `protopilot/plan/passes/promote.py` supplies its links and notes, and a link that does
   not touch it is refused, so what the plan had settled stays settled. It writes no
-  finding, so the topic stays not researched. A promotion that stays red changes nothing.
+  finding, so the topic stays not researched until `research_topic` runs on it. A
+  promotion that stays red changes nothing.
 - **Verification proves structure, never truth.** `verify.py` has one check per bullet
   of [What "verified" means](implementations/spec/plan-prototypes.md#what-verified-means-for-text):
   `topic_map`, `no_cycles`, `findings_traced`, `sources_fetched`, `start_order`,
@@ -217,8 +266,10 @@ one model value in a file name is a topic slug, which `model.py` checks, and
   that out for a step a kept one waits on. `worsened` throws away one that leaves more
   wrong than it found. A thrown-away attempt counts, and its reason goes into the next.
   A repair pass that fails or changes nothing stops the loop, and offline, where the
-  twin returns the plan as it stands, that is the first attempt. After a promotion
-  `unsettled` adds one rule: every link and step the plan held before stays as it was.
+  twin returns the plan as it stands, that is the first attempt. After a person's change
+  `unsettled` adds one rule: what the plan held before is settled. Repair may move only
+  the links and steps of the topics the change touched, which after a promotion or an
+  addition is the new topic, and a repair that rewrites another topic is thrown away.
 - **The floor hands back a whole tree.** A plan still red is written anyway, with a
   `RUNBOOK.md` from `verify.runbook`, a *Not verified* banner on `PLAN.md` and every
   topic page, and no green line; `finished` says `ok=False` and the CLI exits 1.

@@ -9,8 +9,12 @@ What a usable fetch proves is narrow: `WebFetch` returns a model's summary of th
 not the page, so a citation shows that summary was read, never that a claim is in the source.
 
 The transcripts live in `.protopilot/research/`, beside the reviewed outline a resumed
-run starts from. `reconciled` redraws each record's fetches from its transcript, so a
-`fetched: true` typed into plan.json, or a fetch typed into the ledger, earns nothing.
+run starts from. A topic researched again gets a numbered transcript beside its first,
+and its record names the one that counts. A try that has not landed is marked
+`<slug>.pending.json`, and only a marked transcript is replayed, and only while its
+hash and what it was asked still hold. `reconciled` redraws each record's fetches
+from that transcript, so a `fetched: true` typed into plan.json, or a fetch typed into
+the ledger, earns nothing, and a record cannot borrow another topic's transcript.
 A forged transcript is beyond any check here. `normal` keeps http/https, `www.`, `:443`
 and `%7E` apart, which errs toward calling a citation an assumption: a ruling, for now.
 """
@@ -18,9 +22,11 @@ and `%7E` apart, which errs toward calling a citation an assumption: a ruling, f
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from contextlib import suppress
 from pathlib import Path
+from typing import NamedTuple
 from urllib.parse import urlsplit, urlunsplit
 
 from protopilot.llm import LLMError, stream_events
@@ -114,19 +120,28 @@ def research_dir(tree: Path) -> Path:
     return Path(tree) / RESEARCH_DIR
 
 
-def transcript_name(slug: str) -> str:
-    return f"{slug}.jsonl"
+def transcript_name(slug: str, number: int = 1) -> str:
+    """A topic's first transcript is `<slug>.jsonl`, and each later one is numbered from 2. A slug holds no dot."""
+    return f"{slug}.jsonl" if number <= 1 else f"{slug}.{number}.jsonl"
+
+
+def transcript_number(name: str, slug: str) -> int:
+    """Which of `slug`'s own transcripts `name` is, counted from 1, or 0 if it is not one of them."""
+    if name == transcript_name(slug):
+        return 1
+    numbered = re.fullmatch(rf"{re.escape(slug)}\.([1-9]\d*)\.jsonl", name)
+    return int(numbered.group(1)) if numbered and int(numbered.group(1)) > 1 else 0
 
 
 def digest(transcript: str) -> str:
     return hashlib.sha256(transcript.encode("utf-8")).hexdigest()
 
 
-def write_transcript(tree: Path, slug: str, transcript: str) -> str:
+def write_transcript(tree: Path, slug: str, transcript: str, number: int = 1) -> str:
     """Land a topic's transcript whole, and return its file name."""
     folder = research_dir(tree)
     folder.mkdir(parents=True, exist_ok=True)
-    name = transcript_name(slug)
+    name = transcript_name(slug, number)
     temp = folder / f".{name}.tmp"
     temp.write_text(transcript, encoding="utf-8")
     temp.replace(folder / name)
@@ -159,11 +174,79 @@ def write_refused(tree: Path, slug: str, transcript: str) -> str:
     return f"{RESEARCH_DIR}/{name}"
 
 
-def read_transcript(tree: Path, slug: str) -> str | None:
-    path = research_dir(tree) / transcript_name(slug)
+def read_transcript(tree: Path, slug: str, number: int = 1) -> str | None:
+    path = research_dir(tree) / transcript_name(slug, number)
     if path.is_symlink() or not path.is_file():
         return None
     return path.read_text(encoding="utf-8", errors="replace")
+
+
+def next_number(tree: Path, slug: str, after: int = 0) -> int:
+    """A number past `after` that none of `slug`'s transcripts on disk holds, so a new call overwrites no evidence."""
+    folder = research_dir(tree)
+    held = [transcript_number(path.name, slug) for path in folder.glob(f"{slug}*.jsonl")] if folder.is_dir() else []
+    return max([after, *held]) + 1
+
+
+def _pending_path(tree: Path, slug: str) -> Path:
+    return research_dir(tree) / f"{slug}.pending.json"
+
+
+class Mark(NamedTuple):
+    """What `<slug>.pending.json` says of a try not yet landed. Every field is typed by nobody we trust."""
+
+    number: int
+    depth: str
+    since: str
+    sha256: str
+    asked: str
+
+
+def save_pending(tree: Path, slug: str, number: int, depth: str, since: str, sha256: str = "", asked: str = "") -> None:
+    """Mark transcript `number` as a try not yet landed.
+
+    The mark holds the depth asked, the transcript the try would replace, the transcript's
+    hash, and a fingerprint of what was asked, so a rerun can tell whether it is the same try.
+    """
+    path = _pending_path(tree, slug)
+    said = {"number": number, "depth": depth, "since": since, "sha256": sha256, "asked": asked}
+    temp = path.with_name(f".{path.name}.tmp")
+    temp.write_text(json.dumps(said) + "\n", encoding="utf-8")
+    temp.replace(path)
+
+
+def pending(tree: Path, slug: str) -> Mark | None:
+    """The mark `slug` holds, as written, or None if there is none that can be read. Judging it is `stale`'s."""
+    path = _pending_path(tree, slug)
+    if path.is_symlink() or not path.is_file():
+        return None
+    try:
+        said = json.loads(path.read_text(encoding="utf-8"))
+        fields = (said["depth"], said["since"], said.get("sha256", ""), said.get("asked", ""))
+        return Mark(int(said["number"]), *(str(field) for field in fields))
+    except (ValueError, KeyError, TypeError, AttributeError):
+        return None
+
+
+def stale(mark: Mark, tree: Path, slug: str, since: str, asked: str) -> str:
+    """Why `mark`'s transcript is not this try's to replay, or an empty string.
+
+    Only a marked transcript is one to replay. Any other on disk is evidence of an earlier
+    state, a dropped topic's included, and a new call is numbered past it.
+    """
+    if not (mark.sha256 and mark.asked):
+        return "its mark does not say what was asked"
+    if mark.since != since or mark.number <= transcript_number(since, slug):
+        return "it was made before this topic's research last changed"
+    said = read_transcript(tree, slug, mark.number)
+    if said is None or digest(said) != mark.sha256:
+        return "its transcript is missing or was altered"
+    return "" if mark.asked == asked else "what research would be asked has changed since"
+
+
+def forget_pending(tree: Path, slug: str) -> None:
+    with suppress(OSError):
+        _pending_path(tree, slug).unlink(missing_ok=True)
 
 
 def save_draft(tree: Path, plan: Plan) -> None:
@@ -190,8 +273,8 @@ def forget_draft(tree: Path) -> None:
 
 
 def _evidence(record: TopicResearch, tree: Path) -> list[Fetch] | None:
-    """The fetches in this topic's own transcript, or None if it is not there as written."""
-    if record.transcript != transcript_name(record.topic):
+    """The fetches in the transcript this record names, or None if it is not this topic's or not there as written."""
+    if not transcript_number(record.transcript, record.topic):
         return None
     path = research_dir(tree) / record.transcript
     if path.is_symlink() or not path.is_file():

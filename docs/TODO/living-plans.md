@@ -145,6 +145,19 @@ a local, unpublished checkout, transcripts included; nothing is committed here.
   `--must`, and was proposed anyway; open questions again went unanswered by any step.
 - Operator's five lines: _open — the operator's to write._
 
+**The revise verbs, first use, 2026-11-11 (agent-run, from the unmerged branch).** Run
+on two earlier researched plans whose trees are not published: `proto answer` twice,
+`proto topic add` once, and `proto research` on the added topic, on an existing topic
+and on a topic whose first research failed. All landed green.
+
+- An answered question renders as the question and the answer run together in one
+  constraint bullet. It reads badly.
+- An answer that bore on one topic got no hint which topic. One vote for open question 2.
+- **`topic add` and `research` left *Where to start* unchanged.** After the purpose
+  changed and a topic was added, the steps were the same. That needs a ruling.
+- A failed research call rendered a truncated fragment of usage JSON as its reason and
+  kept no transcript. Fixed since by #56 (proto-pilot@434c498, proto-pilot@7175d96).
+
 ## Phase 2 — Revise a plan after it is made
 
 **Problem.** See the first four bullets of *Problem*.
@@ -212,18 +225,18 @@ any of it is built:
 
 Tasks:
 
-- [ ] Characterise first: tests that pin what `outline.rename`, `outline.drop`
+- [x] Characterise first: tests that pin what `outline.rename`, `outline.drop`
       and `ledger.reconciled` do to a *finished* plan today, before changing any
-- [ ] `proto answer`, with its offline twin being the whole thing
-- [ ] `proto topic rename`, then `drop`, then `add`, each landing through `_land`
-- [ ] The dropped-topics list on `Plan`, with a test that an old `plan.json`
+- [x] `proto answer`, with its offline twin being the whole thing
+- [x] `proto topic rename`, then `drop`, then `add`, each landing through `_land`
+- [x] The dropped-topics list on `Plan`, with a test that an old `plan.json`
       without it loads and saves byte-identical
-- [ ] `proto research SLUG`, resumable as the first run's research is
-- [ ] The held-topic guard on repair, with a planted repair that rewrites
+- [x] `proto research SLUG`, resumable as the first run's research is
+- [x] The held-topic guard on repair, with a planted repair that rewrites
       another topic
-- [ ] The partly-researched stamp, with a planted-failure test per check it
+- [x] The partly-researched stamp, with a planted-failure test per check it
       touches, as `test_every_check_has_a_planted_failure` requires
-- [ ] `docs/CLI.md`, `README.md` commands, and `ARCHITECTURE.md`'s plan pipeline
+- [x] `docs/CLI.md`, `README.md` commands, and `ARCHITECTURE.md`'s plan pipeline
       section, in the same change
 
 **Done is checked by:** on the offline tool-library plan, `proto topic drop`
@@ -244,6 +257,48 @@ nothing else.
    first needs a model call to judge.
 3. Does a dropped topic's dream get set aside (proposed above) or dropped?
    **Ruled 2026-11-11: set aside, with the reason.**
+
+**Built 2026-11-11, and where the code differs from the sketch.** Each of these was
+a choice the sketch did not make or the code made for it. They stand until ruled
+otherwise.
+
+1. `ledger.reconciled` could not pick a second transcript: it read `<slug>.jsonl` by
+   name and called anything else no evidence. The name rule now takes a topic's own
+   numbered transcripts (`<slug>.2.jsonl`) and still refuses another topic's.
+2. `topic add` makes one call, the promotion's own pass, not `consider`, `connect` and
+   `start`. The table's *Reuses* column and the offline rule both say it lands as a
+   promotion does.
+3. `topic drop` runs `start` again only when no step is left, which is the one way a
+   drop fails `start_order`. The table said whenever a step named the topic.
+4. The ruling on a dropped topic's dream covers a dream anchored to it. A dream the
+   topic was *promoted from* had no rule, and `dreams_shaped` goes red on it, so it is
+   marked dropped with the person's `--why`. A set-aside dream keeps its anchor, and
+   `dreams_shaped` accepts the anchor of a remembered dropped topic on a dream no longer
+   on offer.
+5. Repair reaches links and steps and never a finding, so the held-topic guard is stated
+   in those terms. `connect` on a re-research is narrowed the same way (`only=SLUG`), or
+   it would rewrite every other topic's links.
+6. "Partly" is derived from the ledger's records, not stored, so `plan.json` kept its
+   shape. A topic research never reached now draws the same stamp in a researched plan
+   as in an unresearched one, so the first research of a `--no-research` plan redraws no
+   other topic's page.
+7. Adding a dropped title is told and then done, not refused. A research call that
+   fails changes nothing, where a first run would record the topic as failed. `PLAN.md`
+   lists dropped topics, which the sketch did not ask for.
+8. Only a transcript marked `<slug>.pending.json` is replayed. The mark holds its
+   hash, the depth asked and a fingerprint of the research prompt, so an answer, or a
+   change to any topic's name or to the topic list, makes the next research a new call.
+   A replay that fails drops the mark. A dropped topic's transcripts stay and are never
+   replayed, and a drop of the only researched topic leaves the plan *Not researched*.
+9. `proto topic rename` to a title another topic already has is refused in a sentence.
+   **Not yet ruled:** this is the coordinator's default.
+
+**Seen and left open**
+
+- Two open questions with the same text are one key to `proto answer`, so one answer
+  closes both.
+- `TopicResearch.topic` is not validated as a slug, though `ledger` builds a file name
+  from it.
 
 ## Phase 3 — A plan as a handoff
 
