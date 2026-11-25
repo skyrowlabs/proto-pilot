@@ -12,7 +12,7 @@ checking whether a capability already exists (parked) before rebuilding it.
 
 **Machine-readable index**: [`../todo_index.json`](../todo_index.json).
 
-**1 open plans** · **0 agent-managed**
+**2 open plans** · **0 agent-managed**
 
 ---
 
@@ -23,6 +23,14 @@ _Not started — intended future work._
 | Plan | Priority | Updated | Summary |
 | ---- | -------- | ------- | ------- |
 | [Living Plans](living-plans.md) | medium | 2026-11-11 | Let a plan be revised, tested and handed off after it is made: answer its questions, change or re-research one topic, record what a real test showed, and emit a brief another tool can start from. |
+
+## ⛔ Blocked
+
+_Startable or code-complete, gated on an external prerequisite._
+
+| Gate | Plan | Priority | Updated | Summary |
+| ---- | ---- | -------- | ------- | ------- |
+| 🖧 Host/ops change | [Scrub for Public](scrub-for-public.md) | high | 2026-11-24 | Remove personal traces and private-project context from the tracked tree, then hand the visibility flip to the maintainer; history is kept as it is. |
 
 ---
 
