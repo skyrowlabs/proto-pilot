@@ -18,7 +18,7 @@ from scripts.yaml_text import read_uncommented
 
 #: Written only when GitHub's description is empty: it is the scaffold's tagline,
 #: and a description somebody wrote since is theirs.
-DESCRIPTION = "A framework for prototyping ideas with agents."
+DESCRIPTION = "Give it an idea and a little direction, and get back a plan."
 
 
 @dataclass(frozen=True)

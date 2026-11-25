@@ -184,22 +184,18 @@ Tabling the hosted service does not throw away everything in that doc:
 - **The automatic oracle was always the rare part**, and it belongs to the
   pipeline, not the service. It gets better in the terminal.
 - **Tier 3, training a model on the corpus, is unchanged and still not this
-  repo's job** — that is mind.head's, per the workspace seam.
+  repo's job** — model training is out of scope here.
 - **What is genuinely given up** is the distribution of *real* intent: which
   ideas strangers actually want. That is one column of the row, and it is the
   column you can buy last.
 - **The service ambition is detached, not killed** — and that distinction is
-  somebody else's to resolve. The workspace's open research question R1 aims at
-  "a public-facing skyrow.ai that turns an idea into a running app, as a
-  service", and names this pipeline as the vehicle. Tabling the hosted page does
-  not settle skyrow.ai: **a service could be built on the same models without
-  being `proto`.** What it settles is that R1 can no longer assume proto.pilot
-  is the front door. Read `docs/ideas/hosted.md`'s "Where it would live" section
-  with that in mind — its conclusion (marketing page in `skyrowlabs.ai`, service
+  somebody else's to resolve. An open research question outside this repo aims at
+  a public service that turns an idea into a running app, and names this pipeline
+  as the vehicle. Tabling the hosted page does not settle that: **a service could
+  be built on the same models without being `proto`.** What it settles is that
+  the question can no longer assume proto.pilot is the front door. Read `docs/ideas/hosted.md`'s "Where it would live" section
+  with that in mind — its conclusion (marketing page on a static site, service
   as a deployment of this repo) is the half that is now withdrawn.
-
-  (Raised by skyrow-workspace, who own R1 and have flagged the tension in place
-  rather than resolving it.)
 
 ## Open questions
 
