@@ -274,6 +274,7 @@ def _asked(job, plan: Plan, llm, tree: Path, topic: Topic, number: int = 1) -> t
         transcript, data = got.transcript, got.data
     else:
         transcript, data = stored, research_result(stored, label)
+    data = research.upgraded(data)
     try:
         fault = misshapen(research.schema(plan), data)
         if fault:

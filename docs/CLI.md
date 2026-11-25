@@ -93,8 +93,8 @@ research time and reported cost, from one measured topic: about two minutes and 
 each, the price the run would carry, not a subscription charge.
 
 **Research runs on `--backend claude-code` only.** Each topic gets one call holding web
-search and web fetch and nothing else. A finding is cited only if this run fetched its
-page with usable content, which is judged by a heuristic, and anything else is labelled
+search and web fetch and nothing else. A finding may cite up to three pages, and is cited
+only if this run fetched every one of them with usable content, which is judged by a heuristic, and anything else is labelled
 an assumption; `sources.md` lists what was cited and not fetched, and every fetch that
 failed, as plain text and never as a link. A fetched page is read
 through a model's summary of it, so a citation shows the summary was read, not that the

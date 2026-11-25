@@ -24,11 +24,11 @@ def fetched(url: str = URL, code: int = 200, text: str = SUMMARY, size: int = 50
 
 
 def cited(text: str = "Most tool libraries carry liability cover.", url: str = URL, title: str = "A guide") -> dict:
-    return {"text": text, "kind": "cited", "source_url": url, "source_title": title}
+    return {"text": text, "kind": "cited", "sources": [{"url": url, "title": title}] if url else []}
 
 
 def assumed(text: str = "Volunteers will turn up every week.") -> dict:
-    return {"text": text, "kind": "assumption", "source_url": "", "source_title": ""}
+    return {"text": text, "kind": "assumption", "sources": []}
 
 
 def transcript(
@@ -86,3 +86,13 @@ class ResearchingLLM(FakeLLM):
             raise said
         assert isinstance(said, str)
         return Researched(research_result(said, label), said)
+
+
+def old_shape(said: str) -> str:
+    """`said` as a run before #53 answered it: each finding's one `source_url` and `source_title`."""
+    events = [json.loads(line) for line in said.splitlines()]
+    for event in events:
+        for row in (event.get("structured_output") or {}).get("findings", []):
+            first = (row.pop("sources") or [{"url": "", "title": ""}])[0]
+            row["source_url"], row["source_title"] = first["url"], first["title"]
+    return "\n".join(json.dumps(event) for event in events) + "\n"

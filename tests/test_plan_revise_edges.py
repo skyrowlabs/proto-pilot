@@ -8,7 +8,7 @@ import pytest
 from click.testing import CliRunner
 from fakes import FakeLLM
 from plan_script import GOOD, IDEA, script
-from research_script import OTHER, URL, ResearchingLLM, assumed, cited, fetched, transcript
+from research_script import OTHER, URL, ResearchingLLM, assumed, cited, fetched, old_shape, transcript
 
 from protopilot import cli
 from protopilot.jobs import Job
@@ -412,9 +412,9 @@ def old_tree(tree: Path) -> Path:
     (tree / ".protopilot").mkdir(parents=True)
     (tree / ".protopilot" / "plan.json").write_bytes(BEFORE.read_bytes())
     for slug, said_ in {"members": transcript(), "lending": AGAIN, "space": NOTHING}.items():
-        ledger.write_transcript(tree, slug, said_)
+        ledger.write_transcript(tree, slug, old_shape(said_))
     for slug in ("money", "safety"):
-        ledger.write_transcript(tree, slug, transcript())
+        ledger.write_transcript(tree, slug, old_shape(transcript()))
     assert pipeline.rerender(job_for(), tree).ok
     return tree
 

@@ -132,8 +132,9 @@ one model value in a file name is a topic slug, which `model.py` checks, and
   depth allows fails, live or replayed. Every string from a page is drawn through
   `render.md_text`, as one line with no markdown syntax left in it, and an unfetched or
   failed URL is drawn as inline code, never a link. A failed fetch carries no error
-  flag. `research.apply` makes a finding cited only through a usable fetch of a whole
-  http(s) URL (`WEB_URL`); any other citation becomes an assumption, its URL kept as
+  flag. `research.apply` makes a finding cited only through a usable fetch of each whole
+  http(s) URL it names (`WEB_URL`, `MAX_SOURCES` at most); one that is not makes the
+  finding an assumption, its URL kept as
   `unfetched` for `sources.md`. `ledger.normal` matches URLs without a fragment or
   trailing slash, and keeps http/https, `www.` and `:443` apart, which errs toward an
   assumption. `WebFetch` returns a model's summary of a page, so a citation shows that
