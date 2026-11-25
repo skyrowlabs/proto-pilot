@@ -21,6 +21,7 @@ and makes the relevant part harder to find, not easier.
 | **Reports of any kind**    | reports/README.md            | `docs/reports/README.md`            |
 | **Agentic Automation** | AGENTIC_AUTOMATION.md | `docs/AGENTIC_AUTOMATION.md` |
 | **Ideas, not scheduled** | ideas/README.md | `docs/ideas/README.md` |
+| **Worked examples of a real plan** | examples/README.md | `docs/examples/README.md` |
 | **Reports / release windows** | reports/README.md | `docs/reports/README.md` |
 | **Why the pipeline is shaped this way** | README.md | `README.md` |
 | **Open items / what bit us** | NOTES.md | `docs/NOTES.md` |

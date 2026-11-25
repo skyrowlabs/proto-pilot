@@ -10,7 +10,7 @@
 >
 > Kept, not deleted. Most of the analysis below survives the decision — the
 > automatic oracle, the cache-prefix argument, the three meanings of
-> "self-improving", and the reason model creation is mind.head's job — because
+> "self-improving", and the reason model creation is not this repo's job — because
 > those are properties of the pipeline rather than of the service. What is
 > tabled is the public front door and the corpus-from-strangers thesis it was
 > built to serve. The successor doc says which parts it inherits.
@@ -45,7 +45,7 @@ It reclassifies proto.pilot **from an internal instrument to a minor product.**
 That is the real price, and it is not paid in dollars. A public endpoint means
 uptime, abuse handling, a privacy posture, and a support surface, all attached to
 a repo whose current job is to be useful to one operator on one machine. The
-brief (`skyrow-workspace/strategy/projects/proto-pilot.md`) records
+project's brief recorded
 "whether proto.pilot is ever a released product or stays an internal instrument"
 as the open question. This is one answer to it — and answering it costs the
 freedom to change the tool without warning anyone.
@@ -113,7 +113,7 @@ bump. The actual control is a hard daily spend ceiling on the funding account,
 set so that the worst case is a page that says "come back tomorrow."
 
 There is a third lever that removes the bill rather than capping it: **run the
-model ourselves.** A local-model backend on a breeze.brain node — Qwen or
+model ourselves.** A local-model backend on a self-hosted GPU — Qwen or
 whatever else measures up — turns a generation into electricity instead of API
 credit, which is the only version of this where "free and unmetered" is
 honest at any volume. It is tracked in [NOTES](../NOTES.md) as its own idea
@@ -170,10 +170,9 @@ should not be.
    self-improving system whose output is a reviewable patch is tractable; one
    whose output is a weight update is not, at this stage.
 3. **Training a model on the corpus.** The long-term thesis, and the reason for
-   collecting at all. **This work does not land in this repo.** Per the workspace
-   seam, model creation — datasets, fine-tuning, eval, adapters — is mind.head's
-   job, and hosting the result is breeze.brain's; see
-   `skyrow-workspace/strategy/seams/model-hosting-handoff.md`.
+   collecting at all. **This work does not land in this repo.** Model creation —
+   datasets, fine-tuning, eval, adapters — and hosting the result are out of
+   scope here.
    proto.pilot's role in that chain is *producer of a dataset* and, later,
    *consumer of an endpoint* through the existing `LLM` Protocol — which is
    already a one-method interface with three backends, so a fourth is not an
@@ -185,12 +184,10 @@ operator can generate alone. That is the actual argument for going public.
 
 ## Where it would live
 
-`skyrowlabs.ai` is currently an empty repo and is the natural home for the
-landing page; the workspace naming rule already carves out repos named for the
-domain they serve. But the service is a stateful container orchestrator, not a
+A static website is the natural home for the landing page. But the service is a stateful container orchestrator, not a
 static site, and `skyrowlabs.com` has no build step by design.
 
-So: the marketing page in `skyrowlabs.ai`, and the service as **a deployment of
+So: the marketing page on a static site, and the service as **a deployment of
 this repo**. No service code in a website repo, and no new repo — a hosted
 proto.pilot is proto.pilot with a different front door.
 
@@ -218,5 +215,5 @@ proto.pilot is proto.pilot with a different front door.
 - Does public exposure constrain the pipeline in ways that hurt the local tool?
   If hosted requirements start dictating what the CLI may do, the reference
   implementation has changed owner.
-- Priority. jam.sense is Priority 1 and pre-launch; breeze.brain is Priority 2.
+- Priority. Two other products come first, one of them pre-launch.
   This is a third thing with a recurring bill and an on-call surface.

@@ -23,7 +23,7 @@ from __future__ import annotations
 import json
 
 from protopilot.plan import render, verify
-from protopilot.plan.model import Edge, Plan, Step
+from protopilot.plan.model import STEP_FIELD_WORDS, Edge, Plan, Step
 from protopilot.plan.passes import BRIEF, connect, start, topics_block
 
 NAME = "repair"
@@ -42,6 +42,9 @@ fix what failed. Nothing else in the plan is within your reach.
 - Keep every edge that is on no loop: a dependency is never removed to suit the steps.
 - Keep every step nothing is wrong with, word for word. Only when the list is full may
   one give way, and only to a step that a kept step depends on.
+- A step you add is short: an `action` of {STEP_FIELD_WORDS["action"]} words at most, starting with
+  a verb, and a `why` of {STEP_FIELD_WORDS["why"]} words at most. A kept step stays as it is, whatever
+  its length.
 
 A repair that breaks those last two rules, or leaves more wrong than it found, is
 thrown away.

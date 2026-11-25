@@ -34,10 +34,11 @@ repository's own tooling (`cli/`, `scripts/`). See AGENTS.md Rule 15.
 One `proto plan` run, end to end. Every arrow is a place something can be refused.
 
 ```
-  idea (one sentence) + direction
+  idea (one sentence) + direction + brief (goal, for, horizon, must, not: each optional)
     │
     ▼
-  scope ──────────────────  goal, constraints, up to three questions for you
+  scope ──────────────────  goal, constraints, up to three questions for you;
+    │                       a field the brief states is put back over the model's
     │
     ▼
   outline ────────────────  the topics, each with a reason it matters
@@ -160,7 +161,10 @@ one model value in a file name is a topic slug, which `model.py` checks, and
   says researched while no record is, and a topic that cites a page its own research
   never fetched.
 - **A failed topic costs only itself, and a stopped run resumes.** A topic whose call or
-  output fails is recorded `failed` and the run goes on. Before the first call the
+  output fails is recorded `failed` and the run goes on. `pipeline._call` asks a refused
+  call once more unless `llm.ResearchFailed.retry` is False (a `Breach`, or a timeout), and
+  keeps every unused stream as `<topic>.refused-<n>.jsonl`, `n` rising across runs. No slug holds a dot, so no
+  reader of evidence opens one. Before the first call the
   reviewed outline is saved as `outline.json` beside the transcripts, and each topic's
   transcript as it lands, so a run that stops, or fails at a later pass, resumes on
   rerun: `resumable` finds the outline, and a topic with a transcript is replayed, not
@@ -284,7 +288,7 @@ one model value in a file name is a topic slug, which `model.py` checks, and
   old topic pages, unmarked, which is why `after_failure` says any page may be out of
   date and points at the rerun.
 - **A rerun of a finished plan is a re-render, and it verifies.** No pass runs, and it
-  needs neither `--yes` nor a terminal. Another idea, direction or `--depth` is refused.
+  needs neither `--yes` nor a terminal. Another idea, direction, brief or `--depth` is refused.
   `plan.json` may be hand-edited, so `rerender` judges it as it stands, and red takes
   the floor and exits 1. With no model there is no repair, so a red tree's rerun never
   retries one: a fresh attempt means removing the tree. Its runbook keeps what the
@@ -331,6 +335,19 @@ A pass that returns structured output runs under `llm.ISOLATION`: no tool, no
 file, no shell. The research call runs under `RESEARCH_ISOLATION`: web search
 and fetch and nothing else. Widening either works perfectly in the happy case,
 which is why the violation is invisible. AGENTS.md carries the rule.
+
+### A step's word cap binds only the first time steps are written
+
+`start.schema` holds `action` and `why` to `model.STEP_FIELD_WORDS` with a
+`pattern`, which the claude-code backend enforces, but only while the plan has
+no steps. Repair and promote reuse that schema and must return every healthy
+step word for word, and a step written before the cap can be longer than it.
+Under the pattern they could not do both: the backend would refuse the verbatim
+step, or a rewritten one would trip the shrink guard and the repair would be
+thrown away. Either way an older plan could never be repaired, and nothing would
+say why. There the cap is asked for in the prompt and no more. A step's length
+is readability, never structure, so `apply` lands an over-long step from a
+backend that ignores the pattern.
 
 ### The registry is shared, so it is written whole and under a lock
 

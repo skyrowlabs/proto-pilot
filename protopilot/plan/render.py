@@ -155,7 +155,10 @@ def _plan_page(plan: Plan, verified: bool) -> str:
     if plan.direction:
         scope.insert(0, f"**Direction:** {plan.direction}")
     topic_map = [f"[{t.title}]({_topic_file(t.slug)}): {t.why}" for t in plan.topics]
-    steps = [f"{n}. **{titles.get(s.topic, s.topic)}:** {s.action} {s.why}" for n, s in enumerate(plan.steps, start=1)]
+    steps = [
+        f"{n}. **{titles.get(s.topic, s.topic)}:** {s.action}\n   - Why here: {s.why}"
+        for n, s in enumerate(plan.steps, start=1)
+    ]
     dropped = [f"{t.title} (`{t.slug}`): {t.why}" for t in plan.dropped_topics]
     return _page(
         f"# {plan.title}",
@@ -164,6 +167,7 @@ def _plan_page(plan: Plan, verified: bool) -> str:
         f"## The idea\n\n{plan.idea}",
         "\n\n".join(scope),
         f"## Constraints\n\n{_bullets(plan.constraints)}",
+        f"## Out of scope\n\n{_bullets(plan.brief.out)}" if plan.brief.out else "",
         f"## Open questions\n\n{_bullets(plan.questions)}",
         f"## Topic map\n\n{_bullets(topic_map)}",
         f"## How the topics connect\n\n{_bullets([_edge_line(e, titles) for e in _edges(plan)])}",

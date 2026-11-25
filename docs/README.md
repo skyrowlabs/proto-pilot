@@ -18,6 +18,7 @@ for the routing table — load only the documents a task needs.
 | `reports/regular/` | In-flight periodic reports, anchored to the current window |
 | `reports/releases/` | Frozen per-release editions — never edited                |
 | `reports/occasional/` | One-time deep dives and sweeps                          |
+| `examples/`        | Real `proto plan` runs, committed whole, each with a walkthrough |
 | `ideas/`           | Ideas, and what came of looking — nothing here is scheduled |
 
 ---

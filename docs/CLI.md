@@ -19,6 +19,7 @@ and the second person to need it writes it again.
 | `pp doctor` | Account facts no file can state (release PRs, required checks) |
 | `pp settings` | Set GitHub settings to `scripts/repo_settings.py`; previews unless `--apply` |
 | `pp inbox`  | Every open capture per lane, every job at its cap, and every Dependabot PR waiting on a person |
+| `pp pr`     | Land a branch: `check pre-push`, push, pull request, its checks, then the pinned merge command |
 
 Run `./pp <group> --help` for the current commands — the help is generated
 from the code, so it cannot go stale the way this table can.
@@ -55,14 +56,28 @@ diverged default interpreter is the exact false negative the override removes.
 `proto plan --help` lists the same flags.
 
 ```bash
-proto plan "start a community tool library" --direction "one town, volunteer run"
+proto plan "start a community tool library" --for "renters in one town" --must "volunteer run" --not "delivery"
 proto plan "start a community tool library" --offline --yes
+proto plan            # at a terminal: asks for the idea, then each field of the brief
 ```
+
+**The idea is one sentence; the brief beside it is optional, and what you state is the
+plan's.** The scope pass is shown each field you fill and asked only for the blanks, and
+whatever it returns, your field is put back over it, offline or not. The outline review
+marks each of them `(yours)`, so you can tell what you said from what the model
+inferred. Leave out `IDEA` at a terminal to be asked for the idea and each field in
+turn; a field given as a flag is not asked again. Off a terminal, or with `--yes`, a
+missing idea is refused before any model is called.
 
 | Flag | What it does |
 | ---- | ------------ |
+| `--goal` | What the finished plan should let you decide or do. Kept as written |
+| `--for` | Who the idea is for. Kept as written, as the plan's audience |
+| `--horizon` | The span the plan covers: time, budget, people. Kept as written |
+| `--must` | A constraint the plan has to respect. Repeatable; listed first in *Constraints*, after any direction |
+| `--not` | Something deliberately out of scope. Repeatable; given to every pass after scope, and listed in its own *Out of scope* section |
+| `--direction` | Free-text steer for anything the fields do not hold, kept as a constraint |
 | `--dir` | Target directory; the default is `./<slug>` |
-| `--direction` | Extra steer, kept as a constraint |
 | `--depth` | Topics in the outline: `shallow` 4, `standard` 6, `deep` 8, and research effort: 3–4, 4–6 or 6–8 findings a topic, reading at most 3, 5 or 8 pages. A topic answering with more findings than that fails. The default is `standard`, and it is refused on an offline backend |
 | `--backend` | `api` bills API credit, `claude-code` a Claude subscription, `offline` calls no model. Beats `PROTOPILOT_LLM`; with neither set, `api` is used |
 | `--offline` | The deterministic baseline with no model call. Beats `--backend` |
@@ -87,6 +102,10 @@ claim is in the page. With `--backend api` the command refuses before any call u
 `--no-research` is given. Offline, nothing is researched. A topic whose research fails
 says so on its page and costs nothing else. A plan with a topic left out is stamped
 *Partly researched*, and `PLAN.md` names every topic not researched.
+A call whose answer is refused or fails is asked once more, unless the session held more
+than the web or ran out of time. Each stream not used is kept as
+`.protopilot/research/<topic>.refused-<n>.jsonl`, and the failure names it. A kept stream
+is never read as evidence and never resumed from.
 
 **A run that stops during research, or after it, resumes.** Rerun the same command: the
 reviewed outline and each researched topic's transcript are kept in
@@ -138,8 +157,9 @@ runbook and banners, so it is how a hand edit to `plan.json` gets checked. A sou
 marked fetched by hand stays red: the check reads the run's transcripts, not the flag. A
 topic whose transcript is missing, renamed or edited is shown as failed research. With no
 model there is no repair: to have one try again, remove the directory and start over.
-The same target with another idea or direction is refused, as is a `--depth` other
-than the plan's.
+The same target with another idea, direction or brief is refused, as is a `--depth`
+other than the plan's. The brief is compared as typed, after spacing is collapsed, so
+the command that made a plan is the command that re-renders it.
 
 **A page's name belongs to the plan.** A `RUNBOOK.md` of your own is left alone on
 green, and blocks a red plan: every other page is drawn and marked, and the command

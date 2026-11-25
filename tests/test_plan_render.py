@@ -318,7 +318,7 @@ def test_dangling_references_render_as_their_raw_ids():
         )
     )
     assert "- ghost_a informs ghost_b\n- Members depends on ghost_topic" in pages["PLAN.md"]
-    assert "1. **ghost_step:** Act. Because." in pages["PLAN.md"]
+    assert "1. **ghost_step:** Act.\n   - Why here: Because." in pages["PLAN.md"]
     assert "- Members depends on ghost_topic" in pages["topics/members.md"]
     assert "- **Assumption:** Cited. (sources: ghost_source)" in pages["topics/members.md"]
     assert "- Extends: ghost_anchor" in pages["dreams.md"]

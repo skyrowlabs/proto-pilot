@@ -2,7 +2,7 @@
 
 The gate that caught this lives in CI and could not have caught it locally.
 `check_doc_links` asks the filesystem whether a relative link resolves -- and on
-a development machine `../skeletor` and `../../skyrow-workspace/...` resolve
+a development machine `../skeletor` and `../../<another repo>/...` resolve
 perfectly, because every skyrow.labs repo is a sibling checkout under one root.
 A CI runner clones one repository. So does every stranger.
 

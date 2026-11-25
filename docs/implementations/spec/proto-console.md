@@ -182,7 +182,7 @@ otherwise.
 **Why this is not optional and not cosmetic.** A progress view built by parsing
 `lines` would be reading human-formatted output to recover structure the producer
 already had — the exact anti-pattern the workspace guide names as *sky.boss
-never parses human output* (`skyrow-workspace/workspace.md`, a sibling checkout;
+never parses human output* (the company workspace guide, in a sibling checkout;
 named rather than linked, because a relative link into a sibling repo resolves on
 this machine and nowhere else). The text log is for a person. The event list is
 for a view.

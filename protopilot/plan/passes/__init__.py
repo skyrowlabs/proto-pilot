@@ -82,6 +82,9 @@ def scope_block(plan: Plan) -> str:
         "horizon": plan.horizon,
         "constraints": plan.constraints,
     }
+    if plan.brief.out:
+        # The person's, and every later pass is held to it: no topic, step or dream for these.
+        facts["out_of_scope"] = plan.brief.out
     return "## The idea and its scope\n\n```json\n" + json.dumps(facts, indent=2, ensure_ascii=False) + "\n```"
 
 

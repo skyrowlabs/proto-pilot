@@ -36,10 +36,18 @@ from pathlib import Path
 from typing import TypeVar
 
 from protopilot import registry
-from protopilot.llm import LLM, LLMError, OfflineLLM, ResearchUnavailable, research_result
+from protopilot.llm import (
+    LLM,
+    LLMError,
+    OfflineLLM,
+    Researched,
+    ResearchFailed,
+    ResearchUnavailable,
+    research_result,
+)
 from protopilot.plan import baseline, dreaming, ledger, render, revising, verify
 from protopilot.plan.lenses import LENSES, Lens
-from protopilot.plan.model import DEFAULT_DEPTH, Depth, Dream, Plan, Topic, TopicResearch, plan_path
+from protopilot.plan.model import DEFAULT_DEPTH, Brief, Depth, Dream, Plan, Topic, TopicResearch, plan_path
 from protopilot.plan.passes import (
     PlanPassError,
     collect,
@@ -65,6 +73,8 @@ RENDER = "render"
 T = TypeVar("T")
 #: A model's error can be a page of text, and it lands in `dreams.md`.
 MOST_FAILURE_CHARS = 300
+#: A research call refused by a slip is asked once more; a second refusal fails the topic (#56).
+RESEARCH_ATTEMPTS = 2
 
 
 class PlanRefused(Exception):
@@ -85,15 +95,22 @@ class Checked:
     tried: list[str]
 
 
-def _same_ask(plan: Plan, idea: str, direction: str) -> bool:
-    return (baseline.clean(idea), baseline.clean(direction)) == (plan.idea, plan.direction)
+def _same_ask(plan: Plan, idea: str, direction: str, brief: Brief | None) -> bool:
+    asked = (baseline.clean(idea), baseline.clean(direction), brief or Brief())
+    return asked == (plan.idea, plan.direction, plan.brief)
+
+
+def _brief(job) -> Brief:
+    """The brief a job was created with: the job holds it as plain data, which the plan validates."""
+    return Brief.model_validate(getattr(job, "brief", None) or {})
 
 
 def _steer(plan: Plan) -> str:
-    return f" with direction {plan.direction!r}" if plan.direction else " with no direction"
+    steer = f" with direction {plan.direction!r}" if plan.direction else " with no direction"
+    return f"{steer} and a brief of its own" if plan.brief else steer
 
 
-def resumable(tree: Path, idea: str, direction: str = "") -> Plan | None:
+def resumable(tree: Path, idea: str, direction: str = "", brief: Brief | None = None) -> Plan | None:
     """The reviewed outline a stopped run left in `tree`, None if it left none, refused if it is another plan's."""
     tree = Path(tree)
     if plan_path(tree).exists():
@@ -102,35 +119,35 @@ def resumable(tree: Path, idea: str, direction: str = "") -> Plan | None:
         draft = ledger.draft(tree)
     except (OSError, ValueError) as exc:
         raise PlanRefused(f"{ledger.research_dir(tree) / ledger.DRAFT_FILE} cannot be read: {exc}") from exc
-    if draft is not None and not _same_ask(draft, idea, direction):
+    if draft is not None and not _same_ask(draft, idea, direction, brief):
         raise PlanRefused(
             f"{tree} holds research in progress for {draft.idea!r}{_steer(draft)}. "
-            "Pick another --dir, or rerun with that same idea and direction to resume it."
+            "Pick another --dir, or rerun with that same idea, direction and brief to resume it."
         )
     return draft
 
 
-def existing_plan(tree: Path, idea: str, direction: str = "") -> Plan | None:
+def existing_plan(tree: Path, idea: str, direction: str = "", brief: Brief | None = None) -> Plan | None:
     """The plan to re-render from `tree`, None if `tree` is free or resumable, refused otherwise.
 
-    A plan for anything but this idea and direction is refused: exiting 0 on it
+    A plan for anything but this idea, direction and brief is refused: exiting 0 on it
     would hand back somebody else's plan as the answer to what was asked.
     """
     tree = Path(tree)
     if not tree.exists():
         return None
     if not plan_path(tree).exists():
-        if resumable(tree, idea, direction) is not None:
+        if resumable(tree, idea, direction, brief) is not None:
             return None
         raise PlanRefused(f"{tree} already exists and holds no plan; refusing to overwrite it")
     try:
         plan = Plan.load(tree)
     except (OSError, ValueError) as exc:
         raise PlanRefused(f"{plan_path(tree)} cannot be read as a plan: {exc}") from exc
-    if not _same_ask(plan, idea, direction):
+    if not _same_ask(plan, idea, direction, brief):
         raise PlanRefused(
             f"{tree} already holds a plan for {plan.idea!r}{_steer(plan)}. "
-            "Pick another --dir, or rerun with that same idea and direction to re-render it."
+            "Pick another --dir, or rerun with that same idea, direction and brief to re-render it."
         )
     return plan
 
@@ -209,7 +226,7 @@ def scoped(job, llm: LLM, depth: Depth | None = None, dream: bool = True, resear
     """The plan's scope, with any questions still open. Writes no files."""
     names = _names(dream, researching)
     job.event("plan", passes=names)
-    plan = scope.seed(job.idea, job.direction, None if llm.offline else depth or DEFAULT_DEPTH)
+    plan = scope.seed(job.idea, job.direction, None if llm.offline else depth or DEFAULT_DEPTH, _brief(job))
     return _model_pass(job, scope, plan, llm, names)
 
 
@@ -228,7 +245,22 @@ def _short(exc: BaseException) -> str:
     return baseline.clean(str(exc))[:MOST_FAILURE_CHARS].rstrip(" .") or type(exc).__name__
 
 
-def _asked(plan: Plan, llm, tree: Path, topic: Topic, number: int = 1) -> tuple[Plan, TopicResearch, bool]:
+def _call(job, plan: Plan, llm, tree: Path, topic: Topic, label: str) -> Researched:
+    """The research call, asked once more after a slip. Every stream not used is kept, never read as evidence."""
+    system, user = research.build(plan, topic)
+    for attempt in range(1, RESEARCH_ATTEMPTS + 1):
+        try:
+            return llm.research(system=system, user=user, schema=research.schema(plan), label=label)
+        except ResearchFailed as exc:
+            kept = ledger.write_refused(tree, topic.slug, exc.transcript) if exc.transcript else ""
+            if attempt == RESEARCH_ATTEMPTS or not exc.retry:
+                raise ResearchFailed(str(exc), exc.transcript, retry=False, kept=kept) from exc
+            where = f"; its stream is kept at {kept}" if kept else ""
+            job.log(f"    {topic.slug}: {_short(exc)}{where}; asking once more")
+    raise AssertionError("unreachable")
+
+
+def _asked(job, plan: Plan, llm, tree: Path, topic: Topic, number: int = 1) -> tuple[Plan, TopicResearch, bool]:
     """One topic's research folded into `plan`, its record, and whether it was replayed. A failure is raised.
 
     The topic's transcript `number` is replayed if it is on disk, and written if not, so no call is paid for twice.
@@ -236,8 +268,7 @@ def _asked(plan: Plan, llm, tree: Path, topic: Topic, number: int = 1) -> tuple[
     label = f"{research.NAME} {topic.slug}"
     stored = ledger.read_transcript(tree, topic.slug, number)
     if stored is None:
-        system, user = research.build(plan, topic)
-        got = llm.research(system=system, user=user, schema=research.schema(plan), label=label)
+        got = _call(job, plan, llm, tree, topic, label)
         transcript, data = got.transcript, got.data
     else:
         transcript, data = stored, research_result(stored, label)
@@ -266,11 +297,13 @@ def _research_topic(job, plan: Plan, llm, tree: Path, topic: Topic) -> Plan:
     """One topic researched, or recorded as failed. A transcript already on disk is replayed, not paid for again."""
     started = time.monotonic()
     try:
-        after, record, replayed = _asked(plan, llm, tree, topic)
+        after, record, replayed = _asked(job, plan, llm, tree, topic)
     except ResearchUnavailable:
         raise
     except (LLMError, PlanPassError, ValueError) as exc:
         failure = _short(exc)
+        if isinstance(exc, ResearchFailed) and exc.kept:
+            failure = f"{failure}; its stream is kept at {exc.kept}"
         job.log(f"    {topic.slug}: research failed, and the topic goes on unresearched: {failure}")
         job.event("research_failed", topic=topic.slug, error=failure)
         record = TopicResearch(topic=topic.slug, state="failed", failure=failure)
@@ -307,7 +340,7 @@ def _researched(job, plan: Plan, llm: LLM, tree: Path, names: list[str]) -> Plan
 
 
 def _refuse_if_taken(job, tree: Path) -> None:
-    if existing_plan(tree, job.idea, job.direction) is not None:
+    if existing_plan(tree, job.idea, job.direction, _brief(job)) is not None:
         raise PlanRefused(f"{tree} gained a plan while this one was being made; leaving it alone")
 
 
@@ -627,10 +660,10 @@ def run_plan(
 ) -> verify.PlanVerdict:
     """Every half with nobody asked, a resumed run, or a re-render of the plan already in `tree`."""
     tree = Path(tree)
-    if existing_plan(tree, job.idea, job.direction) is not None:
+    if existing_plan(tree, job.idea, job.direction, _brief(job)) is not None:
         return rerender(job, tree)
     llm = llm or OfflineLLM()
-    draft = resumable(tree, job.idea, job.direction)
+    draft = resumable(tree, job.idea, job.direction, _brief(job))
     if draft is not None:
         return resume(job, tree, draft, llm, dream, researching, depth)
     plan = outlined(job, llm, scoped(job, llm, depth, dream, researching), dream, researching)
@@ -914,7 +947,7 @@ def _researched_again(
     """`plan` with one topic's findings and record replaced by a new call's, and the transcript's file."""
     started = time.monotonic()
     current = plan.research_of(topic.slug)
-    after, record, replayed = _asked(asking, llm, tree, topic, number)
+    after, record, replayed = _asked(job, asking, llm, tree, topic, number)
     if not replayed:
         since, depth = current.transcript if current else "", asking.depth or DEFAULT_DEPTH
         ledger.save_pending(tree, topic.slug, number, depth, since, record.sha256, research.asked(plan, topic))

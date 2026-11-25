@@ -49,6 +49,10 @@ MAX_TOPICS = max(TOPIC_COUNTS.values())
 #: more is a topic. The fields are the budget, so spaced text the schema allows fits the cap.
 DREAM_FIELD_WORDS = {"title": 6, "what_if": 26, "takes": 12}
 DREAM_WORD_CAP = sum(DREAM_FIELD_WORDS.values())
+#: A first step is read as a to-do, so the action leads and is short. Uncapped, five steps
+#: of a real run measured 68-106 words of action and 70-88 of reason, which rendered as
+#: walls of text; the depth those carried is each topic page's unknowns and decisions.
+STEP_FIELD_WORDS = {"action": 30, "why": 25}
 #: What ends a word in the schema's pattern. A model held to `\S+` joined 28 words with
 #: hyphens, so punctuation has to break one. `dream_words` is the exact count, and stricter.
 WORD_BREAK = r"\s/_,.;:!?\u00b7\u200b\u2010-\u2015\u2212-"
@@ -91,6 +95,36 @@ def dream_words(text: str) -> int:
 class _Record(BaseModel):
     # A misspelt field in plan.json is an error, never a value quietly dropped.
     model_config = ConfigDict(extra="forbid")
+
+
+def _one_line(value: str) -> str:
+    return " ".join(value.split())
+
+
+def _items(values: list[str]) -> list[str]:
+    """One line each, blanks dropped, a repeat kept once and in its first place."""
+    return list(dict.fromkeys(line for line in (_one_line(value) for value in values) if line))
+
+
+class Brief(_Record):
+    """What the person said about the idea, beside it. A pass reads it; none may change it.
+
+    Each field the person fills is authoritative, and the scope pass fills only the
+    blanks. It is half the plan's identity with the idea and the direction, so it is
+    normalised here, once, and a rerun that spells it with other spacing is the same ask.
+    """
+
+    goal: str = ""
+    audience: str = ""
+    horizon: str = ""
+    must: list[str] = Field(default_factory=list, description="Constraints the plan has to respect")
+    out: list[str] = Field(default_factory=list, description="What the plan deliberately leaves out")
+
+    _texts = field_validator("goal", "audience", "horizon")(_one_line)
+    _lists = field_validator("must", "out")(_items)
+
+    def __bool__(self) -> bool:
+        return any((self.goal, self.audience, self.horizon, self.must, self.out))
 
 
 class Source(_Record):
@@ -196,6 +230,9 @@ class Plan(_Record):
     title: str
     idea: str
     direction: str = ""
+    # What the person stated, kept apart from what scope concluded, so a rerun compares
+    # with what was typed. Empty for a plan given none, and then plan.json omits it.
+    brief: Brief = Field(default_factory=Brief)
     goal: str = ""
     audience: str = ""
     horizon: str = ""
@@ -249,10 +286,16 @@ class Plan(_Record):
 
     def summary(self) -> str:
         """What the outline checkpoint prints; a topic left out here is one nobody reviews."""
-        lines = [self.title, f"  goal: {self.goal or 'not established'}"]
-        lines += [f"  audience: {self.audience}"] if self.audience else []
-        lines += [f"  horizon: {self.horizon}"] if self.horizon else []
-        lines += [f"  constraint: {item}" for item in self.constraints]
+
+        def mark(stated: bool) -> str:
+            return " (yours)" if stated else ""
+
+        brief = self.brief
+        lines = [self.title, f"  goal: {self.goal or 'not established'}{mark(bool(brief.goal))}"]
+        lines += [f"  audience: {self.audience}{mark(bool(brief.audience))}"] if self.audience else []
+        lines += [f"  horizon: {self.horizon}{mark(bool(brief.horizon))}"] if self.horizon else []
+        lines += [f"  constraint: {item}{mark(item in brief.must)}" for item in self.constraints]
+        lines += [f"  out of scope: {item}" for item in brief.out]
         lines += [f"  open question: {item}" for item in self.questions]
         if self.depth:
             lines.append(f"  depth: {self.depth} ({len(self.topics)} topics)")
@@ -272,6 +315,8 @@ class Plan(_Record):
         data = self.model_dump(mode="json")
         if self.depth is None:
             del data["depth"]
+        if not self.brief:
+            del data["brief"]
         for key in ("dream_failure", "research", "research_failure", "dropped_topics"):
             if not data[key]:
                 del data[key]

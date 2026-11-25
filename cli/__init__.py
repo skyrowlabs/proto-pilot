@@ -99,7 +99,7 @@ def get_version() -> str:
 # right answer and stops. mind.head's, from a tree where both commands exist.
 @click.version_option(version=get_version(), prog_name="pp")
 def cli() -> None:
-    """proto.pilot — A framework for prototyping ideas with agents."""
+    """proto.pilot — give it an idea and a little direction, and get back a plan."""
 
 
 #: Command groups are DISCOVERED, not listed.

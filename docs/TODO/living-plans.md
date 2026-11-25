@@ -17,7 +17,7 @@ summary: "Let a plan be revised, tested and handed off after it is made: answer 
 > **Depends on**: [`remove-prototyping.md`](../implementations/spec/remove-prototyping.md) — every phase here edits `protopilot/cli.py` and `registry.py`, which that plan rewrites
 
 Not `ready`: Phase 1 is a person's reading, and its findings may reorder or cut
-the rest. Each later phase also lists questions only Jeston can answer.
+the rest. Each later phase also lists questions only the maintainer can answer.
 
 The slug is not `plan-depth` because `--depth` already means topic count
 (`model.TOPIC_COUNTS`), and this plan is about a plan's life after it is made.
@@ -80,20 +80,20 @@ bakery and a tool library. Both were invented for the README. Every later phase
 here is a guess about what a real plan lacks.
 
 **Design.** No code. Three to five runs with research on ideas somebody is
-actually deciding about. The workspace has two at concept stage, which makes
-them fair tests: house.fly (research notes, no code) and Node Zero (design
-maturing, no code).
+actually deciding about. Two of the maintainer's other projects are at concept stage, which makes
+them fair tests: one with research notes and no code, one with a maturing design
+and no code.
 
-- [ ] `proto plan` with research, `--depth standard`, on house.fly's idea, from
+- [ ] `proto plan` with research, `--depth standard`, on the first project's idea, from
       a sentence and a direction written without opening its notes (~operator)
-- [ ] The same for Node Zero (~operator)
-- [ ] One to three more: one idea that is not software, and one Jeston already
+- [ ] The same for the second (~operator)
+- [ ] One to three more: one idea that is not software, and one the maintainer already
       knows well enough to catch a wrong finding (~operator)
 - [ ] For each run, record under *Dogfood record* below: wall time, topics
       researched / failed / nothing cited, and the operator's read in five
-      lines — the topic he would not have thought of, the finding that was
-      wrong or empty, the open question he wanted to answer and could not, what
-      he did next with the plan, and what he wished it had handed him
+      lines — the topic they would not have thought of, the finding that was
+      wrong or empty, the open question they wanted to answer and could not, what
+      they did next with the plan, and what they wished it had handed him
       (~operator)
 - [ ] Compare each plan to what the project's own docs already say, after the
       read is written, not before (~operator)
@@ -105,48 +105,58 @@ maturing, no code).
 five lines, and the phase order below carries a sentence saying which run put
 each phase where it is.
 
-**Ruled by Jeston, 2026-11-11:** house.fly's and Node Zero's ideas may go
+**Decided 2026-11-11:** both projects' ideas may go
 through the model, and the resulting plans may be committed to those repos. Each
 commit is a change in that repo, under its own rules.
 
-**Ruled by Jeston, 2026-11-11:** three runs first, then decide whether two more are worth it.
+**Decided 2026-11-11:** three runs first, then decide whether two more are worth it.
 
 ### Dogfood record
 
-Two runs so far, both 2026-11-11, `--depth standard`, `claude-code` backend,
-`-y`. The idea and direction were written from the workspace's one-line
-descriptions without opening either project's notes. The trees are in
-`tmp/dogfood/` of the primary checkout, not yet committed to their repos.
-**The operator's five-line read of each is still owed.**
+**Run 0 — squirrel survival game, 2026-11-16 (agent-run; does not count toward the three).**
+Not one of the ideas this phase names, and run by an agent with `--yes`, so nobody
+answered scope's questions or reviewed the outline. It is recorded because it is the
+first committed real run: [walkthrough](../examples/squirrel-survival.md),
+[tree](../examples/squirrel_survival/PLAN.md).
 
-| Run | Wall time | Topics researched | Cited findings | Fetches usable | Ended |
-| --- | --- | --- | --- | --- | --- |
-| house.fly | 21m43s | 6 of 6 | 25 | 23 of 34 | green |
-| Node Zero | 22m42s | 5 of 6 (one failed) | 24 | 24 of 28 | green |
+- Wall time: about 17 minutes from outline to written tree; research took 96–127 s a topic.
+- Topics: 6 researched, 0 failed, 0 with nothing cited; 22 sources; green, exit 0.
+- Agent's observations, which are not the operator's read: steps render as 150–200-word
+  paragraphs (since capped at 30 + 25 words, with the reason on its own line); no step returns to an open question; an **Assumption:** line names a
+  checkable product fact; the scope pass echoed `--not` into constraints (fixed in the same
+  change; 0 of 5 live samples echoed it afterwards); transcripts fingerprint the machine (#51).
+- Operator's five lines: _open — the operator's to write._
 
-Then, with this phase's verbs run from the unmerged branch on those two trees:
-`proto answer` twice on house.fly with Jeston's answers; `proto topic add`
-("Handing tasks to other smart devices and robots"); `proto research` on the
-new topic (5 cited findings, 113s) and on the observation topic (3, 162s); and
-`proto research` on Node Zero's failed topic (5, 157s). All landed green.
+**Run 1 — a takeout restaurant, 2026-11-18 (agent-run, `--yes`; the not-software idea).**
+Idea and brief supplied by a person deciding about it; run by an agent, so scope's
+questions and the outline review were skipped. The tree is kept outside this repo, in
+a local, unpublished checkout, transcripts included; nothing is committed here.
 
-What the runs showed about the tool, as observed by the session that ran them:
+- Command: the idea plus `--goal "create a business plan for opening the restaurant"`,
+  `--for`, four `--must` constraints (hours, ordering, service model, name), `--depth standard --backend claude-code -y`. No `--horizon`, no `--not`.
+- Wall time: not measured end to end; research took about 11 minutes, 102–123 s a topic.
+- Topics: 6 researched, 0 failed, 0 with nothing cited; 21 sources, 8 fetches unusable; green, exit 0.
+- Agent's observations, which are not the operator's read: the goal asked for a business
+  plan and the run wrote a plan *for* one (findings, unknowns, decisions; no projections
+  or summary to hand over), which is Phase 3's question, met on a real goal; a blank
+  `--horizon` stayed *Not established* though `--help` says the model proposes (#52); a
+  finding from two pages credits one (#53); one page under a redirecting URL became two
+  sources (#54); dream d5's dinner "simply arrives" reads as delivery against the takeout
+  `--must`, and was proposed anyway; open questions again went unanswered by any step.
+- Operator's five lines: _open — the operator's to write._
 
-- `-y` skipped scope's questions, and both plans ended with two open questions
-  that decided the topic list. Phase 2's `answer` is what closed them.
-- An answered question renders as the question and the answer run together in
-  one constraint bullet. It reads badly.
-- Jeston's second house.fly answer (own home first, then a product) bears on
-  the build-order topic and the tool said nothing. One vote for open question 2.
-- **`topic add` and `research` left *Where to start* unchanged.** After the
-  purpose changed and a seventh topic was added, the five steps were the same
-  five. Nothing offers a refreshed start; that needs a ruling.
-- A failed research call rendered a truncated fragment of the model's usage
-  JSON as its reason in `PLAN.md`, and kept no transcript, so the cause is
-  unknown. File it through `./pp bug`.
-- About a third of house.fly's fetches gave nothing usable.
-- "Horizon: Not established" and the direction repeated verbatim as the first
-  constraint read as filler.
+**The revise verbs, first use, 2026-11-11 (agent-run, from the unmerged branch).** Run
+on two earlier researched plans whose trees are not published: `proto answer` twice,
+`proto topic add` once, and `proto research` on the added topic, on an existing topic
+and on a topic whose first research failed. All landed green.
+
+- An answered question renders as the question and the answer run together in one
+  constraint bullet. It reads badly.
+- An answer that bore on one topic got no hint which topic. One vote for open question 2.
+- **`topic add` and `research` left *Where to start* unchanged.** After the purpose
+  changed and a topic was added, the steps were the same. That needs a ruling.
+- A failed research call rendered a truncated fragment of usage JSON as its reason and
+  kept no transcript. Fixed since by #56 (proto-pilot@434c498, proto-pilot@7175d96).
 
 ## Phase 2 — Revise a plan after it is made
 
@@ -236,7 +246,7 @@ topic file is byte-identical. With a scripted research backend,
 `proto research SLUG` changes that topic's file, `sources.md` and `PLAN.md` and
 nothing else.
 
-**Open questions for Jeston**
+**Open questions for the maintainer**
 
 1. `proto answer` and `proto topic` and `proto research` as top-level verbs, or
    one group (`proto revise …`)? **Ruled 2026-11-11: top-level.** Each
@@ -333,7 +343,7 @@ Tasks:
 - [ ] The approval record, written by a verb that calls no model and lands
       through `_land`; a test that a plan changed after approval exports a brief
       saying so
-- [ ] Run the real readers, and record what happened here: Jeston reads a
+- [ ] Run the real readers, and record what happened here: the maintainer reads a
       `BRIEF.md` from a Phase 1 plan and says whether he could approve from it
       alone (~operator); the approved brief is handed to a coding agent in an
       empty directory, and what it does first is read (~operator)
@@ -342,7 +352,7 @@ Tasks:
 --brief` on a red plan exits 1 and writes nothing; and the two operator runs
 are recorded with what each reader got wrong.
 
-**Open questions for Jeston**
+**Open questions for the maintainer**
 
 1. Does approving need its own verb (`proto approve`), or is it a flag on
    `proto export --brief`? A verb keeps "I read it" apart from "I made a file".
@@ -401,7 +411,7 @@ check; a plan with `--broke` recorded re-renders with the finding marked and
 exits 0 if its structure holds; and the operator's one real probe is in the
 *Dogfood record*.
 
-**Open questions for Jeston**
+**Open questions for the maintainer**
 
 1. One probe per plan, or one per first step? **Ruled 2026-11-11: one open
    probe at a time.** One keeps it a decision; several make a
@@ -415,7 +425,7 @@ exits 0 if its structure holds; and the operator's one real probe is in the
 
 ## Phase 5 — Research stays on the subscription
 
-**Ruled by Jeston, 2026-11-11:** no API credit is bought. Research is done from
+**Decided 2026-11-11:** no API credit is bought. Research is done from
 subscription usage, which is the `claude-code` backend, and the API backend's
 research is not built or measured.
 
@@ -445,7 +455,7 @@ Tasks:
 **Done is checked by:** `proto plan --backend api` without `--no-research` says
 in one sentence which backend researches.
 
-**Open questions for Jeston**
+**Open questions for the maintainer**
 
 1. A less generic baseline is more code that no real plan uses. Is the offline
    run a demo worth improving, or only the test suite's fixture?

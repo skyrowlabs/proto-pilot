@@ -55,56 +55,10 @@ is the last commit that holds it.
   here that is not a commit.
 - ~~**No `CONTRIBUTING.md`, issue templates, `dependabot.yml` or `CODEOWNERS`.**~~
   All four arrived with the skeletor `governed` tier on 2026-09-01. They are
-  the scaffold's generic wording and have not been read against this project;
-  do that before the visibility flip, not after.
+  the scaffold's generic wording; read against this project on 2026-11-24 and
+  kept as they are.
 
 ## Open — found in a neighbour, to report not fix
-
-- **proto.pilot's footprint in skyrow-workspace, so the next session does not
-  guess at it.** Reporting the pivot, I flagged `strategy/seams/gpu-platform.md`
-  and `strategy/seams/model-hosting-handoff.md` as possibly leaning on the
-  hosted-tier framing. **Neither mentions proto.pilot at all** — `grep -ci proto`
-  returns 0 for both. The framing was in `strategy/research.md` R1 and in the
-  brief, both since amended by them.
-
-  I reasoned from which docs *ought* to own that framing instead of grepping a
-  sibling checkout that was right there, having already grepped a different
-  sibling twice the same day. The tell is in the wording I used — "worth knowing
-  *if* the seam doc leans on it anywhere" is the sentence you write instead of
-  checking.
-
-  **That list was wrong too, and both of us got it wrong differently.** I
-  scoped my grep to `strategy/`; two files sit above it, and one is
-  `workspace.md` — which *is* the workspace CLAUDE.md, reached through the
-  symlink at the workspace root's `CLAUDE.md`, carrying seven mentions including the
-  branch rule about this repo. **A `strategy/`-scoped grep is structurally blind
-  to the guide that governs the workspace.** Theirs used `grep -i proto`, which
-  matches `prototype`, so it carried three files that never mention us.
-
-  So I recorded the matcher-blindness lesson in this file and committed the same
-  error inside the hour — not by failing to grep this time, but by *choosing a
-  scope* and then reading the result as the whole answer. The blindness moved
-  from the pattern to the path, and nothing in the output said so.
-
-  The settled list, verified here with `grep -rn -E 'proto\.pilot|proto-pilot|`proto`'`
-  over the whole repo — nine documents, plus two neither of us had:
-
-  | hits | file |
-  | ---- | ---- |
-  | 20 | `strategy/research.md` — **more than the brief**; R1 is the real blast radius |
-  | 16 | `strategy/projects/proto-pilot.md` |
-  | 7 | `workspace.md` (the workspace CLAUDE.md) |
-  | 3 | `strategy/naming.md` |
-  | 2 | `strategy/portfolio.md`, `status.md` |
-  | 1 | `strategy/{sequencing,README,map}.md`, `scripts/refresh-status.py`, `project-diagram.drawio` |
-
-  **Not the seams** — `grep -ci proto` returns 0 for both. Relative paths into a
-  sibling are prose only, never a markdown link, per the trap above.
-
-  Their R1 observation is the one worth carrying, and it is recorded in
-  [sketches-not-scaffolds](ideas/sketches-not-scaffolds.md): tabling the
-  hosted page **detaches** the service ambition rather than killing it, so R1
-  can no longer assume proto.pilot is skyrow.ai's front door.
 
 - **`check_doc_tables.py` was green having looked at 4 documents out of 24, and
   I had seen the reason and called it harmless.** `_DOC_PATH` was
@@ -477,7 +431,7 @@ is the last commit that holds it.
 
 - **A relative link to a sibling repo resolves on your machine and nowhere
   else.** Every skyrow.labs repo is a sibling checkout under one root, so
-  `../skeletor` and `../../skyrow-workspace/...` are valid locally and broken
+  `../skeletor` and `../../<another repo>/...` are valid locally and broken
   for CI, which clones one repository, and for anyone who clones this one. It
   cost three red CI runs behind a green `./pp check pre-push`.
 
@@ -512,11 +466,9 @@ is the last commit that holds it.
   public front door and the corpus-from-strangers thesis.
 
 - **Make Claude optional — a local-model backend.** Captured 2026-08-28. Run Qwen
-  (and whatever else is worth trying) on our own breeze.brain node and let `proto`
+  (and whatever else is worth trying) on a self-hosted GPU and let `proto`
   drive it, so the pipeline is not bound to one vendor and a generation can cost
-  electricity instead of API credit. This is the same internal-GPU-as-cost-play
-  argument as the gpu-platform seam (`skyrow-workspace/strategy/seams/gpu-platform.md`,
-  a sibling checkout), applied to proto.pilot instead of jam.sense.
+  electricity instead of API credit.
 
   **Its best argument was tabled with the hosted page and the idea got stronger
   anyway.** This used to be justified as what would make a free public tier
@@ -549,8 +501,8 @@ is the last commit that holds it.
   the shape, port the interface.
 
   This is the engineering half. The research half — which open model, fine-tuned on
-  what corpus, at what cost crossover, aimed at a public skyrow.ai — is
-  R1 in the research queue (`skyrow-workspace/strategy/research.md`).
+  what corpus, at what cost crossover, aimed at a public hosted service — is
+  tracked outside this repo.
 
   Expectation-setting: each plan pass reads the plan the passes before it built, so
   context grows and is quality-sensitive. Treat the first local backend as a way to
@@ -856,9 +808,9 @@ is the last commit that holds it.
   badge would have rendered empty. Four badges added to the README.
 
   `develop` cut at the same time, mirroring what sky.boss did the day *it* went
-  public — see [Branches in `CLAUDE.md`](../CLAUDE.md). The workspace table in
-  `../skyrow-workspace` still lists proto.pilot as neither public nor on
-  `develop`; that is a separate repo and a separate commit.
+  public — see [Branches in `CLAUDE.md`](../CLAUDE.md). The company's workspace table
+  still lists proto.pilot as neither public nor on `develop`; that is a separate
+  repo and a separate commit.
 
 - **2026-08-30 — the README's stale Status section is fixed.** It had claimed the
   `passes/` prompts were never run live, and omitted Pillow, the browser stage

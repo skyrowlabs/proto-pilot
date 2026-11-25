@@ -238,6 +238,12 @@ push and a push earns everything.
 on a *ready* PR re-runs everything that PR earns; iterating in draft pays once, when the work
 is actually done.
 
+**`./pp pr land` is the end of that loop as one command**: `check pre-push`, push, the
+pull request opened as a draft (or found) and marked ready, its checks waited for on the head
+commit, and the pinned `gh pr merge <n> --merge --match-head-commit <sha>` printed. It stops
+there, because a merge is a person's call; `--merge` makes that call on the command line, and
+then watches the base branch's push runs on the merge commit too.
+
 ### 9. Docs Are Part of the Change, Not a Follow-Up
 
 Decide in planning which docs a change will invalidate, and update them in the same PR. A
@@ -416,6 +422,7 @@ Load on-demand only. Full mapping in `.github/DOCS_INDEX.md`.
 | The design argument        | `docs/ARCHITECTURE.md`           |
 | Live parking lot           | `docs/NOTES.md`                  |
 | Captured ideas (not scheduled) | `docs/ideas/README.md`       |
+| Worked examples (real runs)    | `docs/examples/README.md`    |
 | Reports (anchored to releases) | `docs/reports/README.md`     |
 
 <!-- Add a row per doc as it is written. `pp check docs` fails on a doc

@@ -13,14 +13,14 @@ summary: Delete everything that generates, runs or verifies an app, both front e
 # Remove Prototyping
 
 > **Status**: ✅ Complete — 2026-11-11
-> **Priority**: High — Jeston's ruling of 2026-11-11, and [living-plans](../../TODO/living-plans.md) waits on it
+> **Priority**: High — the decision of 2026-11-11, and [living-plans](../../TODO/living-plans.md) waits on it
 > **Updated**: 2026-11-11
 
 ## Problem
 
 Planning has been the product since 2026-11-06, and
 [plans-first](../../ideas/plans-first.md) decision 2 kept prototyping "tabled, not
-deleted". On 2026-11-11 Jeston ruled further: **remove the physical prototyping
+deleted". On 2026-11-11 it was decided further: **remove the physical prototyping
 layer outright and feature the written plan.** Decision 2 is superseded by this
 plan.
 
@@ -403,7 +403,7 @@ an agent cannot take. They are listed so the PR body can carry them.
    is not edited here. Also worth reporting: the docs lifecycle has no state for
    a plan that was dropped rather than finished.
 3. **Tell the workspace its two copies are stale.** The proto.pilot row in
-   `skyrow-workspace/workspace.md` ("its Dockerised prototypes are tabled but
+   the company workspace guide ("its Dockerised prototypes are tabled but
    still run") and the product copy in `skyrowlabs.com/README.md`. Two other
    repos, two other changes.
 

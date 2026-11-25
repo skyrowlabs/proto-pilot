@@ -23,6 +23,8 @@ class Job:
     id: str
     idea: str
     direction: str = ""
+    #: The person's brief beside the idea, as plain data: `plan.model.Brief` validates it.
+    brief: dict = field(default_factory=dict)
     status: str = "pending"  # pending | running | done | failed
     lines: list[str] = field(default_factory=list)
     #: The structured half of the transcript, **beside `lines` and never
@@ -57,6 +59,7 @@ class Job:
             "id": self.id,
             "idea": self.idea,
             "direction": self.direction,
+            "brief": dict(self.brief),
             "status": self.status,
             "lines": list(self.lines),
             "events": list(self.events),
@@ -164,8 +167,8 @@ class JobStore:
         self._jobs: dict[str, Job] = {}
         self._lock = threading.Lock()
 
-    def create(self, idea: str, direction: str = "") -> Job:
-        job = Job(id=uuid.uuid4().hex[:12], idea=idea, direction=direction)
+    def create(self, idea: str, direction: str = "", brief: dict | None = None) -> Job:
+        job = Job(id=uuid.uuid4().hex[:12], idea=idea, direction=direction, brief=dict(brief or {}))
         with self._lock:
             self._jobs[job.id] = job
         return job
