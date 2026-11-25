@@ -154,7 +154,8 @@ and on a topic whose first research failed. All landed green.
   constraint bullet. It reads badly.
 - An answer that bore on one topic got no hint which topic. One vote for open question 2.
 - **`topic add` and `research` left *Where to start* unchanged.** After the purpose
-  changed and a topic was added, the steps were the same. That needs a ruling.
+  changed and a topic was added, the steps were the same. Decided 2026-11-25 that they
+  should offer a refreshed one: Phase 2's open question 4.
 - A failed research call rendered a truncated fragment of usage JSON as its reason and
   kept no transcript. Fixed since by #56 (proto-pilot@434c498, proto-pilot@7175d96).
 
@@ -257,6 +258,9 @@ nothing else.
    first needs a model call to judge.
 3. Does a dropped topic's dream get set aside (proposed above) or dropped?
    **Ruled 2026-11-11: set aside, with the reason.**
+4. Should `topic add` and `research` offer a refreshed *Where to start*? Both leave
+   the steps as they were, so a plan whose purpose moved keeps steps for the old one.
+   **Decided 2026-11-25: yes.** Not built yet.
 
 **Built 2026-11-11, and where the code differs from the sketch.** Each of these was
 a choice the sketch did not make or the code made for it. They stand until ruled
