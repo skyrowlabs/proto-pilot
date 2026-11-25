@@ -184,7 +184,7 @@ Tabling the hosted service does not throw away everything in that doc:
 - **The automatic oracle was always the rare part**, and it belongs to the
   pipeline, not the service. It gets better in the terminal.
 - **Tier 3, training a model on the corpus, is unchanged and still not this
-  repo's job** — it belongs to a separate model project.
+  repo's job** — model training is out of scope here.
 - **What is genuinely given up** is the distribution of *real* intent: which
   ideas strangers actually want. That is one column of the row, and it is the
   column you can buy last.
@@ -194,11 +194,8 @@ Tabling the hosted service does not throw away everything in that doc:
   as the vehicle. Tabling the hosted page does not settle that: **a service could
   be built on the same models without being `proto`.** What it settles is that
   the question can no longer assume proto.pilot is the front door. Read `docs/ideas/hosted.md`'s "Where it would live" section
-  with that in mind — its conclusion (marketing page in a website repo, service
+  with that in mind — its conclusion (marketing page on a static site, service
   as a deployment of this repo) is the half that is now withdrawn.
-
-  (Raised by the owners of that question, who flagged the tension in place
-  rather than resolving it.)
 
 ## Open questions
 

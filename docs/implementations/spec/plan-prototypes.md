@@ -19,7 +19,7 @@ summary: Add `proto plan`, which turns an idea into a researched, connected, org
 ## Problem
 
 `proto new` answers one question: *what would this look like running?* Some ideas
-cannot be tested that way. "Build a renewable GPU facility" or "start a community
+cannot be tested that way. "Open a neighbourhood repair café" or "start a community
 tool library" has no useful thirty-second spec, because the unknowns are in the
 territory around the idea: what the deeper topics are, how they depend on each
 other, what could sink it, and where to begin.

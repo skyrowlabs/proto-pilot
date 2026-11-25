@@ -466,10 +466,9 @@ is the last commit that holds it.
   public front door and the corpus-from-strangers thesis.
 
 - **Make Claude optional — a local-model backend.** Captured 2026-08-28. Run Qwen
-  (and whatever else is worth trying) on our own GPU node and let `proto`
+  (and whatever else is worth trying) on a self-hosted GPU and let `proto`
   drive it, so the pipeline is not bound to one vendor and a generation can cost
-  electricity instead of API credit. This is the same internal-GPU-as-cost-play
-  argument the company makes for its own GPU platform, applied to proto.pilot.
+  electricity instead of API credit.
 
   **Its best argument was tabled with the hosted page and the idea got stronger
   anyway.** This used to be justified as what would make a free public tier

@@ -91,9 +91,9 @@ and no code.
       knows well enough to catch a wrong finding (~operator)
 - [ ] For each run, record under *Dogfood record* below: wall time, topics
       researched / failed / nothing cited, and the operator's read in five
-      lines — the topic he would not have thought of, the finding that was
-      wrong or empty, the open question he wanted to answer and could not, what
-      he did next with the plan, and what he wished it had handed him
+      lines — the topic they would not have thought of, the finding that was
+      wrong or empty, the open question they wanted to answer and could not, what
+      they did next with the plan, and what they wished it had handed him
       (~operator)
 - [ ] Compare each plan to what the project's own docs already say, after the
       read is written, not before (~operator)
@@ -133,8 +133,7 @@ questions and the outline review were skipped. The tree is kept outside this rep
 a local, unpublished checkout, transcripts included; nothing is committed here.
 
 - Command: the idea plus `--goal "create a business plan for opening the restaurant"`,
-  `--for`, four `--must` (lunch and dinner hours, online ordering only, 100% takeout,
-  the restaurant's name), `--depth standard --backend claude-code -y`. No `--horizon`, no `--not`.
+  `--for`, four `--must` constraints (hours, ordering, service model, name), `--depth standard --backend claude-code -y`. No `--horizon`, no `--not`.
 - Wall time: not measured end to end; research took about 11 minutes, 102–123 s a topic.
 - Topics: 6 researched, 0 failed, 0 with nothing cited; 21 sources, 8 fetches unusable; green, exit 0.
 - Agent's observations, which are not the operator's read: the goal asked for a business

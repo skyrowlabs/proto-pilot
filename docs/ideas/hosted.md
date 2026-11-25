@@ -113,7 +113,7 @@ bump. The actual control is a hard daily spend ceiling on the funding account,
 set so that the worst case is a page that says "come back tomorrow."
 
 There is a third lever that removes the bill rather than capping it: **run the
-model ourselves.** A local-model backend on our own GPU node — Qwen or
+model ourselves.** A local-model backend on a self-hosted GPU — Qwen or
 whatever else measures up — turns a generation into electricity instead of API
 credit, which is the only version of this where "free and unmetered" is
 honest at any volume. It is tracked in [NOTES](../NOTES.md) as its own idea
@@ -171,8 +171,8 @@ should not be.
    whose output is a weight update is not, at this stage.
 3. **Training a model on the corpus.** The long-term thesis, and the reason for
    collecting at all. **This work does not land in this repo.** Model creation —
-   datasets, fine-tuning, eval, adapters — belongs to a separate model project,
-   and hosting the result to a separate hosting one.
+   datasets, fine-tuning, eval, adapters — and hosting the result are out of
+   scope here.
    proto.pilot's role in that chain is *producer of a dataset* and, later,
    *consumer of an endpoint* through the existing `LLM` Protocol — which is
    already a one-method interface with three backends, so a fourth is not an
@@ -184,11 +184,10 @@ operator can generate alone. That is the actual argument for going public.
 
 ## Where it would live
 
-A separate website repo, named for the domain it serves, is the natural home
-for the landing page. But the service is a stateful container orchestrator, not a
+A static website is the natural home for the landing page. But the service is a stateful container orchestrator, not a
 static site, and `skyrowlabs.com` has no build step by design.
 
-So: the marketing page in that website repo, and the service as **a deployment of
+So: the marketing page on a static site, and the service as **a deployment of
 this repo**. No service code in a website repo, and no new repo — a hosted
 proto.pilot is proto.pilot with a different front door.
 
