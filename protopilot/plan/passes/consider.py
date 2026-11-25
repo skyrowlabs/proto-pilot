@@ -60,7 +60,9 @@ def schema(plan: Plan, only: str = "") -> dict:
 
 def build(plan: Plan, only: str = "") -> tuple[str, str]:
     connections = [f"- {e.from_topic} {e.kind} {e.to_topic}" for e in plan.edges]
-    blocks = [scope_block(plan), topics_block(plan.topics), findings_block(plan)]
+    # Narrowed, the others' notes are shown, so this topic does not repeat a risk they list.
+    shown = topics_block(plan.topics, *FIELDS) if only else topics_block(plan.topics)
+    blocks = [scope_block(plan), shown, findings_block(plan)]
     links = ["## How they connect", "\n".join(connections) or "No links."]
     return SYSTEM, "\n\n".join(
         [*(block for block in blocks if block), *links, *([ONLY.format(slug=only)] if only else [])]

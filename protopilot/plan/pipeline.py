@@ -37,6 +37,8 @@ from typing import TypeVar
 
 from protopilot import registry
 from protopilot.llm import (
+    API_RESEARCH,
+    API_RESEARCH_ONE,
     LLM,
     LLMError,
     OfflineLLM,
@@ -272,10 +274,16 @@ def _asked(job, plan: Plan, llm, tree: Path, topic: Topic, number: int = 1) -> t
         transcript, data = got.transcript, got.data
     else:
         transcript, data = stored, research_result(stored, label)
-    fault = misshapen(research.schema(plan), data)
-    if fault:
-        raise PlanPassError(f"pass {label!r} returned output that cannot be used: {fault}")
-    after, record = research.apply(plan, topic.slug, data, ledger.fetches(transcript))
+    try:
+        fault = misshapen(research.schema(plan), data)
+        if fault:
+            raise PlanPassError(f"pass {label!r} returned output that cannot be used: {fault}")
+        after, record = research.apply(plan, topic.slug, data, ledger.fetches(transcript))
+    except (PlanPassError, ValueError) as exc:
+        if stored is not None:
+            raise
+        kept = ledger.write_refused(tree, topic.slug, transcript)
+        raise ResearchFailed(str(exc), transcript, retry=False, kept=kept) from exc
     name = ledger.transcript_name(topic.slug, number)
     if stored is None:
         ledger.write_transcript(tree, topic.slug, transcript, number)
@@ -833,6 +841,14 @@ def _topic(plan: Plan, slug: str) -> Topic:
     raise PlanRefused(f"this plan has no topic {slug!r}; it holds: {', '.join(t.slug for t in plan.topics)}")
 
 
+def _refuse_twin(plan: Plan, title: str, slug: str = "") -> None:
+    """Refuse a title another topic already has, whatever its capitals."""
+    same = baseline.clean(title).casefold()
+    twin = next((t for t in plan.topics if t.slug != slug and t.title.casefold() == same), None)
+    if twin is not None:
+        raise PlanRefused(f"Nothing was changed: the topic {twin.slug} is already called {twin.title!r}.")
+
+
 def rename_topic(job, tree: Path, slug: str, title: str) -> verify.PlanVerdict:
     """A topic's new title. Calls no model; the slug is its identity, so its file, links, steps and research stay."""
     tree = Path(tree)
@@ -840,11 +856,7 @@ def rename_topic(job, tree: Path, slug: str, title: str) -> verify.PlanVerdict:
     plan = _held(tree, REVISE_NEEDS)
     was = _topic(plan, slug).title
     job.event("plan", passes=[RENDER])
-    twin = next(
-        (t for t in plan.topics if t.slug != slug and t.title.casefold() == baseline.clean(title).casefold()), None
-    )
-    if twin is not None:
-        raise PlanRefused(f"Nothing was changed: the topic {twin.slug} is already called {twin.title!r}.")
+    _refuse_twin(plan, title, slug)
     try:
         renamed = outline.rename(plan, slug, title)
     except ValueError as exc:
@@ -881,7 +893,9 @@ def drop_topic(job, tree: Path, slug: str, why: str, backend: Callable[[], LLM])
         job.log("  no step is left to begin on, so `start` runs again")
         try:
             llm = backend()
-            checked = repaired(job, _model_pass(job, start, after, llm, names), llm, plan, frozenset({slug}))
+            started = _model_pass(job, start, after, llm, names)
+            # `start` wrote every step again, so the links stay settled and no step does.
+            checked = repaired(job, started, llm, after.revised(steps=[]), frozenset({slug}))
         except (LLMError, PlanPassError) as exc:
             raise PlanRefused(f"{slug} was not dropped, and nothing was changed: {exc}") from exc
     else:
@@ -898,6 +912,7 @@ def add_topic(job, tree: Path, title: str, why: str, llm: LLM) -> verify.PlanVer
     tree = Path(tree)
     job.project_dir = str(tree)
     plan = _held(tree, REVISE_NEEDS)
+    _refuse_twin(plan, title)
     try:
         grown, note = revising.added(plan, title, why)
     except ValueError as exc:
@@ -959,7 +974,7 @@ def _researched_again(
     _research_said(
         job, after, after.research_of(topic.slug) or record, left if replayed else f"{time.monotonic() - started:.0f}s"
     )
-    return after, [f"{ledger.RESEARCH_DIR}/{record.transcript}"]
+    return after, [] if replayed else [f"{ledger.RESEARCH_DIR}/{record.transcript}"]
 
 
 #: Said when a try stops after its call. The conditions are `_research_try`'s.
@@ -990,6 +1005,7 @@ def research_topic(job, tree: Path, slug: str, llm: LLM, deeper: bool = False) -
     plan = _held(tree, REVISE_NEEDS)
     topic = _topic(plan, slug)
     refusal = "research does not run offline" if llm.offline else research_refusal(llm)
+    refusal = API_RESEARCH_ONE if refusal == API_RESEARCH else refusal
     if refusal:
         raise PlanRefused(f"{slug} was not researched, and nothing was changed: {refusal}")
     further = research.deeper(plan) if deeper else None
@@ -1010,13 +1026,18 @@ def research_topic(job, tree: Path, slug: str, llm: LLM, deeper: bool = False) -
         if replaying:
             ledger.forget_pending(tree, slug)  # or every rerun would replay it, and fail the same way
         left = UNREPLAYABLE if replaying else ""
+        if isinstance(exc, ResearchFailed) and exc.kept:
+            left = f" Its stream is kept at {exc.kept}.{left}"
         raise PlanRefused(f"{slug} was not researched, and nothing was changed: {_short(exc)}.{left}") from exc
     try:
         for module in (connect, consider):
             after = _fitted(job, module, after, llm, names, slug)
     except (LLMError, PlanPassError, ValueError) as exc:
         raise PlanRefused(f"{slug} was not researched, and nothing was changed: {_short(exc)}.{KEPT}") from exc
-    verdict = _land(job, tree, plan, repaired(job, after, llm, plan, frozenset({slug})), names)
+    try:
+        verdict = _land(job, tree, plan, repaired(job, after, llm, plan, frozenset({slug})), names)
+    except PlanRefused as exc:
+        raise PlanRefused(f"{exc}{KEPT}") from exc
     ledger.forget_pending(tree, slug)
     if verdict.ok:
         again = " again, and its earlier transcript stays beside the new one" if number > 1 else ""

@@ -66,6 +66,12 @@ it, and steps only as those links require.
 """
 
 
+RESTARTED_RULE = """\
+The steps of this plan were just made again. Every link is settled: keep them all, word
+for word. No step is settled: reorder the steps, or add the steps they are waiting on.
+"""
+
+
 def fixable(result: verify.PlanVerdict) -> list[verify.CheckResult]:
     return [check for check in result.failed if check.name in FIXES]
 
@@ -76,6 +82,7 @@ def failure(
     """What `build` is told: the failing checks repair can reach, what is settled, and why its last try was thrown away."""
     text = "\n\n".join(check.report() for check in fixable(result))
     rule = TOUCHED_RULE.format(topics=", ".join(sorted(touched))) if touched else SETTLED_RULE
+    rule = RESTARTED_RULE if held is not None and not held.steps else rule
     text = f"{text}\n\n{rule}" if held else text
     return f"{text}\n\nYour last repair was thrown away: {rejection}." if rejection else text
 

@@ -294,11 +294,14 @@ def plan_command(
         sys.exit(1)  # the tree is handed back with a RUNBOOK, and the exit code says it is red
 
 
-def _refuse_unresearchable(llm, researching: bool) -> None:
+def _refuse_unresearchable(llm, researching: bool, one_topic: bool = False) -> None:
     """A backend that cannot research is refused before any call, rather than billed for a stamped plan."""
+    from protopilot.llm import API_RESEARCH, API_RESEARCH_ONE
+
     # Only a backend that says it cannot is refused here. One with no research call at all is
     # labelled by the pipeline instead, and runs unresearched.
     refusal = str(getattr(llm, "research_refusal", "")) if researching and not llm.offline else ""
+    refusal = API_RESEARCH_ONE if one_topic and refusal == API_RESEARCH else refusal
     if refusal:
         raise click.ClickException(f"{refusal} No model was called.")
 
@@ -559,7 +562,7 @@ def research_command(slug: str, deeper: bool, directory: str, offline: bool, bac
             "`proto research` reads the web, and offline reads nothing. Choose a backend that researches. "
             "Nothing was changed."
         )
-    _refuse_unresearchable(llm, True)
+    _refuse_unresearchable(llm, True, one_topic=True)
     target = Path(directory).resolve()
     _revise_step(target, lambda j: pipeline.research_topic(j, target, slug, llm, deeper))
 

@@ -337,7 +337,7 @@ old slug. A title whose slug comes out different is a new topic, and the old ent
 notes, every link must touch it, and repair may mend only what touches it. Offline it
 is linked to nothing and has no risks, unknowns or decisions. Either way it is not
 researched until `proto research` is run on it. A plan holds at most eight topics, and a
-title whose slug a topic already has is refused.
+title another topic already has, whatever its capitals, or whose slug a topic already has, is refused.
 
 **Research replaces one topic's record and never merges.** The new transcript is written
 beside the old one under a numbered name, the topic's findings are replaced, and a source

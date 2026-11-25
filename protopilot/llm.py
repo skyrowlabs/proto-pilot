@@ -121,10 +121,12 @@ def _without_patterns(schema: Any) -> Any:
     return kept
 
 
-API_RESEARCH = (
-    "Research runs only on the claude-code backend so far: the api backend's web search has never "
-    "been run here. Pass --backend claude-code, or --no-research for a plan stamped Not researched."
+_API_RESEARCH_WHY = (
+    "Research runs only on the claude-code backend so far: the api backend's web search has never been run here."
 )
+API_RESEARCH = f"{_API_RESEARCH_WHY} Pass --backend claude-code, or --no-research for a plan stamped Not researched."
+#: Said by `proto research`, which has no `--no-research` to offer.
+API_RESEARCH_ONE = f"{_API_RESEARCH_WHY} Pass --backend claude-code."
 
 
 class ClaudeLLM:
