@@ -16,7 +16,7 @@ and the second person to need it writes it again.
 | `pp docs`   | Index regeneration, plan filing, report windows      |
 | `pp bug`    | Capture an out-of-scope defect without widening scope |
 | `pp task`   | Capture small work that is not a defect              |
-| `pp doctor` | Account facts no file can state (release PRs, required checks) |
+| `pp doctor` | Facts no file can state: release PRs, required checks, the hooks' interpreter, unfrozen releases |
 | `pp settings` | Set GitHub settings to `scripts/repo_settings.py`; previews unless `--apply` |
 | `pp inbox`  | Every open capture per lane, every job at its cap, and every Dependabot PR waiting on a person |
 | `pp pr`     | Land a branch: `check pre-push`, push, pull request, its checks, then the pinned merge command |
